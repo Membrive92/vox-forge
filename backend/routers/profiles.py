@@ -1,0 +1,105 @@
+"""CRUD de perfiles de voz."""
+from __future__ import annotations
+
+import uuid
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, UploadFile
+from pydub import AudioSegment
+
+from ..dependencies import get_profile_manager
+from ..exceptions import InvalidSampleError, ProfileNotFound
+from ..paths import VOICES_DIR
+from ..schemas import DeletedResponse, ProfileUpdate, VoiceProfile
+from ..services.profile_manager import ProfileManager
+
+router = APIRouter(prefix="/profiles", tags=["profiles"])
+
+_ALLOWED_SAMPLE_TYPES: set[str] = {
+    "audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3",
+    "audio/ogg", "audio/flac",
+}
+
+
+@router.get("", response_model=list[VoiceProfile], summary="Listar perfiles")
+async def list_profiles(
+    profiles: ProfileManager = Depends(get_profile_manager),
+) -> list[VoiceProfile]:
+    return profiles.list_all()
+
+
+@router.get("/{profile_id}", response_model=VoiceProfile, summary="Obtener perfil")
+async def get_profile(
+    profile_id: str,
+    profiles: ProfileManager = Depends(get_profile_manager),
+) -> VoiceProfile:
+    profile = profiles.get(profile_id)
+    if profile is None:
+        raise ProfileNotFound(f"Perfil no encontrado: {profile_id}")
+    return profile
+
+
+@router.post("", response_model=VoiceProfile, summary="Crear perfil")
+async def create_profile(
+    name: str = Form(...),
+    voice_id: str = Form(...),
+    language: str = Form(default="es"),
+    speed: int = Form(default=100),
+    pitch: int = Form(default=0),
+    volume: int = Form(default=80),
+    sample: Optional[UploadFile] = File(default=None),
+    profiles: ProfileManager = Depends(get_profile_manager),
+) -> VoiceProfile:
+    """Crea un perfil. La muestra de audio es opcional."""
+    sample_filename: Optional[str] = None
+    sample_duration: Optional[float] = None
+
+    if sample is not None:
+        if sample.content_type not in _ALLOWED_SAMPLE_TYPES:
+            raise InvalidSampleError(
+                f"Tipo no soportado: {sample.content_type}. "
+                "Válidos: wav, mp3, ogg, flac"
+            )
+
+        ext = Path(sample.filename or "").suffix or ".wav"
+        sample_filename = f"{str(uuid.uuid4())[:8]}{ext}"
+        sample_path = VOICES_DIR / sample_filename
+        content = await sample.read()
+        sample_path.write_bytes(content)
+
+        try:
+            audio = AudioSegment.from_file(str(sample_path))
+            sample_duration = round(len(audio) / 1000.0, 1)
+        except Exception:
+            sample_duration = None
+
+    profile = VoiceProfile(
+        name=name,
+        voice_id=voice_id,
+        language=language,
+        speed=speed,
+        pitch=pitch,
+        volume=volume,
+        sample_filename=sample_filename,
+        sample_duration=sample_duration,
+    )
+    return await profiles.create(profile)
+
+
+@router.patch("/{profile_id}", response_model=VoiceProfile, summary="Actualizar perfil")
+async def update_profile(
+    profile_id: str,
+    updates: ProfileUpdate,
+    profiles: ProfileManager = Depends(get_profile_manager),
+) -> VoiceProfile:
+    return await profiles.update(profile_id, updates)
+
+
+@router.delete("/{profile_id}", response_model=DeletedResponse, summary="Eliminar perfil")
+async def delete_profile(
+    profile_id: str,
+    profiles: ProfileManager = Depends(get_profile_manager),
+) -> DeletedResponse:
+    await profiles.delete(profile_id)
+    return DeletedResponse(status="deleted", id=profile_id)
