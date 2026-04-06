@@ -1,4 +1,4 @@
-"""Endpoints de catálogo de voces."""
+"""Voice catalog endpoints."""
 from __future__ import annotations
 
 

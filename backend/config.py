@@ -1,4 +1,4 @@
-"""Configuración de la aplicación vía variables de entorno."""
+"""Application configuration via environment variables."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,10 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Configuración central de VoxForge.
+    """Central VoxForge configuration.
 
-    Todas las opciones pueden sobreescribirse vía entorno con prefijo
-    ``VOXFORGE_``. Ejemplo: ``VOXFORGE_CORS_ORIGINS='["http://localhost:3000"]'``.
+    All options can be overridden via environment variables with the
+    ``VOXFORGE_`` prefix. Example: ``VOXFORGE_CORS_ORIGINS='["http://localhost:3000"]'``.
     """
 
     model_config = SettingsConfigDict(
@@ -20,21 +20,21 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Rutas
+    # Paths
     base_dir: Path = Path(__file__).parent.parent
     data_subdir: str = "data"
 
-    # CORS (en producción, restringir)
+    # CORS (restrict in production)
     cors_origins: list[str] = ["*"]
 
-    # Límites de síntesis
+    # Synthesis limits
     max_text_length: int = 500_000
-    chunk_max_chars: int = 3_000  # Máx caracteres por chunk para Edge-TTS
+    chunk_max_chars: int = 3_000  # Max chars per chunk for Edge-TTS
 
-    # Mantenimiento
+    # Maintenance
     cleanup_max_age_hours: int = 24
 
-    # Servicio
+    # Service
     log_level: str = "INFO"
 
 

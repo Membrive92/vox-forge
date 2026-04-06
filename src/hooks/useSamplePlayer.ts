@@ -1,4 +1,4 @@
-/** Reproduce muestras de audio almacenadas en el backend. */
+/** Play audio samples stored in the backend. */
 import { useCallback, useRef, useState } from "react";
 
 import { API_BASE } from "@/api/client";

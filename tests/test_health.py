@@ -1,4 +1,4 @@
-"""Health check: smoke test del wiring completo."""
+"""Health check: full wiring smoke test."""
 from __future__ import annotations
 
 

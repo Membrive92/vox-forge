@@ -1,4 +1,4 @@
-"""Catálogos estáticos: voces curadas y formatos de audio soportados."""
+"""Static catalogs: curated voices and supported audio formats."""
 from __future__ import annotations
 
 from typing import TypedDict
@@ -16,7 +16,7 @@ class FormatConfig(TypedDict):
     parameters: list[str]
 
 
-# Formatos de audio soportados con parámetros de conversión ffmpeg/pydub.
+# Supported audio formats with ffmpeg/pydub conversion parameters.
 AUDIO_FORMATS: dict[str, FormatConfig] = {
     "mp3":  {"format": "mp3",  "codec": "libmp3lame", "parameters": ["-q:a", "2"]},
     "wav":  {"format": "wav",  "codec": "pcm_s16le",  "parameters": []},
@@ -25,7 +25,7 @@ AUDIO_FORMATS: dict[str, FormatConfig] = {
 }
 
 
-# Subconjunto curado de voces Edge-TTS (descubrir el resto con /api/voices/all).
+# Curated Edge-TTS voice subset (discover more via /api/voices/all).
 SUPPORTED_VOICES: dict[str, dict[str, VoiceMeta]] = {
     "es": {
         "es-ES-AlvaroNeural":   {"name": "Álvaro",   "gender": "M", "accent": "España"},
@@ -47,5 +47,5 @@ SUPPORTED_VOICES: dict[str, dict[str, VoiceMeta]] = {
 
 
 def all_voice_ids() -> set[str]:
-    """Conjunto plano de IDs de voces soportadas."""
+    """Flat set of supported voice IDs."""
     return {vid for lang in SUPPORTED_VOICES.values() for vid in lang}

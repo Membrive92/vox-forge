@@ -1,4 +1,4 @@
-"""CRUD de perfiles de voz."""
+"""Voice profile CRUD endpoints."""
 from __future__ import annotations
 
 import uuid
@@ -22,25 +22,25 @@ _ALLOWED_SAMPLE_TYPES: set[str] = {
 }
 
 
-@router.get("", response_model=list[VoiceProfile], summary="Listar perfiles")
+@router.get("", response_model=list[VoiceProfile], summary="List profiles")
 async def list_profiles(
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> list[VoiceProfile]:
     return profiles.list_all()
 
 
-@router.get("/{profile_id}", response_model=VoiceProfile, summary="Obtener perfil")
+@router.get("/{profile_id}", response_model=VoiceProfile, summary="Get profile")
 async def get_profile(
     profile_id: str,
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> VoiceProfile:
     profile = profiles.get(profile_id)
     if profile is None:
-        raise ProfileNotFound(f"Perfil no encontrado: {profile_id}")
+        raise ProfileNotFound(f"Profile not found: {profile_id}")
     return profile
 
 
-@router.post("", response_model=VoiceProfile, summary="Crear perfil")
+@router.post("", response_model=VoiceProfile, summary="Create profile")
 async def create_profile(
     name: str = Form(...),
     voice_id: str = Form(...),
@@ -51,15 +51,15 @@ async def create_profile(
     sample: Optional[UploadFile] = File(default=None),
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> VoiceProfile:
-    """Crea un perfil. La muestra de audio es opcional."""
+    """Create a profile. Audio sample is optional."""
     sample_filename: Optional[str] = None
     sample_duration: Optional[float] = None
 
     if sample is not None:
         if sample.content_type not in _ALLOWED_SAMPLE_TYPES:
             raise InvalidSampleError(
-                f"Tipo no soportado: {sample.content_type}. "
-                "Válidos: wav, mp3, ogg, flac"
+                f"Unsupported type: {sample.content_type}. "
+                "Valid: wav, mp3, ogg, flac"
             )
 
         ext = Path(sample.filename or "").suffix or ".wav"
@@ -87,7 +87,7 @@ async def create_profile(
     return await profiles.create(profile)
 
 
-@router.patch("/{profile_id}", response_model=VoiceProfile, summary="Actualizar perfil")
+@router.patch("/{profile_id}", response_model=VoiceProfile, summary="Update profile")
 async def update_profile(
     profile_id: str,
     updates: ProfileUpdate,
@@ -96,7 +96,7 @@ async def update_profile(
     return await profiles.update(profile_id, updates)
 
 
-@router.delete("/{profile_id}", response_model=DeletedResponse, summary="Eliminar perfil")
+@router.delete("/{profile_id}", response_model=DeletedResponse, summary="Delete profile")
 async def delete_profile(
     profile_id: str,
     profiles: ProfileManager = Depends(get_profile_manager),

@@ -1,4 +1,4 @@
-"""Endpoint de síntesis de texto a voz."""
+"""Text-to-speech synthesis endpoint."""
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends
@@ -13,15 +13,15 @@ from ..utils import cleanup_old_files
 router = APIRouter(tags=["synthesis"])
 
 
-@router.post("/synthesize", summary="Sintetizar texto a audio")
+@router.post("/synthesize", summary="Synthesize text to audio")
 async def synthesize_text(
     request: SynthesisRequest,
     background_tasks: BackgroundTasks,
     engine: TTSEngine = Depends(get_tts_engine),
 ) -> FileResponse:
-    """Convierte texto a audio y devuelve el archivo generado.
+    """Convert text to audio and return the generated file.
 
-    Textos largos se dividen automáticamente en chunks y se concatenan.
+    Long texts are automatically split into chunks and concatenated.
     """
     output_path, chunk_count = await engine.synthesize(request)
 

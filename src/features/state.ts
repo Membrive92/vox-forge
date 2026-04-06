@@ -1,4 +1,4 @@
-/** Estado de síntesis compartido entre tabs. */
+/** Synthesis state shared between tabs. */
 
 import type { AudioFormat, Language, UploadedSample } from "@/types/domain";
 

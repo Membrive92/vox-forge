@@ -1,4 +1,4 @@
-"""Tests unitarios de servicios: ProfileManager y helpers de TTSEngine."""
+"""Unit tests for services: ProfileManager and TTSEngine helpers."""
 from __future__ import annotations
 
 import json
@@ -6,11 +6,11 @@ import json
 import pytest
 
 
-# --- ProfileManager: persistencia, lock, escritura atómica --------
+# --- ProfileManager: persistence, lock, atomic writes --------
 
 @pytest.fixture()
 def pm(_session_env):
-    """ProfileManager fresco con archivo temporal."""
+    """Fresh ProfileManager with temporary file."""
     from backend.services.profile_manager import ProfileManager
     from backend.paths import PROFILES_DIR
 
@@ -62,7 +62,7 @@ async def test_update_nonexistent_raises(pm) -> None:
 async def test_delete_removes_from_disk(pm) -> None:
     from backend.schemas import VoiceProfile
 
-    profile = VoiceProfile(name="Borrar", voice_id="es-ES-AlvaroNeural")
+    profile = VoiceProfile(name="ToDelete", voice_id="es-ES-AlvaroNeural")
     created = await pm.create(profile)
     await pm.delete(created.id)
 
@@ -101,14 +101,14 @@ async def test_attach_sample_replaces_old(pm, tmp_path) -> None:
 
 
 def test_load_existing_file(tmp_path) -> None:
-    """ProfileManager carga datos existentes en disco."""
+    """ProfileManager loads existing data from disk."""
     from backend.services.profile_manager import ProfileManager
 
     filepath = tmp_path / "profiles.json"
     data = {
         "abc": {
             "id": "abc",
-            "name": "Preexistente",
+            "name": "Preexisting",
             "voice_id": "es-ES-AlvaroNeural",
             "language": "es",
             "speed": 100,
@@ -125,7 +125,7 @@ def test_load_existing_file(tmp_path) -> None:
     pm = ProfileManager(filepath)
     assert pm.count == 1
     assert pm.get("abc") is not None
-    assert pm.get("abc").name == "Preexistente"
+    assert pm.get("abc").name == "Preexisting"
 
 
 def test_load_corrupt_file_recovers(tmp_path) -> None:
@@ -138,7 +138,7 @@ def test_load_corrupt_file_recovers(tmp_path) -> None:
     assert pm.count == 0
 
 
-# --- TTSEngine helpers: rate, pitch, volume strings --------
+# --- TTSEngine helpers: rate, pitch, volume strings ---
 
 def test_rate_string() -> None:
     from backend.services.tts_engine import _rate_str
@@ -164,7 +164,7 @@ def test_volume_string() -> None:
     assert _volume_str(50) == "-50%"
 
 
-# --- Catálogos --------
+# --- Catalogs ---
 
 def test_all_voice_ids() -> None:
     from backend.catalogs import all_voice_ids

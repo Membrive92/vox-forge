@@ -1,4 +1,4 @@
-/** Tipos de dominio compartidos en toda la app (camelCase). */
+/** Domain types shared across the app (camelCase). */
 
 export type Language = "es" | "en";
 export type Gender = "M" | "F";

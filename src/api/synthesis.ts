@@ -1,4 +1,4 @@
-/** Endpoint de síntesis TTS. */
+/** TTS synthesis endpoint. */
 
 import type { SynthesisParams } from "@/types/domain";
 

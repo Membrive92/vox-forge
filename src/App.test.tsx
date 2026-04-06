@@ -1,11 +1,11 @@
 /**
- * Tests de integración del flujo completo de la App.
+ * Integration tests for the full App flow.
  *
- * Cubren las interacciones de usuario end-to-end contra MSW:
- * - Navegación entre tabs
- * - Síntesis de audio
- * - CRUD de perfiles
- * - Cambio de idioma
+ * Cover end-to-end user interactions against MSW:
+ * - Tab navigation
+ * - Audio synthesis
+ * - Profile CRUD
+ * - Language switching
  */
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -22,46 +22,46 @@ function renderApp() {
   return { user };
 }
 
-describe("App — navegación", () => {
-  it("renderiza header y tab Sintetizar por defecto", () => {
+describe("App — navigation", () => {
+  it("renders header and Synth tab by default", () => {
     renderApp();
     expect(screen.getByText("VoxForge")).toBeInTheDocument();
-    // Textarea de síntesis visible
+    // Synthesis textarea visible (default locale is ES)
     expect(
       screen.getByPlaceholderText(/escribe o pega/i),
     ).toBeInTheDocument();
   });
 
-  it("navega al tab Perfiles y muestra estado vacío", async () => {
+  it("navigates to Profiles tab and shows empty state", async () => {
     const { user } = renderApp();
     await user.click(screen.getByText("Perfiles"));
     expect(screen.getByText(/no hay perfiles/i)).toBeInTheDocument();
   });
 
-  it("navega al tab Voces y muestra zona de upload", async () => {
+  it("navigates to Voices tab and shows upload zone", async () => {
     const { user } = renderApp();
     await user.click(screen.getByText("Voces"));
     expect(screen.getByText(/subir muestra de voz/i)).toBeInTheDocument();
   });
 });
 
-describe("App — síntesis de audio", () => {
-  it("botón Generar está desactivado sin texto", () => {
+describe("App — audio synthesis", () => {
+  it("Generate button is disabled without text", () => {
     renderApp();
     const btn = screen.getByText("Generar Audio");
     expect(btn).toBeDisabled();
   });
 
-  it("genera audio y muestra controles de reproducción", async () => {
+  it("generates audio and shows playback controls", async () => {
     const { user } = renderApp();
     const textarea = screen.getByPlaceholderText(/escribe o pega/i);
-    await user.type(textarea, "Hola mundo");
+    await user.type(textarea, "Hello world");
 
     const genBtn = screen.getByText("Generar Audio");
     expect(genBtn).toBeEnabled();
     await user.click(genBtn);
 
-    // Espera a que termine la síntesis (MSW responde al instante)
+    // Wait for synthesis to complete (MSW responds instantly)
     await waitFor(
       () => {
         expect(screen.getByText(/audio listo/i)).toBeInTheDocument();
@@ -71,60 +71,59 @@ describe("App — síntesis de audio", () => {
   });
 });
 
-describe("App — CRUD de perfiles", () => {
-  it("crea un perfil desde el tab Voces", async () => {
+describe("App — profile CRUD", () => {
+  it("creates a profile from the Voices tab", async () => {
     const { user } = renderApp();
     await user.click(screen.getByText("Voces"));
 
     const nameInput = screen.getByPlaceholderText(/ej:/i);
-    await user.type(nameInput, "Mi voz");
+    await user.type(nameInput, "My voice");
 
     const saveBtn = screen.getByText("Guardar perfil");
     await user.click(saveBtn);
 
-    // Toast de confirmación
+    // Confirmation toast
     await waitFor(() => {
       expect(screen.getByText(/perfil guardado/i)).toBeInTheDocument();
     });
 
-    // El perfil aparece en la lista
+    // Profile appears in the list
     await user.click(screen.getByText("Perfiles"));
     await waitFor(() => {
-      expect(screen.getByText("Mi voz")).toBeInTheDocument();
+      expect(screen.getByText("My voice")).toBeInTheDocument();
     });
   });
 
-  it("elimina un perfil", async () => {
+  it("deletes a profile", async () => {
     const { user } = renderApp();
 
-    // Crear primero
+    // Create first
     await user.click(screen.getByText("Voces"));
-    await user.type(screen.getByPlaceholderText(/ej:/i), "Borrable");
+    await user.type(screen.getByPlaceholderText(/ej:/i), "Deletable");
     await user.click(screen.getByText("Guardar perfil"));
     await waitFor(() => expect(screen.getByText(/perfil guardado/i)).toBeInTheDocument());
 
-    // Ir a Perfiles y eliminar
+    // Go to Profiles and delete
     await user.click(screen.getByText("Perfiles"));
-    await waitFor(() => expect(screen.getByText("Borrable")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Deletable")).toBeInTheDocument());
 
     const deleteBtn = screen.getByLabelText("Eliminar");
     await user.click(deleteBtn);
 
     await waitFor(() => {
-      expect(screen.queryByText("Borrable")).not.toBeInTheDocument();
+      expect(screen.queryByText("Deletable")).not.toBeInTheDocument();
     });
   });
 });
 
-describe("App — cambio de idioma", () => {
-  it("cambia la UI a inglés al pulsar el toggle", async () => {
+describe("App — language switch", () => {
+  it("switches UI to English when toggling", async () => {
     const { user } = renderApp();
 
-    // Buscar y pulsar el toggle de idioma
     const langBtn = screen.getByLabelText("Idioma");
     await user.click(langBtn);
 
-    // Ahora la UI debería estar en inglés
+    // UI should now be in English
     await waitFor(() => {
       expect(screen.getByText("EN")).toBeInTheDocument();
       expect(

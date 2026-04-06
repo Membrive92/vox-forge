@@ -1,4 +1,4 @@
-"""Instancias de servicios expuestas como dependencias de FastAPI."""
+"""Service instances exposed as FastAPI dependencies."""
 from __future__ import annotations
 
 from .paths import PROFILES_FILE

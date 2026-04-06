@@ -1,7 +1,7 @@
-"""Persistencia de perfiles de voz en JSON.
+"""Voice profile persistence in JSON.
 
-Acceso concurrente protegido con ``asyncio.Lock``. Escritura atómica:
-se escribe a un ``.tmp`` y luego ``os.replace``.
+Concurrent access protected with ``asyncio.Lock``. Atomic writes:
+data is written to a ``.tmp`` file then ``os.replace``d.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProfileManager:
-    """CRUD de perfiles de voz respaldado por un archivo JSON."""
+    """Voice profile CRUD backed by a JSON file."""
 
     def __init__(self, filepath: Path) -> None:
         self._filepath = filepath
@@ -28,7 +28,7 @@ class ProfileManager:
         self._lock = asyncio.Lock()
         self._load()
 
-    # -- persistencia interna -------------------------------------------------
+    # -- internal persistence --------------------------------------------------
 
     def _load(self) -> None:
         if not self._filepath.exists():
@@ -36,9 +36,9 @@ class ProfileManager:
         try:
             raw = json.loads(self._filepath.read_text(encoding="utf-8"))
             self._profiles = {k: VoiceProfile(**v) for k, v in raw.items()}
-            logger.info("Cargados %d perfiles de voz", len(self._profiles))
-        except Exception as exc:  # noqa: BLE001 - arranque resiliente
-            logger.error("Error cargando perfiles: %s", exc)
+            logger.info("Loaded %d voice profiles", len(self._profiles))
+        except Exception as exc:  # noqa: BLE001 - resilient startup
+            logger.error("Error loading profiles: %s", exc)
             self._profiles = {}
 
     def _write_atomic(self) -> None:
@@ -50,7 +50,7 @@ class ProfileManager:
         )
         os.replace(tmp, self._filepath)
 
-    # -- API pública ---------------------------------------------------------
+    # -- public API ------------------------------------------------------------
 
     @property
     def count(self) -> int:
@@ -66,30 +66,30 @@ class ProfileManager:
         async with self._lock:
             self._profiles[profile.id] = profile
             self._write_atomic()
-        logger.info("Perfil creado: %s (%s)", profile.name, profile.id)
+        logger.info("Profile created: %s (%s)", profile.name, profile.id)
         return profile
 
     async def update(self, profile_id: str, updates: ProfileUpdate) -> VoiceProfile:
         async with self._lock:
             profile = self._profiles.get(profile_id)
             if profile is None:
-                raise ProfileNotFound(f"Perfil no encontrado: {profile_id}")
+                raise ProfileNotFound(f"Profile not found: {profile_id}")
             for key, value in updates.model_dump(exclude_none=True).items():
                 setattr(profile, key, value)
             profile.updated_at = datetime.now().isoformat()
             self._write_atomic()
-        logger.info("Perfil actualizado: %s (%s)", profile.name, profile.id)
+        logger.info("Profile updated: %s (%s)", profile.name, profile.id)
         return profile
 
     async def delete(self, profile_id: str) -> None:
         async with self._lock:
             profile = self._profiles.pop(profile_id, None)
             if profile is None:
-                raise ProfileNotFound(f"Perfil no encontrado: {profile_id}")
+                raise ProfileNotFound(f"Profile not found: {profile_id}")
             if profile.sample_filename:
                 (VOICES_DIR / profile.sample_filename).unlink(missing_ok=True)
             self._write_atomic()
-        logger.info("Perfil eliminado: %s (%s)", profile.name, profile.id)
+        logger.info("Profile deleted: %s (%s)", profile.name, profile.id)
 
     async def attach_sample(
         self,
@@ -97,11 +97,11 @@ class ProfileManager:
         sample_filename: str,
         sample_duration: float | None,
     ) -> VoiceProfile:
-        """Asocia (o reemplaza) la muestra de audio de un perfil."""
+        """Attach (or replace) the audio sample of a profile."""
         async with self._lock:
             profile = self._profiles.get(profile_id)
             if profile is None:
-                raise ProfileNotFound(f"Perfil no encontrado: {profile_id}")
+                raise ProfileNotFound(f"Profile not found: {profile_id}")
             if profile.sample_filename:
                 (VOICES_DIR / profile.sample_filename).unlink(missing_ok=True)
             profile.sample_filename = sample_filename

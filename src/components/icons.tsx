@@ -1,4 +1,4 @@
-/** Set de iconos SVG inline. Sin dependencia externa. */
+/** Inline SVG icon set. No external dependencies. */
 
 const base = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const };
 const SIZE_MD = { width: 18, height: 18 };

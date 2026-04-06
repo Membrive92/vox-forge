@@ -1,4 +1,4 @@
-/** MSW request handlers que simulan el backend. */
+/** MSW request handlers that simulate the backend. */
 import { http, HttpResponse } from "msw";
 
 import type { ProfileDTO, SynthesisRequestDTO } from "@/api/types";
@@ -91,7 +91,7 @@ export const handlers = [
     return HttpResponse.json({ status: "deleted", id: params["id"] });
   }),
 
-  // Synthesis — devuelve un blob de audio falso
+  // Synthesis — returns a fake audio blob
   http.post("/api/synthesize", async ({ request }) => {
     const body = (await request.json()) as SynthesisRequestDTO;
     const fakeAudio = new Uint8Array([0xff, 0xfb, 0x90, 0x00]); // fake mp3 frame header

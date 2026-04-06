@@ -1,4 +1,4 @@
-"""Directorios runtime. Se crean al importar."""
+"""Runtime directories. Created on import."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,7 +15,7 @@ PROFILES_FILE: Path = PROFILES_DIR / "profiles.json"
 
 
 def ensure_dirs() -> None:
-    """Crea los directorios de datos si no existen."""
+    """Create data directories if they don't exist."""
     for d in (VOICES_DIR, PROFILES_DIR, OUTPUT_DIR, TEMP_DIR):
         d.mkdir(parents=True, exist_ok=True)
 

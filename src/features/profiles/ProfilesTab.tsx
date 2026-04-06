@@ -247,7 +247,7 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, samplePlayer, voiceP
         </div>
       ) : null}
 
-      {/* Preview de la voz base del perfil */}
+      {/* Preview the profile's base voice */}
       <button
         onClick={() => voicePreview.toggle(profile.voiceId, profile.lang)}
         style={{

@@ -1,4 +1,4 @@
-"""Endpoint de estado del servicio."""
+"""Service health check endpoint."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
@@ -13,7 +13,7 @@ router = APIRouter(tags=["health"])
 _VERSION = "1.0.0"
 
 
-@router.get("/health", response_model=HealthResponse, summary="Estado del servicio")
+@router.get("/health", response_model=HealthResponse, summary="Service status")
 async def health_check(
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> HealthResponse:

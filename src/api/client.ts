@@ -1,4 +1,4 @@
-/** Cliente HTTP centralizado. Manejo uniforme de errores. */
+/** Centralized HTTP client. Uniform error handling. */
 
 import type { ApiErrorBody } from "./types";
 

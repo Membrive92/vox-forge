@@ -1,267 +1,264 @@
-# VoxForge — Guía de Desarrollo
+# VoxForge — Development Guide
 
-Motor de síntesis de voz. Backend Python (FastAPI + Edge-TTS), frontend React.
+Voice synthesis engine. Python backend (FastAPI + Edge-TTS), React frontend.
 
-## Arquitectura actual
+## Current Architecture
 
 ```
-backend.py            → API FastAPI monolítica (619 líneas, a modularizar)
-voxforge-tts-app.jsx  → SPA React de un solo componente (a migrar a TS + módulos)
-data/                 → Almacenamiento runtime (voices, profiles, output, temp)
+backend/              -> Modular FastAPI package (routers, services, schemas)
+src/                  -> React + TypeScript SPA (components, hooks, features)
+data/                 -> Runtime storage (voices, profiles, output, temp)
 ```
 
-Contrato HTTP: backend expone snake_case (`voice_id`, `sample_filename`), frontend trabaja en camelCase. La normalización vive en `normalizeProfile()` del cliente API — mantener ese único punto de traducción.
+HTTP contract: backend exposes snake_case (`voice_id`, `sample_filename`), frontend works in camelCase. Normalization lives in `api/profiles.ts` — keep this as the single translation point.
 
-## Comandos
+## Commands
 
 ```bash
 # Backend
-uvicorn backend:app --reload --port 8000
+python -m uvicorn backend:app --reload --port 8000
 
-# Tests backend (a crear)
+# Backend tests
 pytest -xvs
 
-# Frontend (dentro del proyecto React)
-npm start
-npm run lint
+# Frontend
+npm run dev
 npm run typecheck
+npm test
 ```
 
 ---
 
-## Principios transversales
+## Cross-cutting Principles
 
-1. **Claridad sobre cleverness**. Código explícito > abstracciones prematuras. Tres líneas similares son mejor que una abstracción equivocada.
-2. **Fallar rápido y fuerte** en los límites del sistema (entrada de usuario, API externa). Confiar en código interno.
-3. **Una responsabilidad por módulo/función**. Si el nombre necesita "and", divídelo.
-4. **Sin muertos**: no dejar código comentado, imports sin uso, variables `_unused` como memoria histórica. `git` es la memoria.
-5. **No duplicar contratos**: el schema de un endpoint vive en un solo sitio (Pydantic) y se deriva hacia el cliente.
+1. **Clarity over cleverness**. Explicit code > premature abstractions. Three similar lines are better than a wrong abstraction.
+2. **Fail fast and loud** at system boundaries (user input, external API). Trust internal code.
+3. **One responsibility per module/function**. If the name needs "and", split it.
+4. **No dead code**: no commented-out code, unused imports, `_unused` variables as historical memory. `git` is the memory.
+5. **Don't duplicate contracts**: an endpoint's schema lives in one place (Pydantic) and derives toward the client.
 
 ---
 
 ## Python — Backend
 
-### Estructura objetivo (refactor de `backend.py`)
+### Target Structure
 
 ```
 backend/
 ├── __init__.py
-├── main.py              # app FastAPI, middlewares, routers
-├── config.py            # settings via pydantic-settings (BaseSettings)
-├── models/
-│   ├── synthesis.py     # SynthesisRequest
-│   └── profile.py       # VoiceProfile, ProfileUpdate
+├── main.py              # FastAPI app, middlewares, routers
+├── config.py            # Settings via pydantic-settings (BaseSettings)
+├── schemas.py           # Pydantic models (request, persistence, response)
+├── catalogs.py          # Curated voices + audio formats (TypedDict)
+├── exceptions.py        # Domain exceptions + global HTTP handler
+├── dependencies.py      # Injectable singletons via Depends()
+├── paths.py             # BASE_DIR, DATA_DIR, etc.
+├── utils.py             # Cleanup
 ├── services/
-│   ├── tts_engine.py    # TTSEngine
+│   ├── tts_engine.py    # TTSEngine with chunking
 │   └── profile_manager.py
-├── routers/
-│   ├── synthesis.py
-│   ├── profiles.py
-│   └── voices.py
-├── core/
-│   ├── paths.py         # BASE_DIR, DATA_DIR, etc.
-│   ├── voices_catalog.py
-│   └── audio_formats.py
-└── utils/
-    └── cleanup.py
+└── routers/
+    ├── synthesis.py
+    ├── profiles.py
+    ├── voices.py
+    └── health.py
 ```
 
-Objetivo: ningún archivo > 200 líneas, cada router < 100 líneas.
+Goal: no file > 200 lines, each router < 100 lines.
 
-### Tipado
+### Typing
 
-- **Type hints obligatorios** en toda función pública. Usar `from __future__ import annotations` en archivos nuevos.
-- Preferir tipos modernos: `list[str]`, `dict[str, int]`, `X | None` (Python 3.10+).
-- `Optional` solo si hace el intent más claro que `| None`.
-- Anotar también variables en scope de módulo si su tipo no es obvio.
-- Usar `TypedDict` / `Protocol` para contratos internos, no `dict[str, Any]`.
+- **Mandatory type hints** on all public functions. Use `from __future__ import annotations` in new files.
+- Prefer modern types: `list[str]`, `dict[str, int]`, `X | None` (Python 3.10+).
+- `Optional` only if it makes intent clearer than `| None`.
+- Annotate module-scope variables if their type isn't obvious.
+- Use `TypedDict` / `Protocol` for internal contracts, not `dict[str, Any]`.
 
-### Validación y modelos
+### Validation and Models
 
-- **Un modelo Pydantic por payload**. No reutilizar `SynthesisRequest` para cosas que no sean exactamente eso.
-- Validaciones de rango con `Field(ge=, le=)`, no con `if` manual.
-- Validadores personalizados con `@field_validator` (Pydantic v2).
-- Modelos de respuesta explícitos: usar `response_model=` en cada endpoint. Nunca devolver `dict` crudo de un endpoint público.
-- Separar modelos de entrada (`XxxCreate`, `XxxUpdate`) de modelos de persistencia (`Xxx`) y de respuesta (`XxxResponse`).
+- **One Pydantic model per payload**. Don't reuse `SynthesisRequest` for things that aren't exactly that.
+- Range validations with `Field(ge=, le=)`, not manual `if` checks.
+- Custom validators with `@field_validator` (Pydantic v2).
+- Explicit response models: use `response_model=` on every endpoint. Never return raw `dict` from a public endpoint.
+- Separate input models (`XxxCreate`, `XxxUpdate`) from persistence models (`Xxx`) and response models (`XxxResponse`).
 
-### Configuración
+### Configuration
 
-Sustituir constantes en el módulo por `Settings` con `pydantic-settings`:
+Use `Settings` with `pydantic-settings`:
 
 ```python
 class Settings(BaseSettings):
     base_dir: Path = Path(__file__).parent
     cors_origins: list[str] = ["http://localhost:3000"]
-    max_text_length: int = 50_000
+    max_text_length: int = 500_000
     cleanup_max_age_hours: int = 24
     model_config = SettingsConfigDict(env_file=".env", env_prefix="VOXFORGE_")
 ```
 
-Nada de `allow_origins=["*"]` en producción.
+No `allow_origins=["*"]` in production.
 
-### Errores
+### Errors
 
-- Lanzar `HTTPException` solo en la capa de routers. Los servicios lanzan excepciones de dominio propias (`ProfileNotFound`, `UnsupportedVoiceError`).
-- Traducir excepciones de dominio → HTTP en un `exception_handler` global.
-- Nunca `except Exception:` silencioso sin log + re-raise o respuesta específica.
-- Nada de `print`. Usar el `logger` del módulo con niveles correctos (`debug`/`info`/`warning`/`error`).
+- Raise `HTTPException` only in the router layer. Services raise their own domain exceptions (`ProfileNotFound`, `UnsupportedVoiceError`).
+- Translate domain exceptions -> HTTP in a global `exception_handler`.
+- Never silent `except Exception:` without log + re-raise or specific response.
+- No `print`. Use the module's `logger` with correct levels (`debug`/`info`/`warning`/`error`).
 
-### Async y I/O
+### Async and I/O
 
-- Endpoints `async def` solo si hacen I/O async de verdad. Si la función es CPU-bound (pydub/ffmpeg), usar `def` normal — FastAPI la ejecuta en un threadpool.
-- Operaciones de disco bloqueantes (`Path.read_text`, `write_bytes`) en handlers `async` deben ir a `asyncio.to_thread` si el archivo puede ser grande. Aceptable para configs pequeñas.
-- `edge-tts` es async nativo → mantener.
+- `async def` endpoints only if they do real async I/O. If the function is CPU-bound (pydub/ffmpeg), use plain `def` — FastAPI runs it in a threadpool.
+- Blocking disk operations (`Path.read_text`, `write_bytes`) in `async` handlers should go to `asyncio.to_thread` if the file may be large. Acceptable for small configs.
+- `edge-tts` is natively async -> keep it.
 
-### Persistencia
+### Persistence
 
-- El JSON store (`profiles.json`) es aceptable para MVP, pero:
-  - **Acceso concurrente no es seguro**. Añadir `asyncio.Lock` alrededor de `_save()` o migrar a SQLite con `aiosqlite`.
-  - El `_save()` actual no es atómico. Escribir a `*.tmp` y `os.replace()`.
-- No acceder a miembros `_privados` desde fuera de la clase (ya corregido con `attach_sample`). Romper esta regla pide tests que no tenemos.
+- The JSON store (`profiles.json`) is acceptable for MVP, but:
+  - **Concurrent access is not safe**. Use `asyncio.Lock` around `_save()` or migrate to SQLite with `aiosqlite`.
+  - `_save()` is not atomic. Write to `*.tmp` then `os.replace()`.
+- Don't access `_private` members from outside the class (already fixed with `attach_sample`).
 
 ### Testing
 
-- Usar `pytest` + `httpx.AsyncClient` con `ASGITransport` para tests de endpoints.
-- Fixtures para directorios `data/` temporales (`tmp_path`).
-- Cada endpoint: un test de happy path + un test de validación + un test de error.
-- Mock de `edge_tts.Communicate` con un fake que escribe un mp3 mínimo válido.
+- Use `pytest` + `httpx.AsyncClient` with `ASGITransport` for endpoint tests.
+- Fixtures for temporary `data/` directories (`tmp_path`).
+- Each endpoint: one happy path test + one validation test + one error test.
+- Mock `edge_tts.Communicate` with a fake that writes minimal valid mp3 bytes.
 
-### Estilo
+### Style
 
-- **Formatter**: `ruff format` (no black, no isort).
-- **Linter**: `ruff check` con regla set al menos `E,F,I,UP,B,SIM,RUF`.
-- **Type-check**: `mypy --strict` o `pyright` en modo strict.
-- Docstrings: estilo Google o NumPy, solo en funciones públicas y clases. No docstring obvio (`"""Devuelve self.x."""`).
-- Comentarios solo donde el *por qué* no es evidente. El *qué* lo dice el código.
+- **Formatter**: `ruff format` (not black, not isort).
+- **Linter**: `ruff check` with at least rule set `E,F,I,UP,B,SIM,RUF`.
+- **Type-check**: `mypy --strict` or `pyright` in strict mode.
+- Docstrings: Google or NumPy style, only on public functions and classes. No obvious docstrings (`"""Return self.x."""`).
+- Comments only where the *why* isn't evident. The *what* is in the code.
 
 ---
 
 ## TypeScript / React — Frontend
 
-### Migración JSX → TSX
-
-Objetivo inmediato: convertir `voxforge-tts-app.jsx` a TypeScript y trocearlo.
+### Structure
 
 ```
 src/
 ├── App.tsx
 ├── api/
 │   ├── client.ts          # fetch wrapper, API_BASE
-│   ├── types.ts           # tipos del contrato API (generados o escritos)
-│   └── profiles.ts, synthesis.ts, voices.ts
+│   ├── types.ts           # API contract types (generated or handwritten)
+│   └── profiles.ts, synthesis.ts
 ├── components/
 │   ├── Slider.tsx
 │   ├── WaveformVisualizer.tsx
-│   ├── AudioPlayer.tsx
-│   └── icons/index.tsx
+│   ├── Toast.tsx
+│   └── icons.tsx
 ├── features/
 │   ├── synth/SynthTab.tsx
 │   ├── voices/VoicesTab.tsx
 │   └── profiles/ProfilesTab.tsx
 ├── hooks/
 │   ├── useProfiles.ts
-│   └── useSynthesis.ts
+│   ├── useSynthesis.ts
+│   ├── useAudioPlayer.ts
+│   ├── useVoicePreview.ts
+│   └── useSamplePlayer.ts
 ├── i18n/
-│   ├── es.ts
-│   ├── en.ts
-│   └── index.ts
+│   ├── es.ts, en.ts, index.ts
 ├── constants/voices.ts
+├── theme/tokens.ts
 └── types/domain.ts
 ```
 
-Regla: ningún componente > 150 líneas, ningún archivo > 250.
+Rule: no component > 150 lines, no file > 250.
 
-### Tipado
+### Typing
 
-- `tsconfig.json` con `"strict": true`, `"noUncheckedIndexedAccess": true`, `"exactOptionalPropertyTypes": true`.
-- **Prohibido** `any`. Si hace falta escapar, usar `unknown` + narrowing.
-- Prohibido `as Foo` salvo en los bordes (parseo de JSON externo). En esos casos, validar con un parser (`zod`) antes.
-- Props tipadas con `interface` explícita por componente. No inline salvo 1-2 props triviales.
-- No usar `React.FC`. Firma normal: `function Component(props: Props) { … }`.
-- Tipos del contrato API en `api/types.ts` — idealmente generados desde el OpenAPI de FastAPI (`openapi-typescript`).
+- `tsconfig.json` with `"strict": true`, `"noUncheckedIndexedAccess": true`, `"exactOptionalPropertyTypes": true`.
+- **No `any`**. If you need to escape, use `unknown` + narrowing.
+- No `as Foo` except at boundaries (parsing external JSON). In those cases, validate with a parser (`zod`) first.
+- Props typed with explicit `interface` per component. No inline except for 1-2 trivial props.
+- Don't use `React.FC`. Normal signature: `function Component(props: Props) { ... }`.
+- API contract types in `api/types.ts` — ideally generated from FastAPI's OpenAPI schema (`openapi-typescript`).
 
-### Estado y efectos
+### State and Effects
 
-- `useState` solo para estado local de UI. Estado remoto → hook dedicado (`useProfiles`) o `@tanstack/react-query` cuando el proyecto crezca.
-- `useEffect` con array de deps **completo y correcto**. Si hay que silenciar el linter, hay un bug latente.
-- Cleanup functions obligatorias en efectos que crean recursos (timers, blob URLs, subscriptions). Ya aplicado con `URL.revokeObjectURL`.
-- `useCallback`/`useMemo` solo cuando hay problema real de performance o dependencias de otros hooks. No por defecto.
+- `useState` only for local UI state. Remote state -> dedicated hook (`useProfiles`) or `@tanstack/react-query` when the project grows.
+- `useEffect` with **complete and correct** deps array. If you need to silence the linter, there's a latent bug.
+- Mandatory cleanup functions in effects that create resources (timers, blob URLs, subscriptions). Already applied with `URL.revokeObjectURL`.
+- `useCallback`/`useMemo` only when there's a real performance issue or hook dependency chain. Not by default.
 
-### Estilos
+### Styles
 
-El código actual usa estilos inline masivos. Esto **se refactoriza**:
+Current code uses massive inline styles. This **gets refactored**:
 
-- Migrar a CSS Modules, vanilla-extract, Tailwind, o styled-components — elegir **uno** y no mezclar.
-- Design tokens (colores, spacing, radii) en un único archivo (`theme.ts` o `tokens.css`). Ahora mismo `#3b82f6` aparece ~30 veces.
-- Nada de valores mágicos repetidos. Si un color aparece 2+ veces → token.
+- Migrate to CSS Modules, vanilla-extract, Tailwind, or styled-components — pick **one** and don't mix.
+- Design tokens (colors, spacing, radii) in a single file (`theme/tokens.ts`). Colors like `#3b82f6` are already tokenized.
+- No repeated magic values. If a color appears 2+ times -> token.
 
-### API client
+### API Client
 
-- Un solo `fetchJson<T>` con manejo de errores centralizado, no `fetch` suelto en cada handler.
-- Tipar respuestas explícitamente. No devolver `Promise<any>`.
-- Normalización snake_case → camelCase en **una sola capa** (`api/`), nunca en componentes.
-- Errores como excepciones con tipo (`ApiError extends Error { status, detail }`), no strings.
+- A single `fetchJson<T>` with centralized error handling, not loose `fetch` in each handler.
+- Type responses explicitly. Don't return `Promise<any>`.
+- snake_case -> camelCase normalization in **one layer** (`api/`), never in components.
+- Errors as typed exceptions (`ApiError extends Error { status, detail }`), not strings.
 
 ### i18n
 
-- Extraer `i18n` a archivos por idioma. Tipo `type TranslationKey = keyof typeof es`.
-- Hook `useT()` que devuelve `t` tipado.
-- Al añadir una key en `es.ts`, TypeScript debe forzar añadirla en `en.ts`.
+- Extract `i18n` to per-language files. Type: `type TranslationKey = keyof typeof es`.
+- `getTranslations(lang)` returns typed `t`.
+- Adding a key in `es.ts` forces adding it in `en.ts` (compile error if missing).
 
-### Accesibilidad
+### Accessibility
 
-El código actual tiene deudas a11y:
-- Todos los `<button>` con icono-only necesitan `aria-label`.
-- Los sliders custom tienen `<input type="range">` correctamente, pero los thumbs visuales no deben capturar eventos (ya hecho con `pointerEvents: "none"`).
-- `dragOver` zone necesita `role="button"`, `tabIndex={0}` y handler de teclado.
-- Toast necesita `role="status"` + `aria-live="polite"`.
+- All icon-only `<button>` elements need `aria-label`.
+- Custom sliders have `<input type="range">` correctly, visual thumbs don't capture events (`pointerEvents: "none"`).
+- `dragOver` zone needs `role="button"`, `tabIndex={0}` and keyboard handler.
+- Toast needs `role="status"` + `aria-live="polite"`.
 
 ### Testing
 
 - `vitest` + `@testing-library/react`.
-- Tests por componente: render + interacciones clave. No tests de implementación (no inspeccionar state interno).
-- MSW (`msw`) para mockear la API en tests.
+- Per-component tests: render + key interactions. No implementation tests (don't inspect internal state).
+- MSW (`msw`) to mock the API in tests.
 
-### Estilo
+### Style Guide
 
 - **Formatter**: Prettier.
-- **Linter**: ESLint con `@typescript-eslint/strict`, `react-hooks`, `jsx-a11y`.
-- Imports ordenados (built-in → external → internal → relative).
-- Nombres: `PascalCase` componentes, `camelCase` funciones/variables, `UPPER_SNAKE` constantes de módulo.
+- **Linter**: ESLint with `@typescript-eslint/strict`, `react-hooks`, `jsx-a11y`.
+- Sorted imports (built-in -> external -> internal -> relative).
+- Names: `PascalCase` components, `camelCase` functions/variables, `UPPER_SNAKE` module constants.
 
 ---
 
-## Convenciones comunes
+## Common Conventions
 
 ### Git
 
-- Commits en imperativo, en inglés o español (elegir y ser consistente). Formato sugerido: `tipo: descripción` (`fix: uuid subscript in sample upload`).
-- Un commit = un cambio lógico. No mezclar refactor + feature + bug fix.
-- Nunca `--no-verify`.
+- Commits in imperative, in English. Suggested format: `type: description` (`fix: uuid subscript in sample upload`).
+- One commit = one logical change. Don't mix refactor + feature + bug fix.
+- Never `--no-verify`.
 
-### Documentación
+### Documentation
 
-- Este `CLAUDE.md` documenta el **cómo trabajamos**.
-- `README.md` documenta el **qué es y cómo ejecutarlo**.
-- No crear más `.md` salvo que sean necesarios (ADRs para decisiones no obvias).
+- This `CLAUDE.md` documents **how we work**.
+- `README.md` documents **what it is and how to run it**.
+- Don't create additional `.md` files unless necessary (ADRs for non-obvious decisions).
 
-### Secretos
+### Secrets
 
-- Nunca hardcodear URLs de producción, API keys, ni credenciales.
-- `.env` en `.gitignore`. `.env.example` sí se commitea.
+- Never hardcode production URLs, API keys, or credentials.
+- `.env` in `.gitignore`. `.env.example` gets committed.
 
 ---
 
-## Plan de refactor sugerido (orden)
+## Refactor Plan (order)
 
-1. **Backend**: extraer `Settings` + modularizar en paquete `backend/` con routers.
-2. **Backend**: añadir `response_model` a todos los endpoints y handler global de excepciones.
-3. **Backend**: lock en `ProfileManager` + escritura atómica.
-4. **Backend**: suite mínima de tests pytest (happy path de cada endpoint).
-5. **Frontend**: setup TS estricto + migrar archivo único a TSX.
-6. **Frontend**: trocear en `components/`, `features/`, `hooks/`, `api/`.
-7. **Frontend**: extraer estilos inline a sistema unificado (CSS Modules o Tailwind).
-8. **Frontend**: generar tipos desde OpenAPI del backend.
-9. **Ambos**: CI con lint + typecheck + tests antes de merge.
+1. ~~**Backend**: extract `Settings` + modularize into `backend/` package with routers.~~ Done.
+2. ~~**Backend**: add `response_model` to all endpoints and global exception handler.~~ Done.
+3. ~~**Backend**: lock in `ProfileManager` + atomic writes.~~ Done.
+4. ~~**Backend**: minimal pytest suite (happy path for each endpoint).~~ Done (48 tests, 96% coverage).
+5. ~~**Frontend**: strict TS setup + migrate single file to TSX.~~ Done.
+6. ~~**Frontend**: split into `components/`, `features/`, `hooks/`, `api/`.~~ Done.
+7. **Frontend**: extract inline styles to unified system (CSS Modules or Tailwind).
+8. **Frontend**: generate types from backend's OpenAPI schema.
+9. **Both**: CI with lint + typecheck + tests before merge.
 
-Cada paso: un PR pequeño, verde, reviewable.
+Each step: a small, green, reviewable PR.

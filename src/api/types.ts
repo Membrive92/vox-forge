@@ -1,4 +1,4 @@
-/** DTOs del backend (snake_case). */
+/** Backend DTOs (snake_case). */
 
 import type { AudioFormat, Language } from "@/types/domain";
 

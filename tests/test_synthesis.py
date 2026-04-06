@@ -1,10 +1,10 @@
-"""Síntesis de texto a audio."""
+"""Text-to-audio synthesis endpoints."""
 from __future__ import annotations
 
 
 def _payload(**overrides: object) -> dict:
     data = {
-        "text": "Hola mundo",
+        "text": "Hello world",
         "voice_id": "es-ES-AlvaroNeural",
         "output_format": "mp3",
         "speed": 100,
@@ -53,11 +53,11 @@ def test_synthesize_converts_to_wav(client) -> None:
 
 
 def test_synthesize_applies_profile_overrides(client) -> None:
-    """Cuando se pasa profile_id, sus params sobreescriben los de la petición."""
+    """When profile_id is passed, its params override the request's."""
     created = client.post(
         "/api/profiles",
         data={
-            "name": "Rápido",
+            "name": "Fast",
             "voice_id": "es-MX-DaliaNeural",
             "language": "es",
             "speed": 150,

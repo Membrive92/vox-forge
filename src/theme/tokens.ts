@@ -1,4 +1,4 @@
-/** Design tokens. Cualquier valor que aparezca 2+ veces vive aquí. */
+/** Design tokens. Any value that appears 2+ times lives here. */
 
 export const colors = {
   bg: "#0a0f1a",

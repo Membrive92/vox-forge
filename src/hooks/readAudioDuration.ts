@@ -1,4 +1,4 @@
-/** Lee la duración de un archivo de audio local usando un <audio> temporal. */
+/** Read the duration of a local audio file using a temporary <audio> element. */
 export async function readAudioDuration(file: File): Promise<number> {
   return new Promise((resolve) => {
     const audio = document.createElement("audio");

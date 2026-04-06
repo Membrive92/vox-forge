@@ -1,4 +1,4 @@
-"""Endpoints de catálogo de voces y muestras de audio."""
+"""Voice catalog and audio sample endpoints."""
 from __future__ import annotations
 
 import uuid
@@ -29,19 +29,19 @@ _MEDIA_TYPES: dict[str, str] = {
 }
 
 
-@router.get("", summary="Listar voces curadas")
+@router.get("", summary="List curated voices")
 async def list_voices() -> dict[str, dict[str, VoiceMeta]]:
     return SUPPORTED_VOICES
 
 
-@router.get("/all", summary="Listar todas las voces de Edge-TTS")
+@router.get("/all", summary="List all Edge-TTS voices")
 async def list_all_voices() -> dict[str, list[dict[str, str]]]:
     return await TTSEngine.discover_voices()
 
 
 @router.post(
     "/upload-sample",
-    summary="Subir muestra de voz",
+    summary="Upload voice sample",
     response_model=SampleUploadResponse,
 )
 async def upload_voice_sample(
@@ -49,7 +49,7 @@ async def upload_voice_sample(
     profile_id: Optional[str] = Form(default=None),
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> SampleUploadResponse:
-    """Sube una muestra de audio; opcionalmente la asocia a un perfil."""
+    """Upload an audio sample; optionally attach it to a profile."""
     ext = Path(sample.filename or "").suffix or ".wav"
     filename = f"{str(uuid.uuid4())[:8]}{ext}"
     filepath = VOICES_DIR / filename
@@ -61,7 +61,7 @@ async def upload_voice_sample(
         audio = AudioSegment.from_file(str(filepath))
     except Exception as exc:
         filepath.unlink(missing_ok=True)
-        raise InvalidSampleError(f"No se pudo procesar el audio: {exc}") from exc
+        raise InvalidSampleError(f"Could not process audio: {exc}") from exc
 
     duration = round(len(audio) / 1000.0, 1)
 
@@ -69,7 +69,7 @@ async def upload_voice_sample(
         try:
             await profiles.attach_sample(profile_id, filename, duration)
         except ProfileNotFound:
-            # Mantener la muestra en disco aunque el perfil no exista.
+            # Keep the sample on disk even if the profile doesn't exist.
             pass
 
     return SampleUploadResponse(
@@ -83,10 +83,10 @@ async def upload_voice_sample(
     )
 
 
-@router.get("/samples/{filename}", summary="Reproducir muestra de voz")
+@router.get("/samples/{filename}", summary="Serve voice sample")
 async def get_voice_sample(filename: str) -> FileResponse:
     filepath = VOICES_DIR / filename
     if not filepath.exists():
-        raise SampleNotFound("Muestra no encontrada")
+        raise SampleNotFound("Sample not found")
     ext = filepath.suffix.lstrip(".")
     return FileResponse(str(filepath), media_type=_MEDIA_TYPES.get(ext, "audio/wav"))

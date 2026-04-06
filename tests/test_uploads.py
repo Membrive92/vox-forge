@@ -1,11 +1,11 @@
-"""Tests de integración: upload de muestras, creación de perfiles con sample, serve de samples."""
+"""Integration tests: sample uploads, profile creation with sample, sample serving."""
 from __future__ import annotations
 
 import io
 
 
 def _fake_wav() -> io.BytesIO:
-    """Genera un falso fichero WAV mínimo."""
+    """Generate a minimal fake WAV file."""
     buf = io.BytesIO(b"RIFF" + b"\x00" * 40)
     buf.name = "sample.wav"
     return buf
@@ -17,7 +17,7 @@ def _fake_mp3() -> io.BytesIO:
     return buf
 
 
-# --- Upload de muestra ---
+# --- Sample upload ---
 
 def test_upload_sample_returns_analysis(client) -> None:
     response = client.post(
@@ -39,7 +39,7 @@ def test_upload_sample_attached_to_profile(client) -> None:
     # Crear perfil primero
     profile = client.post(
         "/api/profiles",
-        data={"name": "Con muestra", "voice_id": "es-ES-AlvaroNeural"},
+        data={"name": "With sample", "voice_id": "es-ES-AlvaroNeural"},
     ).json()
 
     response = client.post(
@@ -61,7 +61,7 @@ def test_upload_replaces_old_sample(client) -> None:
     # Crear perfil con primera muestra
     profile = client.post(
         "/api/profiles",
-        data={"name": "Reemplazo", "voice_id": "es-ES-AlvaroNeural"},
+        data={"name": "Replacement", "voice_id": "es-ES-AlvaroNeural"},
         files={"sample": ("first.wav", _fake_wav(), "audio/wav")},
     ).json()
     first_sample = profile["sample_filename"]
@@ -78,7 +78,7 @@ def test_upload_replaces_old_sample(client) -> None:
     assert updated["sample_filename"] != first_sample
 
 
-# --- Serve de muestra ---
+# --- Sample serving ---
 
 def test_serve_uploaded_sample(client) -> None:
     upload = client.post(
@@ -92,13 +92,13 @@ def test_serve_uploaded_sample(client) -> None:
     assert len(response.content) > 0
 
 
-# --- Crear perfil con muestra vía POST /api/profiles ---
+# --- Create profile with sample via POST /api/profiles ---
 
 def test_create_profile_with_sample(client) -> None:
     response = client.post(
         "/api/profiles",
         data={
-            "name": "Con audio",
+            "name": "With audio",
             "voice_id": "es-MX-DaliaNeural",
             "language": "es",
             "speed": "90",
@@ -109,7 +109,7 @@ def test_create_profile_with_sample(client) -> None:
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["name"] == "Con audio"
+    assert body["name"] == "With audio"
     assert body["sample_filename"] is not None
     assert body["sample_filename"].endswith(".mp3")
 
@@ -117,17 +117,17 @@ def test_create_profile_with_sample(client) -> None:
 def test_create_profile_rejects_bad_content_type(client) -> None:
     response = client.post(
         "/api/profiles",
-        data={"name": "Malo", "voice_id": "es-ES-AlvaroNeural"},
+        data={"name": "Bad", "voice_id": "es-ES-AlvaroNeural"},
         files={"sample": ("bad.txt", io.BytesIO(b"text"), "text/plain")},
     )
     assert response.status_code == 400
-    assert "no soportado" in response.json()["detail"].lower() or "code" in response.json()
+    assert "unsupported" in response.json()["detail"].lower() or "code" in response.json()
 
 
 # --- Cleanup de archivos ---
 
 async def test_cleanup_removes_old_files(client, _session_env) -> None:
-    """La tarea cleanup elimina archivos antiguos."""
+    """The cleanup task deletes old files."""
     import os
     import time
 

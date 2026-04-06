@@ -1,4 +1,4 @@
-"""Modelos Pydantic: entrada, persistencia y respuesta."""
+"""Pydantic models: request, persistence, and response."""
 from __future__ import annotations
 
 import uuid
@@ -19,19 +19,19 @@ def _now_iso() -> str:
 
 
 class SynthesisRequest(BaseModel):
-    """Petición de síntesis de texto a voz."""
+    """Text-to-speech synthesis request."""
 
     text: str = Field(..., min_length=1, max_length=settings.max_text_length)
-    voice_id: str = Field(..., description="ID de la voz (ej: es-ES-AlvaroNeural)")
+    voice_id: str = Field(..., description="Voice ID (e.g. es-ES-AlvaroNeural)")
     output_format: str = Field(default="mp3", description="mp3 | wav | ogg | flac")
-    speed: int = Field(default=100, ge=50, le=200, description="Velocidad en % (50-200)")
-    pitch: int = Field(default=0, ge=-10, le=10, description="Tono en semitonos")
-    volume: int = Field(default=80, ge=0, le=100, description="Volumen en %")
-    profile_id: Optional[str] = Field(default=None, description="ID de perfil (opcional)")
+    speed: int = Field(default=100, ge=50, le=200, description="Speed in % (50-200)")
+    pitch: int = Field(default=0, ge=-10, le=10, description="Pitch in semitones")
+    volume: int = Field(default=80, ge=0, le=100, description="Volume in %")
+    profile_id: Optional[str] = Field(default=None, description="Profile ID (optional)")
 
 
 class VoiceProfile(BaseModel):
-    """Perfil de voz persistido."""
+    """Persisted voice profile."""
 
     id: str = Field(default_factory=_new_id)
     name: str = Field(..., min_length=1, max_length=100)
@@ -47,7 +47,7 @@ class VoiceProfile(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
-    """Actualización parcial de un perfil."""
+    """Partial profile update."""
 
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     voice_id: Optional[str] = None
@@ -58,7 +58,7 @@ class ProfileUpdate(BaseModel):
 
 
 class SampleUploadResponse(BaseModel):
-    """Respuesta de subida de muestra de voz."""
+    """Voice sample upload response."""
 
     filename: str
     duration_seconds: Optional[float]

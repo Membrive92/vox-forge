@@ -1,4 +1,4 @@
-/** Sintetiza una frase demo con una voz dada y la reproduce. */
+/** Synthesize a demo phrase with a given voice and play it. */
 import { useCallback, useRef, useState } from "react";
 
 import { synthesize } from "@/api/synthesis";
@@ -10,9 +10,9 @@ const DEMO_PHRASES: Record<Language, string> = {
 };
 
 export interface VoicePreviewState {
-  /** ID de la voz que se está previsualizando (null si ninguna). */
+  /** ID of the voice being previewed (null if none). */
   previewingId: string | null;
-  /** Inicia o detiene la preview de una voz. */
+  /** Start or stop the voice preview. */
   toggle: (voiceId: string, lang: Language) => void;
 }
 
@@ -35,13 +35,13 @@ export function useVoicePreview(): VoicePreviewState {
 
   const toggle = useCallback(
     (voiceId: string, lang: Language) => {
-      // Si ya está sonando esta voz, detener
+      // If this voice is already playing, stop it
       if (previewingId === voiceId) {
         cleanup();
         return;
       }
 
-      // Detener preview anterior si hay
+      // Stop previous preview if any
       cleanup();
       setPreviewingId(voiceId);
 

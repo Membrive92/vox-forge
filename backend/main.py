@@ -1,4 +1,4 @@
-"""Punto de entrada de la aplicación FastAPI."""
+"""FastAPI application entry point."""
 from __future__ import annotations
 
 import logging
@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="VoxForge API",
-        description="API de síntesis de texto a voz con gestión de perfiles",
+        description="Text-to-speech synthesis API with voice profile management",
         version="1.0.0",
     )
 
@@ -38,7 +38,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(app)
 
-    # Routers bajo prefijo /api
+    # Mount routers under /api prefix
     app.include_router(synthesis.router, prefix="/api")
     app.include_router(voices.router, prefix="/api")
     app.include_router(profiles.router, prefix="/api")

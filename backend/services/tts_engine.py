@@ -1,4 +1,4 @@
-"""Motor de síntesis de voz (Edge-TTS) con chunking para textos largos."""
+"""Voice synthesis engine (Edge-TTS) with chunking for long texts."""
 from __future__ import annotations
 
 import logging
@@ -18,7 +18,7 @@ from .profile_manager import ProfileManager
 
 logger = logging.getLogger(__name__)
 
-# Regex para dividir por fin de frase (preservando el delimitador).
+# Regex to split at sentence boundaries (preserving the delimiter).
 _SENTENCE_RE = re.compile(r"(?<=[.!?…;])\s+")
 
 
@@ -28,7 +28,7 @@ def _rate_str(speed: int) -> str:
 
 
 def _pitch_str(pitch: int) -> str:
-    """Convierte semitonos a offset Hz (aproximación: 1 st ≈ 16 Hz)."""
+    """Convert semitones to Hz offset (approximation: 1 st ~ 16 Hz)."""
     hz = pitch * 16
     return f"+{hz}Hz" if hz >= 0 else f"{hz}Hz"
 
@@ -39,14 +39,14 @@ def _volume_str(volume: int) -> str:
 
 
 def split_into_chunks(text: str, max_chars: int | None = None) -> list[str]:
-    """Divide texto largo en chunks aptos para Edge-TTS.
+    """Split long text into chunks suitable for Edge-TTS.
 
-    Estrategia:
-    1. Dividir por párrafos (doble salto de línea).
-    2. Si un párrafo excede max_chars, subdividir por frases.
-    3. Agrupar frases cortas consecutivas para minimizar chunks.
+    Strategy:
+    1. Split by paragraphs (double newline).
+    2. If a paragraph exceeds max_chars, subdivide by sentences.
+    3. Group short consecutive sentences to minimize chunk count.
 
-    Nunca corta a mitad de frase.
+    Never cuts in the middle of a sentence.
     """
     limit = max_chars or settings.chunk_max_chars
     if len(text) <= limit:
@@ -63,7 +63,7 @@ def split_into_chunks(text: str, max_chars: int | None = None) -> list[str]:
             chunks.append(para)
             continue
 
-        # Párrafo largo → dividir por frases
+        # Long paragraph -> split by sentences
         sentences = _SENTENCE_RE.split(para)
         current = ""
         for sentence in sentences:
@@ -82,21 +82,21 @@ def split_into_chunks(text: str, max_chars: int | None = None) -> list[str]:
 
 
 class TTSEngine:
-    """Wrapper sobre Edge-TTS con chunking automático y concatenación."""
+    """Edge-TTS wrapper with automatic chunking and concatenation."""
 
     def __init__(self, profiles: ProfileManager) -> None:
         self._profiles = profiles
 
     async def synthesize(self, request: SynthesisRequest) -> tuple[Path, int]:
-        """Sintetiza texto y devuelve (ruta del archivo, número de chunks).
+        """Synthesize text and return (output file path, chunk count).
 
-        Textos largos se dividen automáticamente en chunks, se sintetizan
-        por separado y se concatenan en un solo archivo de salida.
+        Long texts are automatically split into chunks, synthesized
+        separately, and concatenated into a single output file.
         """
         if request.output_format not in AUDIO_FORMATS:
             raise UnsupportedFormatError(
-                f"Formato no soportado: {request.output_format}. "
-                f"Válidos: {sorted(AUDIO_FORMATS)}"
+                f"Unsupported format: {request.output_format}. "
+                f"Valid: {sorted(AUDIO_FORMATS)}"
             )
 
         if request.profile_id:
@@ -109,7 +109,7 @@ class TTSEngine:
 
         if request.voice_id not in all_voice_ids():
             raise UnsupportedVoiceError(
-                f"Voz no soportada: {request.voice_id}"
+                f"Unsupported voice: {request.voice_id}"
             )
 
         chunks = split_into_chunks(request.text)
@@ -134,12 +134,12 @@ class TTSEngine:
                     i + 1, len(chunks), temp_mp3.stat().st_size,
                 )
 
-            # Concatenar chunks
+            # Concatenate chunks
             if len(temp_files) == 1:
                 combined = AudioSegment.from_mp3(str(temp_files[0]))
             else:
                 combined = AudioSegment.empty()
-                # Pausa de 400ms entre párrafos para narración natural
+                # 400ms pause between paragraphs for natural narration
                 pause = AudioSegment.silent(duration=400)
                 for j, tf in enumerate(temp_files):
                     segment = AudioSegment.from_mp3(str(tf))
@@ -147,7 +147,7 @@ class TTSEngine:
                         combined += pause
                     combined += segment
 
-            # Exportar al formato solicitado
+            # Export to requested format
             if request.output_format == "mp3":
                 fmt_cfg = AUDIO_FORMATS["mp3"]
             else:
@@ -170,15 +170,15 @@ class TTSEngine:
             raise
         except Exception as exc:
             output_path.unlink(missing_ok=True)
-            logger.error("Error en síntesis: %s", exc)
-            raise SynthesisError(f"Error en síntesis: {exc}") from exc
+            logger.error("Synthesis error: %s", exc)
+            raise SynthesisError(f"Synthesis error: {exc}") from exc
         finally:
             for tf in temp_files:
                 tf.unlink(missing_ok=True)
 
     @staticmethod
     async def discover_voices() -> dict[str, list[dict[str, str]]]:
-        """Descubre voces disponibles en Edge-TTS (ES, EN)."""
+        """Discover available Edge-TTS voices (ES, EN)."""
         voices = await edge_tts.list_voices()
         result: dict[str, list[dict[str, str]]] = {"es": [], "en": []}
         for voice in voices:

@@ -1,7 +1,7 @@
-"""Excepciones de dominio y sus traducciones a HTTP.
+"""Domain exceptions and their HTTP translations.
 
-Los servicios lanzan estas excepciones; los routers no las capturan manualmente.
-Un handler global las convierte en respuestas HTTP estructuradas.
+Services raise these exceptions; routers don't catch them manually.
+A global handler converts them into structured HTTP responses.
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 
 
 class DomainError(Exception):
-    """Raíz de las excepciones de dominio."""
+    """Root of the domain exception hierarchy."""
 
     status_code: int = 500
     code: str = "domain_error"
@@ -51,7 +51,7 @@ class SynthesisError(DomainError):
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """Traduce excepciones de dominio a respuestas JSON coherentes."""
+    """Translate domain exceptions to consistent JSON responses."""
 
     @app.exception_handler(DomainError)
     async def _handle_domain(_: Request, exc: DomainError) -> JSONResponse:

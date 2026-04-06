@@ -1,11 +1,11 @@
-"""Configuración de la suite de tests.
+"""Test suite configuration.
 
-Objetivos:
-- Aislar I/O: VOXFORGE_BASE_DIR apunta a un tmp path por sesión.
-- Sin dependencias nativas: ``edge_tts`` y ``pydub`` se sustituyen por stubs
-  mínimos que producen bytes válidos suficientes para que FastAPI los sirva
-  y ``ProfileManager`` los analice.
-- Estado limpio por test: el singleton de perfiles se resetea entre tests.
+Goals:
+- Isolate I/O: VOXFORGE_BASE_DIR points to a tmp path per session.
+- No native dependencies: ``edge_tts`` and ``pydub`` are replaced by minimal
+  stubs that produce valid bytes sufficient for FastAPI to serve them
+  and ``ProfileManager`` to analyze them.
+- Clean state per test: the profiles singleton is reset between tests.
 """
 from __future__ import annotations
 
@@ -18,14 +18,14 @@ from typing import Iterator
 import pytest
 
 # ---------------------------------------------------------------------------
-# Stubs de dependencias nativas. Deben instalarse ANTES de importar ``backend``.
+# Native dependency stubs. Must be installed BEFORE importing ``backend``.
 # ---------------------------------------------------------------------------
 
 _FAKE_MP3_BYTES = b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\x00" * 128
 
 
 class _FakeCommunicate:
-    """Fake de ``edge_tts.Communicate`` que escribe bytes estáticos."""
+    """Fake ``edge_tts.Communicate`` that writes static bytes."""
 
     def __init__(self, **_: object) -> None:
         pass
@@ -42,15 +42,15 @@ async def _fake_list_voices() -> list[dict[str, str]]:
 
 
 class _FakeAudioSegment:
-    """Fake mínimo de ``pydub.AudioSegment``.
+    """Minimal ``pydub.AudioSegment`` fake.
 
-    Cada instancia representa un clip de 1 segundo, mono, 16-bit, 44.1 kHz.
-    Soporta concatenación (+=) para testing de chunking.
+    Each instance represents a 1-second clip, mono, 16-bit, 44.1 kHz.
+    Supports concatenation (+=) for chunking tests.
     """
 
     channels = 1
     frame_rate = 44100
-    sample_width = 2  # bytes → 16 bit
+    sample_width = 2  # bytes -> 16 bit
 
     def __init__(self, duration_ms: int = 1000) -> None:
         self._duration_ms = duration_ms
@@ -102,7 +102,7 @@ def _install_stubs() -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def _session_env(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
-    """Prepara entorno aislado y stubs antes de importar ``backend``."""
+    """Set up isolated environment and stubs before importing ``backend``."""
     tmp_base = tmp_path_factory.mktemp("voxforge")
     os.environ["VOXFORGE_BASE_DIR"] = str(tmp_base)
     os.environ["VOXFORGE_DATA_SUBDIR"] = "data"
@@ -114,7 +114,7 @@ def _session_env(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
 
 @pytest.fixture(scope="session")
 def app(_session_env: None):
-    """Importa la app FastAPI una vez instalados los stubs."""
+    """Import the FastAPI app once stubs are installed."""
     from backend import app as fastapi_app
 
     return fastapi_app
@@ -129,10 +129,10 @@ def client(app):
 
 @pytest.fixture(autouse=True)
 def _reset_profiles(_session_env: None) -> Iterator[None]:
-    """Resetea el singleton de perfiles para garantizar aislamiento por test."""
+    """Reset the profiles singleton to guarantee per-test isolation."""
     from backend.dependencies import get_profile_manager
 
     pm = get_profile_manager()
-    pm._profiles.clear()  # noqa: SLF001 - acceso controlado solo en tests
+    pm._profiles.clear()  # noqa: SLF001 - controlled access in tests only
     yield
     pm._profiles.clear()  # noqa: SLF001

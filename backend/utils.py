@@ -1,4 +1,4 @@
-"""Utilidades de mantenimiento."""
+"""Maintenance utilities."""
 from __future__ import annotations
 
 import logging
@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 async def cleanup_old_files(max_age_hours: int | None = None) -> int:
-    """Elimina archivos generados con más de ``max_age_hours`` de antigüedad.
+    """Delete generated files older than ``max_age_hours``.
 
     Returns:
-        Número de archivos eliminados.
+        Number of deleted files.
     """
     threshold = max_age_hours or settings.cleanup_max_age_hours
     now = datetime.now().timestamp()
@@ -27,7 +27,7 @@ async def cleanup_old_files(max_age_hours: int | None = None) -> int:
                 file.unlink(missing_ok=True)
                 count += 1
     if count:
-        logger.info("Limpieza: %d archivos antiguos eliminados", count)
+        logger.info("Cleanup: %d old files deleted", count)
     return count
 
 

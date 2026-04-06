@@ -1,4 +1,4 @@
-"""Tests del sistema de chunking para textos largos."""
+"""Chunking system tests for long texts."""
 from __future__ import annotations
 
 import pytest
@@ -9,38 +9,38 @@ import pytest
 def test_short_text_single_chunk() -> None:
     from backend.services.tts_engine import split_into_chunks
 
-    result = split_into_chunks("Hola mundo.", max_chars=3000)
-    assert result == ["Hola mundo."]
+    result = split_into_chunks("Hello world.", max_chars=3000)
+    assert result == ["Hello world."]
 
 
 def test_split_by_paragraphs() -> None:
     from backend.services.tts_engine import split_into_chunks
 
-    text = "Párrafo uno.\n\nPárrafo dos.\n\nPárrafo tres."
-    # max_chars menor que el texto total para forzar split
+    text = "Paragraph one.\n\nParagraph two.\n\nParagraph three."
+    # max_chars smaller than total text to force split
     result = split_into_chunks(text, max_chars=20)
     assert len(result) == 3
-    assert result[0] == "Párrafo uno."
-    assert result[1] == "Párrafo dos."
-    assert result[2] == "Párrafo tres."
+    assert result[0] == "Paragraph one."
+    assert result[1] == "Paragraph two."
+    assert result[2] == "Paragraph three."
 
 
 def test_long_paragraph_split_by_sentences() -> None:
     from backend.services.tts_engine import split_into_chunks
 
-    sentences = ["Frase número uno." for _ in range(20)]
+    sentences = ["Sentence number one." for _ in range(20)]
     text = " ".join(sentences)  # ~360 chars, single paragraph
     result = split_into_chunks(text, max_chars=100)
     assert len(result) > 1
     # Cada chunk no debe exceder el límite significativamente
     for chunk in result:
-        assert len(chunk) <= 110  # margen por última frase
+        assert len(chunk) <= 110  # margin for last sentence
 
 
 def test_preserves_all_content() -> None:
     from backend.services.tts_engine import split_into_chunks
 
-    text = "Primera frase. Segunda frase. Tercera frase.\n\nSegundo párrafo. Más texto aquí."
+    text = "First sentence. Second sentence. Third sentence.\n\nSecond paragraph. More text here."
     result = split_into_chunks(text, max_chars=40)
 
     # Reconstruir y verificar que no se perdió texto
@@ -59,13 +59,13 @@ def test_empty_text_returns_text() -> None:
 
 
 def test_realistic_story_length() -> None:
-    """Simula un relato de ~11000 palabras (~70k chars)."""
+    """Simulate a story of ~11000 words (~70k chars)."""
     from backend.services.tts_engine import split_into_chunks
 
     paragraphs = []
     for i in range(100):
         sentences = [
-            f"Esta es la frase número {j} del párrafo número {i} de nuestro relato largo de prueba."
+            f"This is sentence number {j} of paragraph number {i} in our long test story."
             for j in range(15)
         ]
         paragraphs.append(" ".join(sentences))
@@ -77,7 +77,7 @@ def test_realistic_story_length() -> None:
     assert len(result) >= 10
     for chunk in result:
         assert len(chunk) <= 3100  # margen razonable
-    # Verificar que todo el texto está representado
+    # Verify all text is represented
     total_chars = sum(len(c) for c in result)
     assert total_chars >= len(text) * 0.95  # al menos 95% del original
 
@@ -86,7 +86,7 @@ def test_realistic_story_length() -> None:
 
 def test_synthesis_short_text_single_chunk(client) -> None:
     response = client.post("/api/synthesize", json={
-        "text": "Texto corto.",
+        "text": "Short text.",
         "voice_id": "es-ES-AlvaroNeural",
         "output_format": "mp3",
         "speed": 100,
@@ -98,8 +98,8 @@ def test_synthesis_short_text_single_chunk(client) -> None:
 
 
 def test_synthesis_long_text_multiple_chunks(client) -> None:
-    """Un texto largo se divide en múltiples chunks."""
-    sentences = ["Esta es una frase de prueba número cien." for _ in range(150)]
+    """A long text is split into multiple chunks."""
+    sentences = ["This is a test sentence number one hundred." for _ in range(150)]
     long_text = " ".join(sentences)
     assert len(long_text) > 3000
 
@@ -119,8 +119,8 @@ def test_synthesis_long_text_multiple_chunks(client) -> None:
 
 
 def test_synthesis_with_paragraphs_chunked(client) -> None:
-    """Párrafos separados por doble newline se dividen correctamente."""
-    paragraphs = [f"Este es el párrafo {i}. Contiene varias frases. Y un poco más de texto." for i in range(20)]
+    """Paragraphs separated by double newlines are split correctly."""
+    paragraphs = [f"This is paragraph {i}. It contains several sentences. And a bit more text." for i in range(20)]
     text = "\n\n".join(paragraphs)
 
     response = client.post("/api/synthesize", json={
@@ -136,9 +136,9 @@ def test_synthesis_with_paragraphs_chunked(client) -> None:
 
 
 def test_max_text_length_accepts_large_text(client) -> None:
-    """Verifica que textos de hasta 500k chars son aceptados por validación."""
-    # Solo verifica que la validación Pydantic no rechaza (no sintetiza 500k)
-    text = "Frase de relleno. " * 200  # ~3800 chars
+    """Verify that texts up to 500k chars are accepted by validation."""
+    # Just verify Pydantic validation doesn't reject (doesn't synthesize 500k)
+    text = "Filler sentence here. " * 200  # ~4400 chars
     response = client.post("/api/synthesize", json={
         "text": text,
         "voice_id": "es-ES-AlvaroNeural",

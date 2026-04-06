@@ -1,10 +1,10 @@
-"""CRUD de perfiles de voz."""
+"""Voice profile CRUD endpoints."""
 from __future__ import annotations
 
 
 def _create_profile(client, **overrides: object) -> dict:
     data = {
-        "name": "Narrador",
+        "name": "Narrator",
         "voice_id": "es-ES-AlvaroNeural",
         "language": "es",
         "speed": 90,
@@ -25,7 +25,7 @@ def test_list_profiles_empty(client) -> None:
 
 def test_create_and_get_profile(client) -> None:
     created = _create_profile(client)
-    assert created["name"] == "Narrador"
+    assert created["name"] == "Narrator"
     assert created["voice_id"] == "es-ES-AlvaroNeural"
     assert created["speed"] == 90
     assert created["id"]
@@ -45,13 +45,13 @@ def test_update_profile(client) -> None:
     created = _create_profile(client)
     response = client.patch(
         f"/api/profiles/{created['id']}",
-        json={"name": "Renombrado", "speed": 120},
+        json={"name": "Renamed", "speed": 120},
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["name"] == "Renombrado"
+    assert body["name"] == "Renamed"
     assert body["speed"] == 120
-    # Campos no tocados se preservan
+    # Untouched fields are preserved
     assert body["voice_id"] == "es-ES-AlvaroNeural"
     assert body["pitch"] == -1
 
@@ -76,15 +76,15 @@ def test_delete_profile(client) -> None:
     assert response.status_code == 200
     assert response.json() == {"status": "deleted", "id": created["id"]}
 
-    # Idempotencia: segunda llamada es 404
+    # Idempotent: second call returns 404
     response = client.delete(f"/api/profiles/{created['id']}")
     assert response.status_code == 404
 
 
 def test_list_reflects_creation(client) -> None:
-    _create_profile(client, name="Uno")
-    _create_profile(client, name="Dos")
+    _create_profile(client, name="One")
+    _create_profile(client, name="Two")
     response = client.get("/api/profiles")
     assert response.status_code == 200
     names = {p["name"] for p in response.json()}
-    assert names == {"Uno", "Dos"}
+    assert names == {"One", "Two"}

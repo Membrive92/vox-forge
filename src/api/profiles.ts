@@ -1,4 +1,4 @@
-/** Endpoints de perfiles. Traduce DTOs snake_case a dominio camelCase. */
+/** Profile endpoints. Translates snake_case DTOs to camelCase domain types. */
 
 import type { Language, Profile } from "@/types/domain";
 
