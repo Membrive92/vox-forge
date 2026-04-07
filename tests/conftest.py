@@ -116,11 +116,22 @@ def _install_stubs() -> None:
     pydub.AudioSegment = _FakeAudioSegment  # type: ignore[attr-defined]
     sys.modules.setdefault("pydub", pydub)
 
-    # Stub torch so clone_engine can import without CUDA
+    # Stub torch so clone_engine and convert_engine can import without CUDA
     if "torch" not in sys.modules:
         torch = types.ModuleType("torch")
         torch.cuda = _FakeTorch.cuda  # type: ignore[attr-defined]
         sys.modules["torch"] = torch
+
+    # Stub openvoice so convert_engine can import without the full package
+    if "openvoice" not in sys.modules:
+        openvoice = types.ModuleType("openvoice")
+        openvoice_api = types.ModuleType("openvoice.api")
+        openvoice_se = types.ModuleType("openvoice.se_extractor")
+        openvoice.api = openvoice_api  # type: ignore[attr-defined]
+        openvoice.se_extractor = openvoice_se  # type: ignore[attr-defined]
+        sys.modules["openvoice"] = openvoice
+        sys.modules["openvoice.api"] = openvoice_api
+        sys.modules["openvoice.se_extractor"] = openvoice_se
 
 
 # ---------------------------------------------------------------------------

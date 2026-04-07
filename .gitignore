@@ -2,6 +2,7 @@ node_modules/
 dist/
 data/
 tools/
+models/
 .env
 *.pyc
 __pycache__/

@@ -65,6 +65,17 @@ export const es = {
   uploadText: "Subir",
   uploadTextDesc: "Sube un archivo .txt, .docx o .pdf y se procesara automaticamente para lectura optima",
   textProcessed: "Texto procesado",
+  tabConvert: "Convertir",
+  convertTitle: "Conversion de voz",
+  convertDesc: "Sube un audio narrado y cambia su tono de voz por otro",
+  sourceAudio: "Audio original",
+  sourceAudioHint: "El audio cuya voz quieres cambiar",
+  targetVoice: "Voz objetivo",
+  targetVoiceOption: "Selecciona como elegir la voz objetivo",
+  useTargetFile: "Subir muestra de voz objetivo",
+  convertButton: "Convertir voz",
+  converting: "Convirtiendo...",
+  conversionReady: "Conversion lista",
 } as const;
 
 export type TranslationKey = keyof typeof es;
