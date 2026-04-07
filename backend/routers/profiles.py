@@ -69,6 +69,10 @@ async def create_profile(
         sample_path.write_bytes(content)
 
         try:
+            import shutil
+
+            if not shutil.which("ffprobe"):
+                raise FileNotFoundError("ffprobe not found")
             audio = AudioSegment.from_file(str(sample_path))
             sample_duration = round(len(audio) / 1000.0, 1)
         except Exception:

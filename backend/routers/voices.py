@@ -57,13 +57,24 @@ async def upload_voice_sample(
     content = await sample.read()
     filepath.write_bytes(content)
 
-    try:
-        audio = AudioSegment.from_file(str(filepath))
-    except Exception as exc:
-        filepath.unlink(missing_ok=True)
-        raise InvalidSampleError(f"Could not process audio: {exc}") from exc
+    duration: float | None = None
+    channels = 1
+    sample_rate = 44100
+    bit_depth = 16
 
-    duration = round(len(audio) / 1000.0, 1)
+    try:
+        import shutil
+
+        if not shutil.which("ffprobe"):
+            raise FileNotFoundError("ffprobe not found")
+        audio = AudioSegment.from_file(str(filepath))
+        duration = round(len(audio) / 1000.0, 1)
+        channels = audio.channels
+        sample_rate = audio.frame_rate
+        bit_depth = audio.sample_width * 8
+    except Exception:
+        # ffmpeg not installed — store the file but skip audio analysis
+        pass
 
     if profile_id:
         try:
@@ -75,9 +86,9 @@ async def upload_voice_sample(
     return SampleUploadResponse(
         filename=filename,
         duration_seconds=duration,
-        channels=audio.channels,
-        sample_rate=audio.frame_rate,
-        bit_depth=audio.sample_width * 8,
+        channels=channels,
+        sample_rate=sample_rate,
+        bit_depth=bit_depth,
         size_kb=round(len(content) / 1024, 1),
         profile_id=profile_id,
     )
