@@ -3,6 +3,7 @@
 import { API_BASE, ApiError, getJson } from "./client";
 
 export interface VoiceLabParams {
+  noise_reduction: number;
   pitch_semitones: number;
   formant_shift: number;
   bass_boost_db: number;
@@ -40,6 +41,7 @@ export async function processAudio(
 ): Promise<LabResult> {
   const fd = new FormData();
   fd.append("audio", audioFile);
+  fd.append("noise_reduction", String(params.noise_reduction));
   fd.append("pitch_semitones", String(params.pitch_semitones));
   fd.append("formant_shift", String(params.formant_shift));
   fd.append("bass_boost_db", String(params.bass_boost_db));

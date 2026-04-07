@@ -36,6 +36,9 @@ _SR = 22050
 class VoiceLabParams:
     """Parameters for voice manipulation."""
 
+    # Noise reduction strength 0-100. 0 = off, 100 = maximum.
+    noise_reduction: float = 0.0
+
     # Pitch shift in semitones (-12 to +12). Negative = deeper.
     pitch_semitones: float = 0.0
 
@@ -239,6 +242,25 @@ class VoiceLabEngine:
     """
 
     @staticmethod
+    def _apply_noise_reduction(audio: np.ndarray, sr: int, strength: float) -> np.ndarray:
+        """Reduce background noise from audio.
+
+        Uses spectral gating via noisereduce. Strength 0-100 maps to
+        the prop_decrease parameter (0.0 = off, 1.0 = full reduction).
+        """
+        if strength < 1:
+            return audio
+        import noisereduce as nr
+
+        prop = min(strength / 100, 1.0)
+        return nr.reduce_noise(
+            y=audio,
+            sr=sr,
+            prop_decrease=prop,
+            stationary=True,
+        )
+
+    @staticmethod
     def _apply_formant_shift(audio: np.ndarray, sr: int, semitones: float) -> np.ndarray:
         """Shift formants independently of pitch using Parselmouth (Praat).
 
@@ -347,6 +369,7 @@ class VoiceLabEngine:
         """Process audio with the given voice lab parameters.
 
         Applies effects in optimal order:
+        0. Noise reduction (clean background first)
         1. Formant shift (changes resonance)
         2. Pitch shift (changes fundamental frequency)
         3. Speed change (time stretch)
@@ -366,7 +389,14 @@ class VoiceLabEngine:
 
             logger.info("Voice lab processing: %d samples at %dHz", len(audio), sr)
 
-            # 1. Formant shift (must be first — works on original signal)
+            # 0. Noise reduction (must be first — clean signal before processing)
+            if params.noise_reduction > 0:
+                audio = await asyncio.to_thread(
+                    self._apply_noise_reduction, audio, sr, params.noise_reduction,
+                )
+                logger.info("Noise reduction applied: %.0f%%", params.noise_reduction)
+
+            # 1. Formant shift (works on clean signal)
             if abs(params.formant_shift) > 0.1:
                 audio = await asyncio.to_thread(
                     self._apply_formant_shift, audio, sr, params.formant_shift,

@@ -40,6 +40,7 @@ def _preset_to_response(p: VoicePreset) -> PresetResponse:
         description=p.description,
         category=p.category,
         params={
+            "noise_reduction": p.params.noise_reduction,
             "pitch_semitones": p.params.pitch_semitones,
             "formant_shift": p.params.formant_shift,
             "bass_boost_db": p.params.bass_boost_db,
@@ -68,6 +69,7 @@ async def random_preset() -> PresetResponse:
 @router.post("/process", summary="Process audio with voice lab effects")
 async def process_audio(
     audio: UploadFile = File(...),
+    noise_reduction: float = Form(default=0),
     pitch_semitones: float = Form(default=0),
     formant_shift: float = Form(default=0),
     bass_boost_db: float = Form(default=0),
@@ -89,6 +91,7 @@ async def process_audio(
     input_path.write_bytes(content)
 
     params = VoiceLabParams(
+        noise_reduction=max(0, min(100, noise_reduction)),
         pitch_semitones=max(-12, min(12, pitch_semitones)),
         formant_shift=max(-6, min(6, formant_shift)),
         bass_boost_db=max(-6, min(12, bass_boost_db)),
