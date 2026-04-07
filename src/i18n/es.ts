@@ -100,6 +100,14 @@ export const es = {
   recordVoice: "Grabar voz",
   stopRecording: "Detener",
   recording: "Grabando...",
+  infoNoiseReduction: "Elimina el ruido de fondo de la grabacion (ventiladores, zumbidos, ambiente). 0% = desactivado, 50% = moderado (recomendado), 100% = agresivo. Aplicar antes de cualquier otro efecto para mejores resultados.",
+  infoPitch: "Sube o baja el tono fundamental de la voz. Valores negativos hacen la voz mas grave, positivos mas aguda. Diferente a formantes: aqui cambias la nota, no la resonancia.",
+  infoFormant: "Modifica la resonancia del tracto vocal sin cambiar el tono. Es lo que distingue una voz naturalmente profunda de una aguda. Valores negativos dan profundidad y cuerpo, positivos hacen la voz mas fina y ligera.",
+  infoBass: "Refuerza las frecuencias graves (200Hz). Da sensacion de potencia y presencia. Util para voces que suenan delgadas o sin cuerpo.",
+  infoWarmth: "Acentua las frecuencias medias (300Hz) que dan calidez a la voz. Hace que suene mas acogedora y envolvente, como un narrador de radio.",
+  infoCompression: "Iguala el volumen: las partes suaves se amplifican y las fuertes se atenuan. Da un sonido mas profesional y consistente. Valores altos pueden sonar artificial.",
+  infoReverb: "Anade sensacion de espacio, como si narraras en una sala. Poco reverb (5-15%) da presencia de estudio, mucho (50%+) suena a catedral o cueva.",
+  infoSpeed: "Cambia la velocidad de habla sin alterar el tono. Util para ajustar el ritmo narrativo. Valores por debajo de 1.0 ralentizan, por encima aceleran.",
 } as const;
 
 export type TranslationKey = keyof typeof es;

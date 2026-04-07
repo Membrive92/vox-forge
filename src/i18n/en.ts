@@ -102,4 +102,12 @@ export const en: Record<TranslationKey, string> = {
   recordVoice: "Record voice",
   stopRecording: "Stop",
   recording: "Recording...",
+  infoNoiseReduction: "Remove background noise from the recording (fans, hums, ambient). 0% = off, 50% = moderate (recommended), 100% = aggressive. Applied before any other effect for best results.",
+  infoPitch: "Raise or lower the fundamental tone of the voice. Negative = deeper, positive = higher. Different from formants: this changes the note, not the resonance.",
+  infoFormant: "Modify the vocal tract resonance without changing pitch. This is what distinguishes a naturally deep voice from a high one. Negative values add depth and body, positive values make the voice thinner and lighter.",
+  infoBass: "Boost low frequencies (200Hz). Adds power and presence. Useful for voices that sound thin or lack body.",
+  infoWarmth: "Emphasize mid frequencies (300Hz) that give warmth to the voice. Makes it sound more welcoming and enveloping, like a radio narrator.",
+  infoCompression: "Evens out volume: quiet parts get louder, loud parts get softer. Gives a more professional and consistent sound. High values may sound artificial.",
+  infoReverb: "Add a sense of space, as if narrating in a room. Low reverb (5-15%) gives studio presence, high (50%+) sounds like a cathedral or cave.",
+  infoSpeed: "Change speech speed without altering pitch. Useful for adjusting narrative rhythm. Values below 1.0 slow down, above 1.0 speed up.",
 };

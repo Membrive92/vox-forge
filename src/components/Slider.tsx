@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { colors, fonts } from "@/theme/tokens";
 
 interface SliderProps {
@@ -8,6 +10,7 @@ interface SliderProps {
   max?: number;
   step?: number;
   unit?: string;
+  info?: string | undefined;
 }
 
 export function Slider({
@@ -18,13 +21,40 @@ export function Slider({
   max = 100,
   step = 1,
   unit = "",
+  info,
 }: SliderProps) {
   const pct = ((value - min) / (max - min)) * 100;
+  const [showInfo, setShowInfo] = useState(false);
+
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-        <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: fonts.sans }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: fonts.sans, display: "flex", alignItems: "center", gap: 6 }}>
           {label}
+          {info && (
+            <span
+              onMouseEnter={() => setShowInfo(true)}
+              onMouseLeave={() => setShowInfo(false)}
+              onClick={() => setShowInfo((v) => !v)}
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                background: showInfo ? colors.primary : "rgba(148,163,184,0.15)",
+                color: showInfo ? "#fff" : colors.textDim,
+                fontSize: 10,
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                flexShrink: 0,
+              }}
+            >
+              i
+            </span>
+          )}
         </span>
         <span
           style={{
@@ -38,6 +68,22 @@ export function Slider({
           {unit}
         </span>
       </div>
+      {showInfo && info && (
+        <div
+          style={{
+            fontSize: 11,
+            color: colors.textMuted,
+            background: "rgba(30,41,59,0.8)",
+            border: `1px solid ${colors.border}`,
+            borderRadius: 6,
+            padding: "8px 10px",
+            marginBottom: 8,
+            lineHeight: 1.5,
+          }}
+        >
+          {info}
+        </div>
+      )}
       <div style={{ position: "relative", height: 6, background: colors.textDark, borderRadius: 3 }}>
         <div
           style={{
