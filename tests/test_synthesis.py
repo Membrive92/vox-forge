@@ -21,6 +21,7 @@ def test_synthesize_returns_audio_file(client) -> None:
     assert response.headers["content-type"].startswith("audio/mp3")
     assert response.headers.get("x-audio-duration") is not None
     assert response.headers.get("x-audio-size") is not None
+    assert response.headers.get("x-audio-engine") == "edge-tts"
     assert len(response.content) > 0
 
 

@@ -69,6 +69,35 @@ describe("App — audio synthesis", () => {
       { timeout: 5000 },
     );
   });
+
+  it("shows EDGE-TTS engine badge after generation", async () => {
+    const { user } = renderApp();
+    const textarea = screen.getByPlaceholderText(/escribe o pega/i);
+    await user.type(textarea, "Test");
+    await user.click(screen.getByText("Generar Audio"));
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("EDGE-TTS")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
+  });
+
+  it("shows engine label in toast after generation", async () => {
+    const { user } = renderApp();
+    const textarea = screen.getByPlaceholderText(/escribe o pega/i);
+    await user.type(textarea, "Test toast");
+    await user.click(screen.getByText("Generar Audio"));
+
+    await waitFor(
+      () => {
+        // Toast should contain both "Audio listo" and the engine label
+        expect(screen.getByText(/voz del sistema/i)).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
+  });
 });
 
 describe("App — profile CRUD", () => {

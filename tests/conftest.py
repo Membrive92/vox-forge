@@ -10,6 +10,7 @@ Goals:
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import types
 from pathlib import Path
@@ -69,6 +70,10 @@ class _FakeAudioSegment:
         return cls()
 
     @classmethod
+    def from_wav(cls, _path: str) -> "_FakeAudioSegment":
+        return cls()
+
+    @classmethod
     def from_file(cls, _path: str) -> "_FakeAudioSegment":
         return cls()
 
@@ -84,6 +89,23 @@ class _FakeAudioSegment:
         Path(path).write_bytes(_FAKE_MP3_BYTES)
 
 
+class _FakeTorch:
+    """Minimal torch stub for clone_engine imports."""
+
+    @staticmethod
+    def cuda_is_available() -> bool:
+        return False
+
+    class cuda:
+        @staticmethod
+        def is_available() -> bool:
+            return False
+
+        @staticmethod
+        def empty_cache() -> None:
+            pass
+
+
 def _install_stubs() -> None:
     edge_tts = types.ModuleType("edge_tts")
     edge_tts.Communicate = _FakeCommunicate  # type: ignore[attr-defined]
@@ -94,10 +116,26 @@ def _install_stubs() -> None:
     pydub.AudioSegment = _FakeAudioSegment  # type: ignore[attr-defined]
     sys.modules.setdefault("pydub", pydub)
 
+    # Stub torch so clone_engine can import without CUDA
+    if "torch" not in sys.modules:
+        torch = types.ModuleType("torch")
+        torch.cuda = _FakeTorch.cuda  # type: ignore[attr-defined]
+        sys.modules["torch"] = torch
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+_original_which = shutil.which
+
+
+def _patched_which(name: str, *args: object, **kwargs: object):
+    """In tests, pretend ffmpeg/ffprobe exist (pydub is stubbed anyway)."""
+    if name in ("ffmpeg", "ffprobe"):
+        return f"/usr/bin/{name}"
+    return _original_which(name, *args, **kwargs)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -107,7 +145,9 @@ def _session_env(tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
     os.environ["VOXFORGE_BASE_DIR"] = str(tmp_base)
     os.environ["VOXFORGE_DATA_SUBDIR"] = "data"
     _install_stubs()
+    shutil.which = _patched_which  # type: ignore[assignment]
     yield
+    shutil.which = _original_which  # type: ignore[assignment]
     os.environ.pop("VOXFORGE_BASE_DIR", None)
     os.environ.pop("VOXFORGE_DATA_SUBDIR", None)
 
