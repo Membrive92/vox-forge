@@ -15,6 +15,8 @@ export interface SynthSettings {
   setPitch: (v: number) => void;
   volume: number;
   setVolume: (v: number) => void;
+  activeProfileId: string | null;
+  setActiveProfileId: (v: string | null) => void;
 }
 
 export interface ProfileDraft {

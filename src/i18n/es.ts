@@ -59,6 +59,12 @@ export const es = {
   synthesizingChunks: "Sintetizando texto largo...",
   concatenating: "Concatenando segmentos...",
   longTextHint: "Texto largo: se dividirá en segmentos automáticamente",
+  engineEdgeTts: "Voz del sistema (Edge-TTS)",
+  engineXttsV2: "Voz clonada (XTTS v2)",
+  cloningVoice: "Clonando voz...",
+  uploadText: "Subir",
+  uploadTextDesc: "Sube un archivo .txt, .docx o .pdf y se procesara automaticamente para lectura optima",
+  textProcessed: "Texto procesado",
 } as const;
 
 export type TranslationKey = keyof typeof es;

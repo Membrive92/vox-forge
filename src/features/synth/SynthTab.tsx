@@ -1,3 +1,6 @@
+import { useRef, useState } from "react";
+
+import { preprocessFile } from "@/api/preprocess";
 import { Slider } from "@/components/Slider";
 import { WaveformVisualizer } from "@/components/WaveformVisualizer";
 import * as Icons from "@/components/icons";
@@ -27,8 +30,24 @@ interface SynthTabProps {
 export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps) {
   const player = useAudioPlayer();
   const synthesis = useSynthesis();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const voiceList = VOICES[settings.lang];
+
+  const handleUploadFile = async (file: File | undefined): Promise<void> => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const result = await preprocessFile(file);
+      setText(result.text);
+      onToast(`${t.textProcessed} (${result.original_length} → ${result.processed_length} chars)`);
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const isLongText = text.length > 3000;
   const steps = isLongText
@@ -44,11 +63,13 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
         speed: settings.speed,
         pitch: settings.pitch,
         volume: settings.volume,
+        profileId: settings.activeProfileId ?? undefined,
       },
       steps,
-      onSuccess: (blob, duration) => {
+      onSuccess: (blob, duration, engine) => {
         player.load(blob, duration);
-        onToast(t.audioReady);
+        const engineLabel = engine === "xtts-v2" ? t.engineXttsV2 : t.engineEdgeTts;
+        onToast(`${t.audioReady} — ${engineLabel}`);
       },
       onError: (msg) => onToast(`Error: ${msg}`),
     });
@@ -67,7 +88,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
   const canGenerate = !synthesis.isGenerating && text.trim().length > 0;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24 }}>
       {/* Left: text + waveform */}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div
@@ -85,7 +106,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
             placeholder={t.textPlaceholder}
             style={{
               width: "100%",
-              minHeight: 220,
+              minHeight: 450,
               padding: 20,
               resize: "vertical",
               background: "none",
@@ -175,6 +196,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
             synthesisDone={synthesis.isGenerated}
             format={settings.format}
             onDownload={handleDownload}
+            lastEngine={synthesis.lastEngine}
           />
           {synthesis.isGenerating ? (
             <ProgressBar
@@ -212,13 +234,46 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
           >
             {t.voice}
           </label>
+          {settings.activeProfileId && (
+            <div
+              style={{
+                marginBottom: 8,
+                padding: "6px 10px",
+                borderRadius: radii.sm,
+                background: colors.accentGlow,
+                border: `1px solid ${colors.accent}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: 11,
+                fontWeight: 600,
+                color: colors.accent,
+              }}
+            >
+              <span>{t.engineXttsV2}</span>
+              <button
+                onClick={() => settings.setActiveProfileId(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: colors.accent,
+                  cursor: "pointer",
+                  fontSize: 11,
+                  fontFamily: fonts.sans,
+                  textDecoration: "underline",
+                }}
+              >
+                {t.cancel}
+              </button>
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {voiceList.map((v) => {
               const active = settings.selectedVoice === v.id;
               return (
                 <button
                   key={v.id}
-                  onClick={() => settings.setSelectedVoice(v.id)}
+                  onClick={() => { settings.setSelectedVoice(v.id); settings.setActiveProfileId(null); }}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -261,6 +316,43 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
           <Slider label={t.volume} value={settings.volume} onChange={settings.setVolume} min={0} max={100} unit="%" />
         </div>
 
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.doc,.docx,.pdf"
+            style={{ display: "none" }}
+            onChange={(e) => void handleUploadFile(e.target.files?.[0])}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            title={t.uploadTextDesc}
+            style={{
+              width: "100%",
+              padding: "10px 0",
+              borderRadius: radii.lg,
+              marginBottom: 8,
+              background: colors.surfaceAlt,
+              border: `1px solid ${colors.border}`,
+              color: colors.textMuted,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: isUploading ? "default" : "pointer",
+              fontFamily: fonts.sans,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              opacity: isUploading ? 0.5 : 1,
+              transition: "all 0.2s",
+            }}
+          >
+            <Icons.Upload />
+            {isUploading ? "..." : t.uploadText}
+          </button>
+        </div>
+
         <button
           onClick={() => void handleGenerate()}
           disabled={!canGenerate}
@@ -301,9 +393,10 @@ interface PlayerControlsProps {
   synthesisDone: boolean;
   format: string;
   onDownload: () => void;
+  lastEngine: string | null;
 }
 
-function PlayerControls({ t, player, synthesisDone, format, onDownload }: PlayerControlsProps) {
+function PlayerControls({ t, player, synthesisDone, format, onDownload, lastEngine }: PlayerControlsProps) {
   const ready = synthesisDone && player.url !== null;
   const playColor = player.isPlaying ? colors.accent : colors.primary;
   return (
@@ -343,6 +436,24 @@ function PlayerControls({ t, player, synthesisDone, format, onDownload }: Player
         {player.duration > 0 && (
           <span style={{ fontSize: 11, color: colors.textDim, fontFamily: fonts.mono, marginLeft: 4 }}>
             {formatDuration(player.duration)}
+          </span>
+        )}
+        {lastEngine && (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              fontFamily: fonts.mono,
+              padding: "2px 6px",
+              borderRadius: 4,
+              marginLeft: 6,
+              background: lastEngine === "xtts-v2" ? colors.accentGlow : colors.primarySoft,
+              color: lastEngine === "xtts-v2" ? colors.accent : colors.primaryLight,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            {lastEngine === "xtts-v2" ? "CLONED" : "EDGE-TTS"}
           </span>
         )}
         <button

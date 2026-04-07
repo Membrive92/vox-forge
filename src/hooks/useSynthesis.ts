@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 
+
 import { synthesize } from "@/api/synthesis";
 import type { SynthesisParams } from "@/types/domain";
 
@@ -8,6 +9,7 @@ export interface SynthesisState {
   isGenerated: boolean;
   progress: number;
   stepLabel: string;
+  lastEngine: string | null;
   reset: () => void;
 }
 
@@ -16,7 +18,7 @@ const STEP_INTERVAL_MS = 600;
 export interface RunSynthesisOptions {
   params: SynthesisParams;
   steps: readonly string[];
-  onSuccess: (blob: Blob, duration: number) => void;
+  onSuccess: (blob: Blob, duration: number, engine: string) => void;
   onError: (message: string) => void;
 }
 
@@ -29,6 +31,7 @@ export function useSynthesis(): SynthesisHook {
   const [isGenerated, setIsGenerated] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stepLabel, setStepLabel] = useState("");
+  const [lastEngine, setLastEngine] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
 
   const clearInterval = useCallback(() => {
@@ -44,14 +47,20 @@ export function useSynthesis(): SynthesisHook {
     setIsGenerated(false);
     setProgress(0);
     setStepLabel("");
+    setLastEngine(null);
   }, [clearInterval]);
+
+  const runningRef = useRef(false);
 
   const run = useCallback(
     async ({ params, steps, onSuccess, onError }: RunSynthesisOptions) => {
       if (!params.text.trim()) return;
+      if (runningRef.current) return; // Prevent double submission
+      runningRef.current = true;
       setIsGenerating(true);
       setIsGenerated(false);
       setProgress(0);
+      setLastEngine(null);
       setStepLabel(steps[0] ?? "");
 
       let stepIdx = 0;
@@ -62,21 +71,24 @@ export function useSynthesis(): SynthesisHook {
       }, STEP_INTERVAL_MS);
 
       try {
-        const { blob, duration } = await synthesize(params);
+        const { blob, duration, engine } = await synthesize(params);
         clearInterval();
         setProgress(100);
         setIsGenerating(false);
         setIsGenerated(true);
-        onSuccess(blob, duration);
+        setLastEngine(engine);
+        runningRef.current = false;
+        onSuccess(blob, duration, engine);
       } catch (e) {
         clearInterval();
         setIsGenerating(false);
         setProgress(0);
-        onError(e instanceof Error ? e.message : "Error desconocido");
+        runningRef.current = false;
+        onError(e instanceof Error ? e.message : "Unknown error");
       }
     },
     [clearInterval],
   );
 
-  return { isGenerating, isGenerated, progress, stepLabel, reset, run };
+  return { isGenerating, isGenerated, progress, stepLabel, lastEngine, reset, run };
 }

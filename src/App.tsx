@@ -29,6 +29,7 @@ export default function App() {
   const [speed, setSpeed] = useState(100);
   const [pitch, setPitch] = useState(0);
   const [volume, setVolume] = useState(80);
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
 
   const [newProfileName, setNewProfileName] = useState("");
   const [uploadedFile, setUploadedFile] = useState<UploadedSample | null>(null);
@@ -48,6 +49,7 @@ export default function App() {
     speed, setSpeed,
     pitch, setPitch,
     volume, setVolume,
+    activeProfileId, setActiveProfileId,
   };
 
   const draft: ProfileDraft = {
@@ -97,6 +99,7 @@ export default function App() {
     setPitch(p.pitch);
     setVolume(p.volume);
     setLang(p.lang);
+    setActiveProfileId(p.id);
     setTab("synth");
   };
 
@@ -137,7 +140,7 @@ export default function App() {
       <Header t={t} lang={lang} onToggleLang={handleToggleLang} />
       <TabsNav t={t} tab={tab} setTab={setTab} />
 
-      <main style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1100, margin: "0 auto" }}>
+      <main style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
         {tab === "synth" && (
           <SynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} />
         )}

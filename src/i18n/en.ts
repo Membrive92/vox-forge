@@ -61,4 +61,10 @@ export const en: Record<TranslationKey, string> = {
   synthesizingChunks: "Synthesizing long text...",
   concatenating: "Concatenating segments...",
   longTextHint: "Long text: will be split into segments automatically",
+  engineEdgeTts: "System voice (Edge-TTS)",
+  engineXttsV2: "Cloned voice (XTTS v2)",
+  cloningVoice: "Cloning voice...",
+  uploadText: "Upload",
+  uploadTextDesc: "Upload a .txt, .docx or .pdf file and it will be automatically processed for optimal reading",
+  textProcessed: "Text processed",
 };

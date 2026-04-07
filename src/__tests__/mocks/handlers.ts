@@ -100,6 +100,8 @@ export const handlers = [
         "Content-Type": `audio/${body.output_format}`,
         "X-Audio-Duration": "1.5",
         "X-Audio-Size": String(fakeAudio.length),
+        "X-Audio-Engine": "edge-tts",
+        "X-Audio-Chunks": "1",
       },
     });
   }),

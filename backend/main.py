@@ -6,9 +6,10 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from .checks import run_startup_checks
 from .config import settings
 from .exceptions import register_exception_handlers
-from .routers import health, profiles, synthesis, voices
+from .routers import health, preprocess, profiles, synthesis, voices
 
 
 def _configure_logging() -> None:
@@ -20,6 +21,7 @@ def _configure_logging() -> None:
 
 def create_app() -> FastAPI:
     _configure_logging()
+    run_startup_checks()
 
     app = FastAPI(
         title="VoxForge API",
@@ -33,7 +35,7 @@ def create_app() -> FastAPI:
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=["X-Audio-Duration", "X-Audio-Size", "X-Audio-Chunks", "X-Text-Length", "Content-Disposition"],
+        expose_headers=["X-Audio-Duration", "X-Audio-Size", "X-Audio-Chunks", "X-Audio-Engine", "X-Text-Length", "Content-Disposition"],
     )
 
     register_exception_handlers(app)
@@ -42,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(synthesis.router, prefix="/api")
     app.include_router(voices.router, prefix="/api")
     app.include_router(profiles.router, prefix="/api")
+    app.include_router(preprocess.router, prefix="/api")
     app.include_router(health.router, prefix="/api")
 
     return app

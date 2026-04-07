@@ -30,7 +30,7 @@ export interface SynthesisParams {
   speed: number;
   pitch: number;
   volume: number;
-  profileId?: string;
+  profileId?: string | undefined;
 }
 
 export interface UploadedSample {
