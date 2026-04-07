@@ -19,6 +19,7 @@ import torch
 from pydub import AudioSegment
 
 from ..config import settings
+from ..cancellation import CancelledError, CancellationToken
 from ..exceptions import SynthesisError
 from ..paths import OUTPUT_DIR, TEMP_DIR
 
@@ -249,10 +250,13 @@ class CloneEngine:
         file_id: str,
         count: int,
         offset: int = 0,
+        cancel_token: CancellationToken | None = None,
     ) -> list[Path]:
         """Generate N candidate audio files for a chunk."""
         candidates: list[Path] = []
         for i in range(count):
+            if cancel_token is not None:
+                cancel_token.check()
             candidate = TEMP_DIR / f"{file_id}_cand{offset + i}.wav"
             candidates.append(candidate)
             await self._generate_one(
@@ -268,6 +272,7 @@ class CloneEngine:
         text: str,
         speaker_wav: str | Path,
         language: str = "es",
+        cancel_token: CancellationToken | None = None,
     ) -> Path:
         """Synthesize a single chunk using voice cloning.
 
@@ -294,6 +299,7 @@ class CloneEngine:
                 # First round of candidates
                 candidates = await self._generate_candidates(
                     text, str(speaker_wav), xtts_lang, file_id, _CANDIDATES_PER_CHUNK,
+                    cancel_token=cancel_token,
                 )
                 all_candidates.extend(candidates)
 
@@ -314,6 +320,7 @@ class CloneEngine:
                     extra = await self._generate_candidates(
                         text, str(speaker_wav), xtts_lang, file_id,
                         _CANDIDATES_PER_CHUNK, offset=len(all_candidates),
+                        cancel_token=cancel_token,
                     )
                     all_candidates.extend(extra)
                     scored = [(c, self._score_audio(c)) for c in all_candidates]
@@ -343,6 +350,13 @@ class CloneEngine:
             )
             return output_path
 
+        except CancelledError:
+            for c in all_candidates:
+                c.unlink(missing_ok=True)
+            self._clear_cuda_cache()
+            logger.info("Clone synthesis cancelled by client")
+            raise SynthesisError("Synthesis cancelled: client disconnected") from None
+
         except asyncio.TimeoutError:
             for c in all_candidates:
                 c.unlink(missing_ok=True)
@@ -370,6 +384,7 @@ class CloneEngine:
         language: str,
         output_format: str,
         format_config: dict,
+        cancel_token: CancellationToken | None = None,
     ) -> tuple[Path, int]:
         """Synthesize multiple chunks with cloning and concatenate.
 
@@ -383,7 +398,9 @@ class CloneEngine:
         try:
             for i, chunk in enumerate(chunks):
                 chunk_text = chunk.text if hasattr(chunk, "text") else str(chunk)
-                chunk_path = await self.synthesize_chunk(chunk_text, speaker_wav, language)
+                if cancel_token is not None:
+                    cancel_token.check()
+                chunk_path = await self.synthesize_chunk(chunk_text, speaker_wav, language, cancel_token=cancel_token)
                 temp_files.append(chunk_path)
                 logger.info("Clone chunk %d/%d done: '%s'", i + 1, len(chunks),
                             chunk_text[:60] + ("..." if len(chunk_text) > 60 else ""))

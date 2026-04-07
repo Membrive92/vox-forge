@@ -10,6 +10,7 @@ from pathlib import Path
 import edge_tts
 from pydub import AudioSegment
 
+from ..cancellation import CancellationToken
 from ..catalogs import AUDIO_FORMATS, all_voice_ids
 from ..config import settings
 from ..exceptions import SynthesisError, UnsupportedFormatError, UnsupportedVoiceError
@@ -203,7 +204,7 @@ class TTSEngine:
             self._clone_engine = CloneEngine()
         return self._clone_engine
 
-    async def synthesize(self, request: SynthesisRequest) -> SynthesisResult:
+    async def synthesize(self, request: SynthesisRequest, cancel_token: CancellationToken | None = None) -> SynthesisResult:
         """Synthesize text and return the result with engine info.
 
         Routes to XTTS v2 if the profile has a voice sample, otherwise
@@ -236,7 +237,7 @@ class TTSEngine:
 
         # Route to clone engine if we have a sample
         if sample_path is not None:
-            return await self._synthesize_cloned(request, sample_path, profile_language)
+            return await self._synthesize_cloned(request, sample_path, profile_language, cancel_token)
 
         # Otherwise use Edge-TTS
         if request.voice_id not in all_voice_ids():
@@ -312,6 +313,7 @@ class TTSEngine:
         request: SynthesisRequest,
         sample_path: Path,
         language: str,
+        cancel_token: CancellationToken | None = None,
     ) -> SynthesisResult:
         """Synthesize text using XTTS v2 voice cloning."""
         logger.info("Using XTTS v2 cloning with sample: %s", sample_path.name)
@@ -325,6 +327,7 @@ class TTSEngine:
             language=language,
             output_format=request.output_format,
             format_config=fmt_cfg,
+            cancel_token=cancel_token,
         )
         return SynthesisResult(path=path, chunks=chunk_count, engine="xtts-v2")
 

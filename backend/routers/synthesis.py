@@ -1,10 +1,11 @@
 """Text-to-speech synthesis endpoint."""
 from __future__ import annotations
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import FileResponse
 from pydub import AudioSegment
 
+from ..cancellation import create_cancellation_token
 from ..dependencies import get_tts_engine
 from ..schemas import SynthesisRequest
 from ..services.tts_engine import TTSEngine
@@ -16,6 +17,7 @@ router = APIRouter(tags=["synthesis"])
 @router.post("/synthesize", summary="Synthesize text to audio")
 async def synthesize_text(
     request: SynthesisRequest,
+    http_request: Request,
     background_tasks: BackgroundTasks,
     engine: TTSEngine = Depends(get_tts_engine),
 ) -> FileResponse:
@@ -23,16 +25,15 @@ async def synthesize_text(
 
     Routes to XTTS v2 (voice cloning) if the profile has a voice sample,
     otherwise uses Edge-TTS (Microsoft neural voices).
-    Long texts are automatically split into chunks and concatenated.
+    Automatically cancels if the client disconnects mid-generation.
     """
-    result = await engine.synthesize(request)
+    cancel_token = create_cancellation_token(http_request)
+    result = await engine.synthesize(request, cancel_token=cancel_token)
 
     try:
         audio = AudioSegment.from_file(str(result.path))
         duration = round(len(audio) / 1000.0, 2)
     except Exception:
-        # ffmpeg not installed or corrupt file — estimate from file size
-        # MP3 ~128kbps = 16KB/s
         size = result.path.stat().st_size
         duration = round(size / 16000, 1) if size > 0 else 0.0
 
