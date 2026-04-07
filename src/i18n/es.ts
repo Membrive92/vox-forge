@@ -80,6 +80,7 @@ export const es = {
   labTitle: "Laboratorio de voz",
   labDesc: "Modifica las propiedades de tu voz para narrar",
   labSourceAudio: "Tu audio de voz",
+  labNoiseReduction: "Reduccion de ruido",
   labPitch: "Tono",
   labFormant: "Formantes",
   labBass: "Profundidad",
@@ -96,6 +97,9 @@ export const es = {
   labNarrators: "Narradores",
   labCharacters: "Personajes",
   labEffects: "Efectos",
+  recordVoice: "Grabar voz",
+  stopRecording: "Detener",
+  recording: "Grabando...",
 } as const;
 
 export type TranslationKey = keyof typeof es;

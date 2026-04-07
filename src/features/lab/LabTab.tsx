@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { listPresets, processAudio, randomPreset, type Preset, type VoiceLabParams } from "@/api/voiceLab";
+import { AudioRecorder } from "@/components/AudioRecorder";
 import { Slider } from "@/components/Slider";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
@@ -13,6 +14,7 @@ interface LabTabProps {
 }
 
 const DEFAULT_PARAMS: VoiceLabParams = {
+  noise_reduction: 0,
   pitch_semitones: 0,
   formant_shift: 0,
   bass_boost_db: 0,
@@ -97,6 +99,17 @@ export function LabTab({ t, onToast }: LabTabProps) {
           <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700 }}>{t.labTitle}</h3>
           <p style={{ margin: "0 0 16px", fontSize: 12, color: colors.textDim }}>{t.labDesc}</p>
 
+          <AudioRecorder
+            onRecorded={setSourceFile}
+            labelRecord={t.recordVoice}
+            labelStop={t.stopRecording}
+            labelRecording={t.recording}
+          />
+
+          <div style={{ textAlign: "center", fontSize: 11, color: colors.textDim, margin: "8px 0" }}>
+            {t.or}
+          </div>
+
           <input ref={sourceInputRef} type="file" accept=".wav,.mp3,.ogg,.flac" style={{ display: "none" }} onChange={(e) => setSourceFile(e.target.files?.[0] ?? null)} />
           <button
             onClick={() => sourceInputRef.current?.click()}
@@ -116,6 +129,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
 
         {/* Sliders */}
         <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radii.xl, padding: 24, backdropFilter: "blur(12px)" }}>
+          <Slider label={t.labNoiseReduction} value={params.noise_reduction} onChange={(v) => setParam("noise_reduction", v)} min={0} max={100} unit="%" />
           <Slider label={t.labPitch} value={params.pitch_semitones} onChange={(v) => setParam("pitch_semitones", v)} min={-12} max={12} step={0.5} unit="st" />
           <Slider label={t.labFormant} value={params.formant_shift} onChange={(v) => setParam("formant_shift", v)} min={-6} max={6} step={0.5} unit="st" />
           <Slider label={t.labBass} value={params.bass_boost_db} onChange={(v) => setParam("bass_boost_db", v)} min={-6} max={12} step={0.5} unit="dB" />

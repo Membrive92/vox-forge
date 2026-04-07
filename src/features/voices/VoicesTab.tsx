@@ -1,5 +1,6 @@
 import { useRef } from "react";
 
+import { AudioRecorder } from "@/components/AudioRecorder";
 import { Slider } from "@/components/Slider";
 import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
@@ -246,7 +247,18 @@ function UploadCard({
       }}
     >
       <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700 }}>{t.uploadVoice}</h3>
-      <p style={{ margin: "0 0 20px", fontSize: 12, color: colors.textDim }}>{t.uploadHint}</p>
+      <p style={{ margin: "0 0 16px", fontSize: 12, color: colors.textDim }}>{t.uploadHint}</p>
+
+      <AudioRecorder
+        onRecorded={(file) => void onFile(file)}
+        labelRecord={t.recordVoice}
+        labelStop={t.stopRecording}
+        labelRecording={t.recording}
+      />
+
+      <div style={{ textAlign: "center", fontSize: 11, color: colors.textDim, margin: "8px 0" }}>
+        {t.or}
+      </div>
 
       <div
         onDragOver={(e) => {

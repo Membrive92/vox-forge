@@ -82,6 +82,7 @@ export const en: Record<TranslationKey, string> = {
   labTitle: "Voice laboratory",
   labDesc: "Modify your voice properties for narration",
   labSourceAudio: "Your voice audio",
+  labNoiseReduction: "Noise reduction",
   labPitch: "Pitch",
   labFormant: "Formants",
   labBass: "Depth",
@@ -98,4 +99,7 @@ export const en: Record<TranslationKey, string> = {
   labNarrators: "Narrators",
   labCharacters: "Characters",
   labEffects: "Effects",
+  recordVoice: "Record voice",
+  stopRecording: "Stop",
+  recording: "Recording...",
 };
