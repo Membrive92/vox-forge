@@ -108,6 +108,17 @@ export const es = {
   infoCompression: "Iguala el volumen: las partes suaves se amplifican y las fuertes se atenuan. Da un sonido mas profesional y consistente. Valores altos pueden sonar artificial.",
   infoReverb: "Anade sensacion de espacio, como si narraras en una sala. Poco reverb (5-15%) da presencia de estudio, mucho (50%+) suena a catedral o cueva.",
   infoSpeed: "Cambia la velocidad de habla sin alterar el tono. Util para ajustar el ritmo narrativo. Valores por debajo de 1.0 ralentizan, por encima aceleran.",
+  tabExperimental: "Experimental",
+  expTitle: "Clonacion cross-lingual",
+  expDesc: "Prueba a generar texto en un idioma usando el timbre de una voz en otro idioma. Resultados variables.",
+  expText: "Texto a sintetizar",
+  expTextPlaceholder: "Escribe el texto que quieres generar con la voz de la muestra...",
+  expVoiceSample: "Muestra de voz (cualquier idioma)",
+  expTargetLang: "Idioma del texto",
+  expGenerate: "Generar",
+  expGenerating: "Generando...",
+  expReady: "Audio generado (experimental)",
+  expWarning: "Experimental: el acento puede no coincidir con el idioma objetivo",
 } as const;
 
 export type TranslationKey = keyof typeof es;

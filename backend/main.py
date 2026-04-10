@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .checks import run_startup_checks
 from .config import settings
 from .exceptions import register_exception_handlers
-from .routers import conversion, health, preprocess, profiles, synthesis, voice_lab, voices
+from .routers import conversion, experimental, health, preprocess, profiles, synthesis, voice_lab, voices
 
 
 def _configure_logging() -> None:
@@ -47,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(preprocess.router, prefix="/api")
     app.include_router(conversion.router, prefix="/api")
     app.include_router(voice_lab.router, prefix="/api")
+    app.include_router(experimental.router, prefix="/api")
     app.include_router(health.router, prefix="/api")
 
     return app

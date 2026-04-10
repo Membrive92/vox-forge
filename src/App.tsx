@@ -4,6 +4,7 @@ import { Toast } from "@/components/Toast";
 import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
 import { ConvertTab } from "@/features/convert/ConvertTab";
+import { ExperimentalTab } from "@/features/experimental/ExperimentalTab";
 import { LabTab } from "@/features/lab/LabTab";
 import { ProfilesTab } from "@/features/profiles/ProfilesTab";
 import { SynthTab } from "@/features/synth/SynthTab";
@@ -17,7 +18,7 @@ import { getTranslations } from "@/i18n";
 import { colors, fonts, fontsHref } from "@/theme/tokens";
 import type { AudioFormat, Language, Profile, UploadedSample } from "@/types/domain";
 
-type Tab = "synth" | "voices" | "profiles" | "convert" | "lab";
+type Tab = "synth" | "voices" | "profiles" | "convert" | "lab" | "experimental";
 
 export default function App() {
   const [lang, setLang] = useState<Language>("es");
@@ -183,6 +184,12 @@ export default function App() {
             onToast={toast.show}
           />
         )}
+        {tab === "experimental" && (
+          <ExperimentalTab
+            t={t}
+            onToast={toast.show}
+          />
+        )}
       </main>
     </div>
   );
@@ -322,6 +329,7 @@ function TabsNav({ t, tab, setTab }: TabsNavProps) {
     { id: "profiles", icon: <Icons.User />, label: t.tabProfiles },
     { id: "convert", icon: <Icons.Mic />, label: t.tabConvert },
     { id: "lab", icon: <Icons.Settings />, label: t.tabLab },
+    { id: "experimental", icon: <Icons.Waveform />, label: t.tabExperimental },
   ];
   return (
     <nav
