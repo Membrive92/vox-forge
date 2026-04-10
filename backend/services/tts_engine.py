@@ -223,10 +223,9 @@ class TTSEngine:
         if request.profile_id:
             profile = self._profiles.get(request.profile_id)
             if profile is not None:
+                # Only override voice_id for routing. Speed/pitch/volume
+                # come from the request (frontend sliders), not the profile.
                 request.voice_id = profile.voice_id
-                request.speed = profile.speed
-                request.pitch = profile.pitch
-                request.volume = profile.volume
                 profile_language = profile.language
                 if profile.sample_filename:
                     from ..paths import VOICES_DIR
@@ -308,6 +307,26 @@ class TTSEngine:
             for tf in temp_files:
                 tf.unlink(missing_ok=True)
 
+    @staticmethod
+    def _apply_volume(path: Path, volume: int) -> None:
+        """Apply volume adjustment to a generated audio file.
+
+        XTTS v2 doesn't support volume natively. Speed is handled
+        by the model's native `speed` parameter.
+        Volume: 80 = default (0dB), 0 = -40dB, 100 = +10dB.
+        """
+        if volume == 80:
+            return
+        try:
+            audio = AudioSegment.from_file(str(path))
+            db_change = (volume - 80) * 0.5
+            adjusted = audio + db_change
+            audio_format = path.suffix.lstrip(".")
+            adjusted.export(str(path), format=audio_format)
+            logger.info("Volume adjusted: %.1fdB (volume=%d)", db_change, volume)
+        except Exception as exc:
+            logger.warning("Could not adjust volume: %s", exc)
+
     async def _synthesize_cloned(
         self,
         request: SynthesisRequest,
@@ -321,6 +340,9 @@ class TTSEngine:
         chunks = split_into_clone_chunks(request.text)
         logger.info("Text split into %d clone chunks (clause-level, no internal punctuation)", len(chunks))
         fmt_cfg = AUDIO_FORMATS[request.output_format]
+        # XTTS v2 speed param: 1.0 = normal. Convert from our 50-200% scale.
+        xtts_speed = request.speed / 100.0
+
         path, chunk_count = await clone.synthesize_long(
             chunks=chunks,
             speaker_wav=sample_path,
@@ -328,7 +350,12 @@ class TTSEngine:
             output_format=request.output_format,
             format_config=fmt_cfg,
             cancel_token=cancel_token,
+            speed=xtts_speed,
         )
+
+        # Volume post-processing (XTTS v2 doesn't support volume natively)
+        self._apply_volume(path, request.volume)
+
         return SynthesisResult(path=path, chunks=chunk_count, engine="xtts-v2")
 
     @staticmethod

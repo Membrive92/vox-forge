@@ -227,6 +227,7 @@ class CloneEngine:
         speaker_wav: str,
         language: str,
         output_path: Path,
+        speed: float = 1.0,
     ) -> None:
         """Generate a single audio file (one attempt)."""
         assert self._model is not None  # noqa: S101
@@ -237,6 +238,7 @@ class CloneEngine:
                 speaker_wav=speaker_wav,
                 language=language,
                 file_path=str(output_path),
+                speed=speed,
                 **_XTTS_QUALITY_PARAMS,
             ),
             timeout=_CHUNK_TIMEOUT_SECONDS,
@@ -251,6 +253,7 @@ class CloneEngine:
         count: int,
         offset: int = 0,
         cancel_token: CancellationToken | None = None,
+        speed: float = 1.0,
     ) -> list[Path]:
         """Generate N candidate audio files for a chunk."""
         candidates: list[Path] = []
@@ -264,6 +267,7 @@ class CloneEngine:
                 speaker_wav=speaker_wav,
                 language=language,
                 output_path=candidate,
+                speed=speed,
             )
         return candidates
 
@@ -273,6 +277,7 @@ class CloneEngine:
         speaker_wav: str | Path,
         language: str = "es",
         cancel_token: CancellationToken | None = None,
+        speed: float = 1.0,
     ) -> Path:
         """Synthesize a single chunk using voice cloning.
 
@@ -299,7 +304,7 @@ class CloneEngine:
                 # First round of candidates
                 candidates = await self._generate_candidates(
                     text, str(speaker_wav), xtts_lang, file_id, _CANDIDATES_PER_CHUNK,
-                    cancel_token=cancel_token,
+                    cancel_token=cancel_token, speed=speed,
                 )
                 all_candidates.extend(candidates)
 
@@ -320,7 +325,7 @@ class CloneEngine:
                     extra = await self._generate_candidates(
                         text, str(speaker_wav), xtts_lang, file_id,
                         _CANDIDATES_PER_CHUNK, offset=len(all_candidates),
-                        cancel_token=cancel_token,
+                        cancel_token=cancel_token, speed=speed,
                     )
                     all_candidates.extend(extra)
                     scored = [(c, self._score_audio(c)) for c in all_candidates]
@@ -385,6 +390,7 @@ class CloneEngine:
         output_format: str,
         format_config: dict,
         cancel_token: CancellationToken | None = None,
+        speed: float = 1.0,
     ) -> tuple[Path, int]:
         """Synthesize multiple chunks with cloning and concatenate.
 
@@ -400,7 +406,7 @@ class CloneEngine:
                 chunk_text = chunk.text if hasattr(chunk, "text") else str(chunk)
                 if cancel_token is not None:
                     cancel_token.check()
-                chunk_path = await self.synthesize_chunk(chunk_text, speaker_wav, language, cancel_token=cancel_token)
+                chunk_path = await self.synthesize_chunk(chunk_text, speaker_wav, language, cancel_token=cancel_token, speed=speed)
                 temp_files.append(chunk_path)
                 logger.info("Clone chunk %d/%d done: '%s'", i + 1, len(chunks),
                             chunk_text[:60] + ("..." if len(chunk_text) > 60 else ""))
