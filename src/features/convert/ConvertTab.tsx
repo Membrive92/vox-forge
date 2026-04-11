@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 
 import { convertVoice } from "@/api/conversion";
+import { Slider } from "@/components/Slider";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { Translations } from "@/i18n";
@@ -20,6 +21,9 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
   const [targetFile, setTargetFile] = useState<File | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [format, setFormat] = useState("mp3");
+  const [pitchShift, setPitchShift] = useState(0);
+  const [formantShift, setFormantShift] = useState(0);
+  const [bassBoost, setBassBoost] = useState(0);
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const targetInputRef = useRef<HTMLInputElement>(null);
   const player = useAudioPlayer();
@@ -39,6 +43,9 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
         profileId: targetMode === "profile" ? (selectedProfileId ?? undefined) : undefined,
         targetSample: targetMode === "file" ? (targetFile ?? undefined) : undefined,
         outputFormat: format,
+        pitchShift,
+        formantShift,
+        bassBoostDb: bassBoost,
       });
       player.load(result.blob, result.duration);
       onToast(t.conversionReady);
@@ -343,6 +350,50 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
             </button>
           </div>
         )}
+
+        {/* Fine-tune output DSP */}
+        <div style={{
+          marginTop: 8, paddingTop: 16,
+          borderTop: `1px solid ${colors.borderFaint}`,
+        }}>
+          <label style={{
+            fontSize: 11, color: colors.textDim, fontWeight: 600,
+            textTransform: "uppercase", letterSpacing: "1.5px",
+            marginBottom: 12, display: "block",
+          }}>
+            {t.convertFineTune}
+          </label>
+          <Slider
+            label={t.convertPitch}
+            value={pitchShift}
+            onChange={setPitchShift}
+            min={-12}
+            max={12}
+            step={0.5}
+            unit="st"
+            info={t.infoConvertPitch}
+          />
+          <Slider
+            label={t.convertFormant}
+            value={formantShift}
+            onChange={setFormantShift}
+            min={-6}
+            max={6}
+            step={0.5}
+            unit="st"
+            info={t.infoConvertFormant}
+          />
+          <Slider
+            label={t.convertBass}
+            value={bassBoost}
+            onChange={setBassBoost}
+            min={-6}
+            max={12}
+            step={0.5}
+            unit="dB"
+            info={t.infoConvertBass}
+          />
+        </div>
 
         {/* Format selector */}
         <div style={{ display: "flex", gap: 6 }}>

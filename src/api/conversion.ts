@@ -8,19 +8,27 @@ export interface ConversionResult {
   sizeBytes: number;
 }
 
+export interface ConvertOptions {
+  profileId?: string | undefined;
+  targetSample?: File | undefined;
+  outputFormat?: string | undefined;
+  pitchShift?: number | undefined;
+  formantShift?: number | undefined;
+  bassBoostDb?: number | undefined;
+}
+
 export async function convertVoice(
   audioFile: File,
-  options: {
-    profileId?: string | undefined;
-    targetSample?: File | undefined;
-    outputFormat?: string | undefined;
-  },
+  options: ConvertOptions,
 ): Promise<ConversionResult> {
   const fd = new FormData();
   fd.append("audio", audioFile);
   if (options.profileId) fd.append("profile_id", options.profileId);
   if (options.targetSample) fd.append("target_sample", options.targetSample);
   fd.append("output_format", options.outputFormat ?? "mp3");
+  fd.append("pitch_shift", String(options.pitchShift ?? 0));
+  fd.append("formant_shift", String(options.formantShift ?? 0));
+  fd.append("bass_boost_db", String(options.bassBoostDb ?? 0));
 
   const res = await fetch(`${API_BASE}/convert`, { method: "POST", body: fd });
 

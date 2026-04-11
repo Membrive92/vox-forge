@@ -150,6 +150,9 @@ class ConvertEngine:
         source_path: Path,
         target_sample_path: Path,
         output_format: str = "mp3",
+        pitch_shift: float = 0.0,
+        formant_shift: float = 0.0,
+        bass_boost_db: float = 0.0,
     ) -> Path:
         """Convert source audio to match target voice.
 
@@ -157,6 +160,11 @@ class ConvertEngine:
             source_path: Path to the audio to convert.
             target_sample_path: Path to the target voice reference (6-30s).
             output_format: Output format (mp3, wav, ogg, flac).
+            pitch_shift: Pitch adjustment in semitones after conversion
+                (-12 to +12). Negative = deeper.
+            formant_shift: Formant resonance shift after conversion
+                (-6 to +6). Negative = deeper, more chest resonance.
+            bass_boost_db: Low-frequency shelf boost in dB (-6 to +12).
 
         Returns:
             Path to the converted audio file.
@@ -204,6 +212,26 @@ class ConvertEngine:
 
             # Post-normalize to restore full loudness (convert() does not)
             await asyncio.to_thread(self._normalize_output, temp_wav)
+
+            # Optional DSP post-processing (pitch, formants, bass)
+            # Lets the user fine-tune residual brightness/darkness of the
+            # converted voice. Applied on the WAV before format export.
+            if abs(pitch_shift) > 0.05 or abs(formant_shift) > 0.05 or abs(bass_boost_db) > 0.05:
+                from .voice_lab_engine import VoiceLabEngine, VoiceLabParams
+
+                lab = VoiceLabEngine()
+                params = VoiceLabParams(
+                    pitch_semitones=pitch_shift,
+                    formant_shift=formant_shift,
+                    bass_boost_db=bass_boost_db,
+                )
+                logger.info(
+                    "Applying DSP post-processing: pitch=%.1fst formant=%.1fst bass=%.1fdB",
+                    pitch_shift, formant_shift, bass_boost_db,
+                )
+                post_path = await lab.process(temp_wav, params, "wav")
+                temp_wav.unlink(missing_ok=True)
+                temp_wav = post_path
 
             # Export to requested format
             if output_format == "wav":

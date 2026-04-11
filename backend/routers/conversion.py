@@ -28,6 +28,9 @@ async def convert_voice(
     profile_id: Optional[str] = Form(default=None),
     target_sample: Optional[UploadFile] = File(default=None),
     output_format: str = Form(default="mp3"),
+    pitch_shift: float = Form(default=0.0),
+    formant_shift: float = Form(default=0.0),
+    bass_boost_db: float = Form(default=0.0),
     engine: ConvertEngine = Depends(get_convert_engine),
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> FileResponse:
@@ -84,6 +87,9 @@ async def convert_voice(
             source_path=source_path,
             target_sample_path=target_path,
             output_format=output_format,
+            pitch_shift=max(-12.0, min(12.0, pitch_shift)),
+            formant_shift=max(-6.0, min(6.0, formant_shift)),
+            bass_boost_db=max(-6.0, min(12.0, bass_boost_db)),
         )
 
         try:
