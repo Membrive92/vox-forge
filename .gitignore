@@ -3,6 +3,7 @@ dist/
 data/
 tools/
 models/
+processed/
 .env
 *.pyc
 __pycache__/
