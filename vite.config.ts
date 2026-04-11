@@ -16,6 +16,9 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
+        // Long timeouts for voice cloning / conversion (can take minutes)
+        timeout: 600_000,
+        proxyTimeout: 600_000,
       },
     },
   },
