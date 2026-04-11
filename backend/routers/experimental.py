@@ -5,49 +5,56 @@ normalization) for fast iteration. Not for production narration.
 """
 from __future__ import annotations
 
-import asyncio
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 from fastapi.responses import FileResponse
 from pydub import AudioSegment
 
-from ..exceptions import SynthesisError
+from ..catalogs import AUDIO_FORMATS
+from ..dependencies import get_tts_engine
+from ..exceptions import InvalidSampleError, UnsupportedFormatError
 from ..paths import OUTPUT_DIR, TEMP_DIR
+from ..services.tts_engine import TTSEngine
+from ..upload_utils import read_upload_safely, validate_audio_upload
+from ..utils import cleanup_old_files
 
 router = APIRouter(prefix="/experimental", tags=["experimental"])
+
+_ALLOWED_LANGUAGES = {"es", "en", "fr", "de", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh", "ja", "hu", "ko"}
 
 
 @router.post("/cross-lingual", summary="Cross-lingual voice cloning (experimental)")
 async def cross_lingual_synthesis(
+    background_tasks: BackgroundTasks,
     text: str = Form(...),
     voice_sample: UploadFile = File(...),
     language: str = Form(default="es"),
     output_format: str = Form(default="mp3"),
+    engine: TTSEngine = Depends(get_tts_engine),
 ) -> FileResponse:
-    """Synthesize text in one language using a voice sample from another.
+    """Synthesize text in one language using a voice sample from another."""
+    # Validate output format
+    if output_format not in AUDIO_FORMATS:
+        raise UnsupportedFormatError(
+            f"Unsupported format: {output_format}. Valid: {sorted(AUDIO_FORMATS)}"
+        )
 
-    Upload a voice sample (e.g. English speaker) and provide text in
-    another language (e.g. Spanish). XTTS v2 will attempt to speak
-    the target language with the timbre of the source voice.
+    # Validate language
+    if language not in _ALLOWED_LANGUAGES:
+        raise InvalidSampleError(
+            f"Unsupported language: {language}. Valid: {sorted(_ALLOWED_LANGUAGES)}"
+        )
 
-    This is experimental — results vary. The model may produce:
-    - Target language with source voice timbre (ideal)
-    - Target language with source language accent (common)
-    - Mixed pronunciation (possible)
+    # Validate upload
+    validate_audio_upload(voice_sample)
 
-    No text normalization, no candidates, no retries. Raw XTTS v2 output
-    for fast experimentation.
-    """
-    import torch
-    from TTS.api import TTS as TTSApi
-
-    # Save sample to temp
+    # Save sample to temp with size limit
     sample_ext = Path(voice_sample.filename or "").suffix or ".wav"
     sample_filename = f"{str(uuid.uuid4())[:8]}_xling{sample_ext}"
     sample_path = TEMP_DIR / sample_filename
-    sample_content = await voice_sample.read()
+    sample_content = await read_upload_safely(voice_sample)
     sample_path.write_bytes(sample_content)
 
     file_id = str(uuid.uuid4())[:12]
@@ -55,39 +62,26 @@ async def cross_lingual_synthesis(
     output_path = OUTPUT_DIR / f"{file_id}.{output_format}"
 
     try:
-        device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-        # Load model (reuse if already loaded by clone engine)
-        from ..dependencies import get_tts_engine
-        engine = get_tts_engine()
         clone = engine._get_clone_engine()
-        clone.load_model()
-        model = clone._model
-
-        if model is None:
-            raise SynthesisError("XTTS v2 model not loaded")
-
-        # Direct synthesis — no normalization, no candidates
-        await asyncio.to_thread(
-            model.tts_to_file,
+        await clone.raw_synthesize(
             text=text,
             speaker_wav=str(sample_path),
             language=language,
-            file_path=str(output_wav),
-            # Use default params for experimentation
-            temperature=0.3,
-            top_p=0.7,
-            repetition_penalty=10.0,
+            output_path=output_wav,
         )
 
         # Convert format
         if output_format == "wav":
             output_wav.rename(output_path)
         else:
-            from ..catalogs import AUDIO_FORMATS
-            fmt = AUDIO_FORMATS.get(output_format, AUDIO_FORMATS["mp3"])
+            fmt = AUDIO_FORMATS[output_format]
             audio = AudioSegment.from_wav(str(output_wav))
-            audio.export(str(output_path), format=fmt["format"], codec=fmt["codec"], parameters=fmt["parameters"])
+            audio.export(
+                str(output_path),
+                format=fmt["format"],
+                codec=fmt["codec"],
+                parameters=fmt["parameters"],
+            )
             output_wav.unlink(missing_ok=True)
 
         try:
@@ -96,6 +90,8 @@ async def cross_lingual_synthesis(
         except Exception:
             duration = 0.0
 
+        background_tasks.add_task(cleanup_old_files)
+
         return FileResponse(
             path=str(output_path),
             media_type=f"audio/{output_format}",
@@ -103,14 +99,10 @@ async def cross_lingual_synthesis(
             headers={
                 "X-Audio-Duration": str(duration),
                 "X-Audio-Engine": "xtts-v2-crosslingual",
-                "X-Source-Language": "auto",
                 "X-Target-Language": language,
             },
         )
 
-    except Exception as exc:
-        output_wav.unlink(missing_ok=True)
-        output_path.unlink(missing_ok=True)
-        raise SynthesisError(f"Cross-lingual error: {exc}") from exc
     finally:
         sample_path.unlink(missing_ok=True)
+        output_wav.unlink(missing_ok=True)

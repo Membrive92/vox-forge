@@ -21,6 +21,7 @@ from pydub import AudioSegment
 from ..config import settings
 from ..cancellation import CancelledError, CancellationToken
 from ..exceptions import SynthesisError
+from ..gpu_lock import gpu_semaphore
 from ..paths import OUTPUT_DIR, TEMP_DIR
 
 if TYPE_CHECKING:
@@ -36,8 +37,8 @@ XTTS_LANGUAGES = {"es": "es", "en": "en"}
 # Max seconds to wait for a single chunk synthesis before timing out.
 _CHUNK_TIMEOUT_SECONDS = 180
 
-# Only one GPU inference at a time to prevent VRAM contention.
-_gpu_semaphore = asyncio.Semaphore(1)
+# Shared GPU semaphore — only one CUDA inference at a time across all engines.
+_gpu_semaphore = gpu_semaphore
 
 # XTTS v2 generation parameters optimized for maximum quality.
 # Trade-off: ~3-5x slower than defaults, but significantly fewer artifacts.
@@ -243,6 +244,43 @@ class CloneEngine:
             ),
             timeout=_CHUNK_TIMEOUT_SECONDS,
         )
+
+    async def raw_synthesize(
+        self,
+        text: str,
+        speaker_wav: str,
+        language: str,
+        output_path: Path,
+        temperature: float = 0.3,
+        top_p: float = 0.7,
+        repetition_penalty: float = 10.0,
+    ) -> None:
+        """Direct XTTS v2 synthesis for experimental use.
+
+        Bypasses the quality system (no candidates, no retries) but
+        still acquires the shared GPU semaphore. Use for fast iteration
+        on cross-lingual tests.
+        """
+        if not self.is_available:
+            raise SynthesisError("CUDA is not available. Voice cloning requires an NVIDIA GPU.")
+
+        self.load_model()
+        assert self._model is not None  # noqa: S101
+
+        async with _gpu_semaphore:
+            await asyncio.wait_for(
+                asyncio.to_thread(
+                    self._model.tts_to_file,
+                    text=text,
+                    speaker_wav=speaker_wav,
+                    language=language,
+                    file_path=str(output_path),
+                    temperature=temperature,
+                    top_p=top_p,
+                    repetition_penalty=repetition_penalty,
+                ),
+                timeout=_CHUNK_TIMEOUT_SECONDS,
+            )
 
     async def _generate_candidates(
         self,

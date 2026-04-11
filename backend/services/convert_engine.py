@@ -16,6 +16,7 @@ import torch
 from pydub import AudioSegment
 
 from ..exceptions import SynthesisError
+from ..gpu_lock import gpu_semaphore
 from ..paths import OUTPUT_DIR, TEMP_DIR
 
 if TYPE_CHECKING:
@@ -27,9 +28,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _MODEL_DIR = _PROJECT_ROOT / "models" / "openvoice_v2"
 _CONVERTER_DIR = _MODEL_DIR / "converter"
 
-# Max source audio length in seconds. Longer files are split into segments.
-_MAX_SEGMENT_SECONDS = 300  # 5 minutes per segment
-_SEGMENT_OVERLAP_SECONDS = 1  # 1s overlap for smooth crossfade
+# Max seconds per conversion step before timing out.
+_CONVERT_TIMEOUT_SECONDS = 600
 
 
 class ConvertEngine:
@@ -73,7 +73,16 @@ class ConvertEngine:
             device=self._device,
         )
         self._converter.load_ckpt(str(_CONVERTER_DIR / "checkpoint.pth"))
-        logger.info("OpenVoice V2 converter loaded on %s", self._device)
+
+        # Disable the watermark: the wavmark neural network rewrites
+        # 1-second chunks and causes the well-known "robotic + low
+        # volume" artifact. Replace add_watermark with a no-op that
+        # passes the audio through unchanged.
+        def _noop_watermark(wav: object, message: object = None) -> object:  # noqa: ARG001
+            return wav
+
+        self._converter.add_watermark = _noop_watermark  # type: ignore[method-assign]
+        logger.info("OpenVoice V2 converter loaded on %s (watermark disabled)", self._device)
 
     def unload_model(self) -> None:
         """Unload model from GPU memory."""
@@ -94,6 +103,47 @@ class ConvertEngine:
             vad=True,
         )
         return se
+
+    @staticmethod
+    def _prepare_source(source_path: Path) -> Path:
+        """Normalize source audio to 22050 Hz mono WAV, peak at -1 dBFS.
+
+        OpenVoice V2's native sample rate is 22050 Hz. Pre-resampling and
+        peak-normalizing avoids librosa surprises inside convert() and
+        fixes the low-volume output problem.
+        """
+        import librosa
+        import numpy as np
+        import soundfile as sf
+
+        y, _ = librosa.load(str(source_path), sr=22050, mono=True)
+        peak = float(np.max(np.abs(y))) if y.size else 0.0
+        if peak > 0:
+            y = (y / peak) * 0.98
+
+        prepped = source_path.with_name(f"{source_path.stem}_prep.wav")
+        sf.write(str(prepped), y, 22050, subtype="PCM_16")
+        return prepped
+
+    @staticmethod
+    def _normalize_output(path: Path) -> None:
+        """Peak-normalize the converted output to -0.5 dBFS.
+
+        OpenVoice's convert() does not normalize, so output typically
+        sits around -6 to -12 dBFS. Post-normalization restores full
+        perceived loudness without distortion.
+        """
+        import numpy as np
+        import soundfile as sf
+
+        try:
+            y, sr = sf.read(str(path))
+            peak = float(np.max(np.abs(y))) if y.size else 0.0
+            if peak > 0:
+                y = (y / peak) * 0.95
+                sf.write(str(path), y, sr)
+        except Exception as exc:
+            logger.warning("Could not normalize output: %s", exc)
 
     async def convert(
         self,
@@ -117,29 +167,43 @@ class ConvertEngine:
         file_id = str(uuid.uuid4())[:12]
         temp_wav = TEMP_DIR / f"{file_id}_converted.wav"
         output_path = OUTPUT_DIR / f"{file_id}.{output_format}"
+        prepped_source: Path | None = None
 
         try:
-            logger.info("Extracting target voice embedding from %s", target_sample_path.name)
-            target_se = await asyncio.to_thread(
-                self._extract_embedding, str(target_sample_path),
-            )
+            # Pre-process source: resample to 22050Hz mono and peak-normalize
+            logger.info("Preparing source audio: %s", source_path.name)
+            prepped_source = await asyncio.to_thread(self._prepare_source, source_path)
 
-            logger.info("Extracting source voice embedding from %s", source_path.name)
-            source_se = await asyncio.to_thread(
-                self._extract_embedding, str(source_path),
-            )
+            async with gpu_semaphore:
+                logger.info("Extracting target voice embedding from %s", target_sample_path.name)
+                target_se = await asyncio.wait_for(
+                    asyncio.to_thread(self._extract_embedding, str(target_sample_path)),
+                    timeout=_CONVERT_TIMEOUT_SECONDS,
+                )
 
-            logger.info("Converting voice tone...")
-            await asyncio.to_thread(
-                self._converter.convert,
-                audio_src_path=str(source_path),
-                src_se=source_se,
-                tgt_se=target_se,
-                output_path=str(temp_wav),
-                message="@VoxForge",
-            )
+                logger.info("Extracting source voice embedding from %s", prepped_source.name)
+                source_se = await asyncio.wait_for(
+                    asyncio.to_thread(self._extract_embedding, str(prepped_source)),
+                    timeout=_CONVERT_TIMEOUT_SECONDS,
+                )
+
+                logger.info("Converting voice tone...")
+                await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self._converter.convert,
+                        audio_src_path=str(prepped_source),
+                        src_se=source_se,
+                        tgt_se=target_se,
+                        output_path=str(temp_wav),
+                        message="",  # ignored when enable_watermark=False
+                    ),
+                    timeout=_CONVERT_TIMEOUT_SECONDS,
+                )
 
             logger.info("Conversion done: %s (%d bytes)", temp_wav, temp_wav.stat().st_size)
+
+            # Post-normalize to restore full loudness (convert() does not)
+            await asyncio.to_thread(self._normalize_output, temp_wav)
 
             # Export to requested format
             if output_format == "wav":
@@ -160,6 +224,13 @@ class ConvertEngine:
             logger.info("Converted audio exported: %s", output_path)
             return output_path
 
+        except asyncio.TimeoutError:
+            temp_wav.unlink(missing_ok=True)
+            output_path.unlink(missing_ok=True)
+            logger.error("Voice conversion timed out after %ds", _CONVERT_TIMEOUT_SECONDS)
+            raise SynthesisError(
+                f"Voice conversion timed out after {_CONVERT_TIMEOUT_SECONDS}s"
+            ) from None
         except SynthesisError:
             raise
         except Exception as exc:
@@ -167,3 +238,6 @@ class ConvertEngine:
             output_path.unlink(missing_ok=True)
             logger.error("Voice conversion error: %s", exc)
             raise SynthesisError(f"Voice conversion error: {exc}") from exc
+        finally:
+            if prepped_source is not None:
+                prepped_source.unlink(missing_ok=True)
