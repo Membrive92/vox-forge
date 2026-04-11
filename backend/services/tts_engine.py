@@ -216,16 +216,17 @@ class TTSEngine:
                 f"Valid: {sorted(AUDIO_FORMATS)}"
             )
 
-        # Resolve profile and check for voice sample
+        # Resolve profile and check for voice sample (without mutating request)
         sample_path: Path | None = None
         profile_language: str = "es"
+        voice_id: str = request.voice_id
 
         if request.profile_id:
             profile = self._profiles.get(request.profile_id)
             if profile is not None:
-                # Only override voice_id for routing. Speed/pitch/volume
+                # Override voice_id from profile for routing. Speed/pitch/volume
                 # come from the request (frontend sliders), not the profile.
-                request.voice_id = profile.voice_id
+                voice_id = profile.voice_id
                 profile_language = profile.language
                 if profile.sample_filename:
                     from ..paths import VOICES_DIR
@@ -239,9 +240,9 @@ class TTSEngine:
             return await self._synthesize_cloned(request, sample_path, profile_language, cancel_token)
 
         # Otherwise use Edge-TTS
-        if request.voice_id not in all_voice_ids():
+        if voice_id not in all_voice_ids():
             raise UnsupportedVoiceError(
-                f"Unsupported voice: {request.voice_id}"
+                f"Unsupported voice: {voice_id}"
             )
 
         chunks = split_into_chunks(request.text)
@@ -255,7 +256,7 @@ class TTSEngine:
                 temp_files.append(temp_mp3)
                 communicate = edge_tts.Communicate(
                     text=chunk,
-                    voice=request.voice_id,
+                    voice=voice_id,
                     rate=_rate_str(request.speed),
                     pitch=_pitch_str(request.pitch),
                     volume=_volume_str(request.volume),
@@ -314,6 +315,9 @@ class TTSEngine:
         XTTS v2 doesn't support volume natively. Speed is handled
         by the model's native `speed` parameter.
         Volume: 80 = default (0dB), 0 = -40dB, 100 = +10dB.
+
+        Preserves codec and bitrate parameters from AUDIO_FORMATS
+        to avoid silent quality degradation on re-export.
         """
         if volume == 80:
             return
@@ -322,7 +326,16 @@ class TTSEngine:
             db_change = (volume - 80) * 0.5
             adjusted = audio + db_change
             audio_format = path.suffix.lstrip(".")
-            adjusted.export(str(path), format=audio_format)
+            fmt_cfg = AUDIO_FORMATS.get(audio_format)
+            if fmt_cfg is not None:
+                adjusted.export(
+                    str(path),
+                    format=fmt_cfg["format"],
+                    codec=fmt_cfg["codec"],
+                    parameters=fmt_cfg["parameters"],
+                )
+            else:
+                adjusted.export(str(path), format=audio_format)
             logger.info("Volume adjusted: %.1fdB (volume=%d)", db_change, volume)
         except Exception as exc:
             logger.warning("Could not adjust volume: %s", exc)
