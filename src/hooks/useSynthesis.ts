@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from "react";
-
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { synthesize } from "@/api/synthesis";
 import type { SynthesisParams } from "@/types/domain";
@@ -40,6 +39,11 @@ export function useSynthesis(): SynthesisHook {
       intervalRef.current = null;
     }
   }, []);
+
+  // Clear interval on unmount to prevent leaks when navigating away mid-generation
+  useEffect(() => {
+    return () => clearInterval();
+  }, [clearInterval]);
 
   const reset = useCallback(() => {
     clearInterval();

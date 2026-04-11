@@ -16,18 +16,25 @@ export function useAudioPlayer(): AudioPlayerState {
   const [url, setUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const currentUrlRef = useRef<string | null>(null);
 
+  // Revoke any remaining URL on unmount
   useEffect(() => {
     return () => {
-      if (url) URL.revokeObjectURL(url);
+      if (currentUrlRef.current) {
+        URL.revokeObjectURL(currentUrlRef.current);
+        currentUrlRef.current = null;
+      }
     };
-  }, [url]);
+  }, []);
 
   const load = useCallback((blob: Blob, dur: number) => {
-    setUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(blob);
-    });
+    if (currentUrlRef.current) {
+      URL.revokeObjectURL(currentUrlRef.current);
+    }
+    const newUrl = URL.createObjectURL(blob);
+    currentUrlRef.current = newUrl;
+    setUrl(newUrl);
     setDuration(dur);
     setIsPlaying(false);
   }, []);
