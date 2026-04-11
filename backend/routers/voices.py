@@ -11,18 +11,15 @@ from pydub import AudioSegment
 
 from ..catalogs import SUPPORTED_VOICES, VoiceMeta
 from ..dependencies import get_profile_manager
-from ..exceptions import InvalidSampleError, ProfileNotFound, SampleNotFound
+from ..exceptions import ProfileNotFound, SampleNotFound
 from ..paths import VOICES_DIR
 from ..schemas import SampleUploadResponse
 from ..services.profile_manager import ProfileManager
 from ..services.tts_engine import TTSEngine
+from ..upload_utils import read_upload_safely, validate_audio_upload
 
 router = APIRouter(prefix="/voices", tags=["voices"])
 
-_ALLOWED_SAMPLE_TYPES: set[str] = {
-    "audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3",
-    "audio/ogg", "audio/flac",
-}
 _MEDIA_TYPES: dict[str, str] = {
     "wav": "audio/wav", "mp3": "audio/mpeg",
     "ogg": "audio/ogg", "flac": "audio/flac",
@@ -50,11 +47,13 @@ async def upload_voice_sample(
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> SampleUploadResponse:
     """Upload an audio sample; optionally attach it to a profile."""
+    validate_audio_upload(sample)
+
     ext = Path(sample.filename or "").suffix or ".wav"
     filename = f"{str(uuid.uuid4())[:8]}{ext}"
     filepath = VOICES_DIR / filename
 
-    content = await sample.read()
+    content = await read_upload_safely(sample)
     filepath.write_bytes(content)
 
     duration: float | None = None
@@ -76,12 +75,14 @@ async def upload_voice_sample(
         # ffmpeg not installed — store the file but skip audio analysis
         pass
 
+    attached_profile_id = profile_id
     if profile_id:
         try:
             await profiles.attach_sample(profile_id, filename, duration)
         except ProfileNotFound:
-            # Keep the sample on disk even if the profile doesn't exist.
-            pass
+            # Don't leave orphaned samples on disk
+            filepath.unlink(missing_ok=True)
+            raise
 
     return SampleUploadResponse(
         filename=filename,
@@ -90,14 +91,26 @@ async def upload_voice_sample(
         sample_rate=sample_rate,
         bit_depth=bit_depth,
         size_kb=round(len(content) / 1024, 1),
-        profile_id=profile_id,
+        profile_id=attached_profile_id,
     )
 
 
 @router.get("/samples/{filename}", summary="Serve voice sample")
 async def get_voice_sample(filename: str) -> FileResponse:
-    filepath = VOICES_DIR / filename
-    if not filepath.exists():
+    # Reject path separators and traversal attempts before touching disk
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise SampleNotFound("Sample not found")
+
+    filepath = (VOICES_DIR / filename).resolve()
+    voices_root = VOICES_DIR.resolve()
+
+    # Verify the resolved path is inside VOICES_DIR
+    try:
+        filepath.relative_to(voices_root)
+    except ValueError:
+        raise SampleNotFound("Sample not found") from None
+
+    if not filepath.exists() or not filepath.is_file():
         raise SampleNotFound("Sample not found")
     ext = filepath.suffix.lstrip(".")
     return FileResponse(str(filepath), media_type=_MEDIA_TYPES.get(ext, "audio/wav"))
