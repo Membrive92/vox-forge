@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from ..config import settings
 from ..exceptions import DomainError
 from ..services.text_normalizer import normalize_for_tts
+from ..upload_utils import read_upload_safely, validate_document_upload
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +106,24 @@ async def preprocess_file(file: UploadFile = File(...)) -> PreprocessResponse:
 
     Supported formats: .txt, .doc, .docx, .pdf
     """
+    validate_document_upload(file)
+
     filename = file.filename or "unknown.txt"
-    content = await file.read()
+    content = await read_upload_safely(file)
 
     logger.info("Processing file: %s (%d bytes)", filename, len(content))
-    text = _extract_text(filename, content)
+    try:
+        text = _extract_text(filename, content)
+    except UnsupportedFileError:
+        raise
+    except Exception as exc:
+        raise UnsupportedFileError(f"Could not read document: {exc}") from exc
+
+    if len(text) > settings.max_text_length:
+        raise UnsupportedFileError(
+            f"Document too long: {len(text)} characters exceeds limit of {settings.max_text_length}"
+        )
+
     processed = normalize_for_tts(text)
 
     logger.info(

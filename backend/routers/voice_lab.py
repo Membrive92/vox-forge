@@ -4,11 +4,13 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from pydub import AudioSegment
 
+from ..catalogs import AUDIO_FORMATS
+from ..exceptions import UnsupportedFormatError
 from ..paths import TEMP_DIR
 from ..services.voice_lab_engine import (
     BUILTIN_PRESETS,
@@ -17,6 +19,8 @@ from ..services.voice_lab_engine import (
     VoicePreset,
     generate_random_preset,
 )
+from ..upload_utils import read_upload_safely, validate_audio_upload
+from ..utils import cleanup_old_files
 
 router = APIRouter(prefix="/voice-lab", tags=["voice-lab"])
 
@@ -68,6 +72,7 @@ async def random_preset() -> PresetResponse:
 
 @router.post("/process", summary="Process audio with voice lab effects")
 async def process_audio(
+    background_tasks: BackgroundTasks,
     audio: UploadFile = File(...),
     noise_reduction: float = Form(default=0),
     pitch_semitones: float = Form(default=0),
@@ -84,10 +89,17 @@ async def process_audio(
     All parameters are optional — only non-zero values produce changes.
     Processing is CPU-based and fast (~5s for 20 minutes of audio).
     """
+    if output_format not in AUDIO_FORMATS:
+        raise UnsupportedFormatError(
+            f"Unsupported format: {output_format}. Valid: {sorted(AUDIO_FORMATS)}"
+        )
+
+    validate_audio_upload(audio)
+
     ext = Path(audio.filename or "").suffix or ".wav"
     input_filename = f"{str(uuid.uuid4())[:8]}_input{ext}"
     input_path = TEMP_DIR / input_filename
-    content = await audio.read()
+    content = await read_upload_safely(audio)
     input_path.write_bytes(content)
 
     params = VoiceLabParams(
@@ -109,6 +121,8 @@ async def process_audio(
             duration = round(len(processed) / 1000.0, 2)
         except Exception:
             duration = 0.0
+
+        background_tasks.add_task(cleanup_old_files)
 
         return FileResponse(
             path=str(output_path),

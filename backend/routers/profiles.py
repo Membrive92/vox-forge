@@ -9,17 +9,13 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydub import AudioSegment
 
 from ..dependencies import get_profile_manager
-from ..exceptions import InvalidSampleError, ProfileNotFound
+from ..exceptions import ProfileNotFound
 from ..paths import VOICES_DIR
 from ..schemas import DeletedResponse, ProfileUpdate, VoiceProfile
 from ..services.profile_manager import ProfileManager
+from ..upload_utils import read_upload_safely, validate_audio_upload
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
-
-_ALLOWED_SAMPLE_TYPES: set[str] = {
-    "audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3",
-    "audio/ogg", "audio/flac",
-}
 
 
 @router.get("", response_model=list[VoiceProfile], summary="List profiles")
@@ -56,16 +52,12 @@ async def create_profile(
     sample_duration: Optional[float] = None
 
     if sample is not None:
-        if sample.content_type not in _ALLOWED_SAMPLE_TYPES:
-            raise InvalidSampleError(
-                f"Unsupported type: {sample.content_type}. "
-                "Valid: wav, mp3, ogg, flac"
-            )
+        validate_audio_upload(sample)
 
         ext = Path(sample.filename or "").suffix or ".wav"
         sample_filename = f"{str(uuid.uuid4())[:8]}{ext}"
         sample_path = VOICES_DIR / sample_filename
-        content = await sample.read()
+        content = await read_upload_safely(sample)
         sample_path.write_bytes(content)
 
         try:
