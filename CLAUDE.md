@@ -1,13 +1,13 @@
 # VoxForge — Development Guide
 
-Voice synthesis engine. Python backend (FastAPI + Edge-TTS), React frontend.
+Local-first audiobook production workbench. Python backend (FastAPI + Edge-TTS + XTTS v2 + OpenVoice V2), React frontend (TypeScript strict).
 
 ## Current Architecture
 
 ```
 backend/              -> Modular FastAPI package (routers, services, schemas)
 src/                  -> React + TypeScript SPA (components, hooks, features)
-data/                 -> Runtime storage (voices, profiles, output, temp)
+data/                 -> Runtime storage (voices, profiles, output, temp, logs, SQLite)
 ```
 
 HTTP contract: backend exposes snake_case (`voice_id`, `sample_filename`), frontend works in camelCase. Normalization lives in `api/profiles.ts` — keep this as the single translation point.
@@ -19,7 +19,7 @@ HTTP contract: backend exposes snake_case (`voice_id`, `sample_filename`), front
 python -m uvicorn backend:app --reload --port 8000
 
 # Backend tests
-pytest -xvs
+python -m pytest -xvs
 
 # Frontend
 npm run dev
@@ -41,30 +41,57 @@ npm test
 
 ## Python — Backend
 
-### Target Structure
+### Current Structure
 
 ```
 backend/
 ├── __init__.py
-├── main.py              # FastAPI app, middlewares, routers
+├── main.py              # create_app(): FastAPI + lifespan + middlewares + routers
 ├── config.py            # Settings via pydantic-settings (BaseSettings)
+├── database.py          # SQLite schema (projects, chapters, generations, takes)
 ├── schemas.py           # Pydantic models (request, persistence, response)
 ├── catalogs.py          # Curated voices + audio formats (TypedDict)
-├── exceptions.py        # Domain exceptions + global HTTP handler
+├── exceptions.py        # Domain exceptions + friendly messages + global HTTP handler
 ├── dependencies.py      # Injectable singletons via Depends()
 ├── paths.py             # BASE_DIR, DATA_DIR, etc.
-├── utils.py             # Cleanup
+├── logging_config.py    # Structured logging: text + JSONL + colored console
+├── middleware.py         # RequestIdMiddleware + AccessLogMiddleware
+├── gpu_lock.py          # Shared GPU semaphore (1 inference at a time)
+├── cancellation.py      # CancellationToken for client disconnect detection
+├── upload_utils.py      # validate_audio_upload, validate_document_upload, chunked reader
+├── utils.py             # Temporary file cleanup
 ├── services/
-│   ├── tts_engine.py    # TTSEngine with chunking
-│   └── profile_manager.py
+│   ├── tts_engine.py        # Dual engine: Edge-TTS + XTTS v2 routing + chunking
+│   ├── clone_engine.py      # XTTS v2 with candidates, scoring, retries, silence trim
+│   ├── convert_engine.py    # OpenVoice V2 tone color converter
+│   ├── voice_lab_engine.py  # DSP suite (pedalboard, parselmouth, librosa)
+│   ├── profile_manager.py   # JSON CRUD with asyncio.Lock + atomic writes
+│   ├── project_manager.py   # SQLite CRUD for projects/chapters/generations/takes
+│   ├── text_normalizer.py   # Spanish normalization (abbreviations, numbers, siglas)
+│   ├── pronunciation.py     # User pronunciation dictionary (whole-word overrides)
+│   ├── character_parser.py  # [Character] markup parser for dialogue casting
+│   ├── ssml_lite.py         # SSML-lite tag parser ([pause], [emph], [whisper])
+│   ├── metadata.py          # ID3/Vorbis/FLAC tag embedding via mutagen
+│   ├── progress.py          # In-memory job progress registry
+│   └── job_store.py         # Crash-safe job persistence to disk
 └── routers/
-    ├── synthesis.py
-    ├── profiles.py
-    ├── voices.py
-    └── health.py
+    ├── synthesis.py          # POST /api/synthesize + progress + resume
+    ├── voices.py             # Catalog + sample upload/serve (path traversal protected)
+    ├── profiles.py           # CRUD /api/profiles
+    ├── projects.py           # CRUD /api/projects + chapters + split
+    ├── chapter_synth.py      # Per-chapter synthesis + chunk map + regen
+    ├── batch_export.py       # ZIP export of all chapters
+    ├── character_synth.py    # Character-cast multi-voice synthesis
+    ├── conversion.py         # Voice conversion (audio-to-audio)
+    ├── voice_lab.py          # DSP processing + presets
+    ├── analyze.py            # Voice sample quality analysis
+    ├── pronunciation.py      # Pronunciation dictionary CRUD
+    ├── preprocess.py         # Text normalization + document upload
+    ├── experimental.py       # Cross-lingual cloning
+    ├── logs.py               # Log viewer + error count
+    ├── stats.py              # Usage statistics
+    └── health.py             # Service status
 ```
-
-Goal: no file > 200 lines, each router < 100 lines.
 
 ### Typing
 
@@ -82,183 +109,195 @@ Goal: no file > 200 lines, each router < 100 lines.
 - Explicit response models: use `response_model=` on every endpoint. Never return raw `dict` from a public endpoint.
 - Separate input models (`XxxCreate`, `XxxUpdate`) from persistence models (`Xxx`) and response models (`XxxResponse`).
 
-### Configuration
-
-Use `Settings` with `pydantic-settings`:
-
-```python
-class Settings(BaseSettings):
-    base_dir: Path = Path(__file__).parent
-    cors_origins: list[str] = ["http://localhost:3000"]
-    max_text_length: int = 500_000
-    cleanup_max_age_hours: int = 24
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="VOXFORGE_")
-```
-
-No `allow_origins=["*"]` in production.
-
 ### Errors
 
-- Raise `HTTPException` only in the router layer. Services raise their own domain exceptions (`ProfileNotFound`, `UnsupportedVoiceError`).
-- Translate domain exceptions -> HTTP in a global `exception_handler`.
+- Services raise domain exceptions (`ProfileNotFound`, `SynthesisError`, etc.).
+- `exceptions.py` has a `_USER_FRIENDLY_MESSAGES` map that translates codes to user-facing English text.
+- Global handler returns `{"detail": friendly, "code": machine, "technical": original}`.
 - Never silent `except Exception:` without log + re-raise or specific response.
-- No `print`. Use the module's `logger` with correct levels (`debug`/`info`/`warning`/`error`).
-
-### Async and I/O
-
-- `async def` endpoints only if they do real async I/O. If the function is CPU-bound (pydub/ffmpeg), use plain `def` — FastAPI runs it in a threadpool.
-- Blocking disk operations (`Path.read_text`, `write_bytes`) in `async` handlers should go to `asyncio.to_thread` if the file may be large. Acceptable for small configs.
-- `edge-tts` is natively async -> keep it.
+- No `print`. Use the module's `logger`.
 
 ### Persistence
 
-- The JSON store (`profiles.json`) is acceptable for MVP, but:
-  - **Concurrent access is not safe**. Use `asyncio.Lock` around `_save()` or migrate to SQLite with `aiosqlite`.
-  - `_save()` is not atomic. Write to `*.tmp` then `os.replace()`.
-- Don't access `_private` members from outside the class (already fixed with `attach_sample`).
+- **Profiles**: JSON file with `asyncio.Lock` + atomic writes (`tmp` + `os.replace`).
+- **Projects/Chapters/Generations/Takes**: SQLite via `aiosqlite` (WAL mode, foreign keys).
+- **Pronunciations**: JSON file with `asyncio.Lock` + atomic writes.
+- **Logs**: rotating file handlers (text + JSONL), 10MB x 5 backups.
+- **Jobs**: per-job JSON record + chunk directory in `data/jobs/`.
+
+### Logging
+
+- `logging_config.py` sets up 4 handlers: app.log (text), app.jsonl (JSON Lines), errors.log (WARNING+), stdout (colored).
+- Every log record carries `request_id` via contextvar, set by `RequestIdMiddleware`.
+- `AccessLogMiddleware` logs `METHOD /path -> STATUS (Nms)` for every request.
+- JSONL format: `{"ts": "...", "level": "INFO", "logger": "backend.access", "msg": "...", "rid": "abc123", "exc": "..."}`.
+- Seek-based tail in the logs endpoint reads only the last 512KB, not the full file.
+
+### GPU Concurrency
+
+- `gpu_lock.py` exports a shared `asyncio.Semaphore(1)`.
+- `CloneEngine`, `ConvertEngine`, and experimental router all acquire this semaphore before GPU inference.
+- `asyncio.wait_for(timeout=600s)` prevents hung requests.
 
 ### Testing
 
-- Use `pytest` + `httpx.AsyncClient` with `ASGITransport` for endpoint tests.
-- Fixtures for temporary `data/` directories (`tmp_path`).
-- Each endpoint: one happy path test + one validation test + one error test.
-- Mock `edge_tts.Communicate` with a fake that writes minimal valid mp3 bytes.
-
-### Style
-
-- **Formatter**: `ruff format` (not black, not isort).
-- **Linter**: `ruff check` with at least rule set `E,F,I,UP,B,SIM,RUF`.
-- **Type-check**: `mypy --strict` or `pyright` in strict mode.
-- Docstrings: Google or NumPy style, only on public functions and classes. No obvious docstrings (`"""Return self.x."""`).
-- Comments only where the *why* isn't evident. The *what* is in the code.
+- `pytest` + `httpx.AsyncClient` with `ASGITransport`.
+- 86 tests, 95%+ coverage.
+- Stubs for edge_tts, pydub, torch, openvoice.
+- Fixtures with `tmp_path` for isolated `data/` directories.
 
 ---
 
 ## TypeScript / React — Frontend
 
-### Structure
+### Current Structure
 
 ```
 src/
-├── App.tsx
+├── App.tsx                    # Orchestrator: tabs, global state, header, nav with error badge
+├── main.tsx                   # Entry: ErrorBoundary + global error handlers + logger init
 ├── api/
-│   ├── client.ts          # fetch wrapper, API_BASE
-│   ├── types.ts           # API contract types (generated or handwritten)
-│   └── profiles.ts, synthesis.ts
+│   ├── client.ts              # Centralized fetch with logging + X-Request-ID
+│   ├── types.ts               # Backend DTOs (snake_case)
+│   ├── profiles.ts            # Profile CRUD (normalizes to camelCase)
+│   ├── synthesis.ts           # Synthesis + progress polling + resume + incomplete
+│   ├── conversion.ts          # Voice conversion
+│   ├── voiceLab.ts            # Lab processing + presets
+│   ├── projects.ts            # Projects + chapters CRUD
+│   ├── chapterSynth.ts        # Chapter synthesis + chunk map + regen
+│   ├── pronunciation.ts       # Pronunciation dict CRUD
+│   ├── logs.ts                # Server logs + error count + stats
+│   └── preprocess.ts          # Text normalization
+├── types/
+│   └── domain.ts              # Domain types (Profile, Voice, SynthesisParams, ExportSettings)
+├── logging/
+│   └── logger.ts              # FE logger: ring buffer + sessionStorage + global handlers
 ├── components/
-│   ├── Slider.tsx
-│   ├── WaveformVisualizer.tsx
-│   ├── Toast.tsx
-│   └── icons.tsx
-├── features/
-│   ├── synth/SynthTab.tsx
-│   ├── voices/VoicesTab.tsx
-│   └── profiles/ProfilesTab.tsx
+│   ├── Slider.tsx             # Accessible range input with info tooltip
+│   ├── InteractivePlayer.tsx  # Scrubber, +/-10s, playback rates, time display
+│   ├── WaveformEditor.tsx     # wavesurfer.js interactive waveform with regions
+│   ├── WaveformVisualizer.tsx # DPR-aware animated canvas (decorative)
+│   ├── ErrorBoundary.tsx      # React error catch with recovery UI
+│   ├── AudioRecorder.tsx      # Microphone recording (MediaRecorder API)
+│   ├── Toast.tsx              # Notification with aria-live
+│   └── icons.tsx              # Inline SVGs
 ├── hooks/
-│   ├── useProfiles.ts
-│   ├── useSynthesis.ts
-│   ├── useAudioPlayer.ts
-│   ├── useVoicePreview.ts
-│   └── useSamplePlayer.ts
+│   ├── useProfiles.ts         # Load + remote CRUD
+│   ├── useSynthesis.ts        # Progress polling + API call + engine tracking
+│   ├── useAudioPlayer.ts      # Blob URL + play/pause/stop/seek/skip/rate
+│   ├── useDraftPersistence.ts # Autosave text to localStorage
+│   ├── useExportSettings.ts   # ID3 metadata + filename pattern (localStorage)
+│   ├── useCustomLabPresets.ts # Save/load custom DSP presets (localStorage)
+│   ├── useVoicePreview.ts     # Live voice demo
+│   ├── useSamplePlayer.ts    # Play samples from backend
+│   └── useToast.ts            # Timer + notification state
+├── features/
+│   ├── synth/SynthTab.tsx          # Editor + player + export panel + keyboard shortcuts + resume banner
+│   ├── projects/WorkbenchTab.tsx   # Project sidebar + chapter cards + chunk map
+│   ├── projects/ChunkMap.tsx       # Per-chapter chunk list + synthesize + regen
+│   ├── voices/VoicesTab.tsx        # Upload + voice browser + profile form
+│   ├── profiles/ProfilesTab.tsx    # Profile cards with actions
+│   ├── convert/ConvertTab.tsx      # Voice conversion with DSP sliders
+│   ├── compare/CompareTab.tsx      # A/B comparison + quick preview all profiles
+│   ├── lab/LabTab.tsx              # DSP suite with presets (built-in + custom)
+│   ├── experimental/ExperimentalTab.tsx # Cross-lingual cloning
+│   ├── pronunciation/PronunciationTab.tsx # Dictionary editor
+│   └── logs/LogsTab.tsx            # Server/Client/Stats tabs, auto-refresh, error badge hook
 ├── i18n/
-│   ├── es.ts, en.ts, index.ts
+│   ├── es.ts, en.ts, index.ts     # Typed translations
 ├── constants/voices.ts
 ├── theme/tokens.ts
 └── types/domain.ts
 ```
 
-Rule: no component > 150 lines, no file > 250.
+### API Client
 
-### Typing
+- `client.ts` wraps all `fetch` calls with:
+  - Auto-generated `X-Request-ID` header (correlates with backend logs)
+  - Structured logging of every request/response with timing
+  - Typed `ApiError` with `status`, `code`, `requestId`
+- `synthesis.ts` sends `X-Synthesis-Job-ID` for per-chunk progress tracking.
 
-- `tsconfig.json` with `"strict": true`, `"noUncheckedIndexedAccess": true`, `"exactOptionalPropertyTypes": true`.
-- **No `any`**. If you need to escape, use `unknown` + narrowing.
-- No `as Foo` except at boundaries (parsing external JSON). In those cases, validate with a parser (`zod`) first.
-- Props typed with explicit `interface` per component. No inline except for 1-2 trivial props.
-- Don't use `React.FC`. Normal signature: `function Component(props: Props) { ... }`.
-- API contract types in `api/types.ts` — ideally generated from FastAPI's OpenAPI schema (`openapi-typescript`).
+### Logging (Frontend)
+
+- `logging/logger.ts`: ring buffer (500 entries), persisted to `sessionStorage` (survives reload).
+- `installGlobalErrorHandlers()`: catches `window.error` + `unhandledrejection`.
+- `ErrorBoundary`: catches React render errors, logs to buffer, shows recovery UI.
+- User actions logged: synthesis start, file upload, voice conversion, lab processing.
+- `useErrorBadge()`: polls `/api/logs/error-count` every 30s, shows count on Logs tab.
 
 ### State and Effects
 
-- `useState` only for local UI state. Remote state -> dedicated hook (`useProfiles`) or `@tanstack/react-query` when the project grows.
-- `useEffect` with **complete and correct** deps array. If you need to silence the linter, there's a latent bug.
-- Mandatory cleanup functions in effects that create resources (timers, blob URLs, subscriptions). Already applied with `URL.revokeObjectURL`.
-- `useCallback`/`useMemo` only when there's a real performance issue or hook dependency chain. Not by default.
+- `useState` only for local UI state. Remote state -> dedicated hooks.
+- `useEffect` with complete deps arrays. Cleanup functions for timers, blob URLs, subscriptions.
+- `useCallback`/`useMemo` only when there's a real performance issue.
 
 ### Styles
 
-Current code uses massive inline styles. This **gets refactored**:
-
-- Migrate to CSS Modules, vanilla-extract, Tailwind, or styled-components — pick **one** and don't mix.
-- Design tokens (colors, spacing, radii) in a single file (`theme/tokens.ts`). Colors like `#3b82f6` are already tokenized.
-- No repeated magic values. If a color appears 2+ times -> token.
-
-### API Client
-
-- A single `fetchJson<T>` with centralized error handling, not loose `fetch` in each handler.
-- Type responses explicitly. Don't return `Promise<any>`.
-- snake_case -> camelCase normalization in **one layer** (`api/`), never in components.
-- Errors as typed exceptions (`ApiError extends Error { status, detail }`), not strings.
+Current code uses inline styles with design tokens from `theme/tokens.ts`. Future: migrate to CSS Modules or Tailwind.
 
 ### i18n
 
-- Extract `i18n` to per-language files. Type: `type TranslationKey = keyof typeof es`.
-- `getTranslations(lang)` returns typed `t`.
+- Typed per-language files. `type TranslationKey = keyof typeof es`.
 - Adding a key in `es.ts` forces adding it in `en.ts` (compile error if missing).
-
-### Accessibility
-
-- All icon-only `<button>` elements need `aria-label`.
-- Custom sliders have `<input type="range">` correctly, visual thumbs don't capture events (`pointerEvents: "none"`).
-- `dragOver` zone needs `role="button"`, `tabIndex={0}` and keyboard handler.
-- Toast needs `role="status"` + `aria-live="polite"`.
 
 ### Testing
 
-- `vitest` + `@testing-library/react`.
-- Per-component tests: render + key interactions. No implementation tests (don't inspect internal state).
-- MSW (`msw`) to mock the API in tests.
-
-### Style Guide
-
-- **Formatter**: Prettier.
-- **Linter**: ESLint with `@typescript-eslint/strict`, `react-hooks`, `jsx-a11y`.
-- Sorted imports (built-in -> external -> internal -> relative).
-- Names: `PascalCase` components, `camelCase` functions/variables, `UPPER_SNAKE` module constants.
+- `vitest` + `@testing-library/react` + `happy-dom`.
+- 26 tests covering components, hooks, i18n parity.
+- MSW for API mocking.
 
 ---
 
 ## Common Conventions
 
 ### Git
-
-- Commits in imperative, in English. Suggested format: `type: description` (`fix: uuid subscript in sample upload`).
-- One commit = one logical change. Don't mix refactor + feature + bug fix.
+- Commits in imperative, in English. Format: `type: description`.
+- One commit = one logical change.
 - Never `--no-verify`.
 
 ### Documentation
-
-- This `CLAUDE.md` documents **how we work**.
-- `README.md` documents **what it is and how to run it**.
-- Don't create additional `.md` files unless necessary (ADRs for non-obvious decisions).
+- `CLAUDE.md` = how we work. `README.md` = what it is and how to run it.
+- `AUDIT_REPORT.md` = QA + product audit (historical reference).
 
 ### Secrets
-
-- Never hardcode production URLs, API keys, or credentials.
+- Never hardcode URLs, API keys, or credentials.
 - `.env` in `.gitignore`. `.env.example` gets committed.
+
+### Dependencies (Python)
+Core: `fastapi`, `uvicorn`, `edge-tts`, `pydub`, `aiofiles`, `python-multipart`, `pydantic-settings`, `aiosqlite`, `mutagen`.
+GPU: `torch`, `torchaudio`, `coqui-tts`, `transformers`, `openvoice`.
+DSP: `pedalboard`, `praat-parselmouth`, `librosa`, `noisereduce`.
+Python 3.13+: `audioop-lts`.
+
+### Dependencies (Node)
+Core: `react`, `react-dom`, `wavesurfer.js`.
+Dev: `typescript`, `vite`, `@vitejs/plugin-react`, `vitest`, `@testing-library/react`, `happy-dom`, `msw`.
 
 ---
 
 ## Refactor Plan (order)
 
-1. ~~**Backend**: extract `Settings` + modularize into `backend/` package with routers.~~ Done.
-2. ~~**Backend**: add `response_model` to all endpoints and global exception handler.~~ Done.
-3. ~~**Backend**: lock in `ProfileManager` + atomic writes.~~ Done.
-4. ~~**Backend**: minimal pytest suite (happy path for each endpoint).~~ Done (48 tests, 96% coverage).
-5. ~~**Frontend**: strict TS setup + migrate single file to TSX.~~ Done.
-6. ~~**Frontend**: split into `components/`, `features/`, `hooks/`, `api/`.~~ Done.
+1. ~~Backend: extract Settings + modularize into backend/ package with routers.~~ Done.
+2. ~~Backend: add response_model + global exception handler.~~ Done.
+3. ~~Backend: lock in ProfileManager + atomic writes.~~ Done.
+4. ~~Backend: minimal pytest suite.~~ Done (86 tests).
+5. ~~Frontend: strict TS + migrate to TSX.~~ Done.
+6. ~~Frontend: split into components/, features/, hooks/, api/.~~ Done.
 7. **Frontend**: extract inline styles to unified system (CSS Modules or Tailwind).
 8. **Frontend**: generate types from backend's OpenAPI schema.
 9. **Both**: CI with lint + typecheck + tests before merge.
 
-Each step: a small, green, reviewable PR.
+---
+
+## Feature Implementation Status
+
+### Tier 1 (Quick Wins) — All Done
+Autosave, duration estimate, keyboard shortcuts, interactive player, ID3 metadata + filename pattern, custom Lab presets, real per-chunk progress, pronunciation dictionary, crash-safe resume.
+
+### Tier 2 (Workbench) — All Done
+SQLite migration, chapter manager, chunk map + per-chunk regen, A/B comparison, multi-voice preview, batch export, character casting, sample analyzer, multiple samples per profile, friendly error messages.
+
+### Tier 3 (Transformative) — Partially Done
+Done: wavesurfer.js editor component, SSML-lite parser.
+Pending (exploratory): emotion conditioning, IPA phoneme dictionary, project templates, ambience tracks, F5-TTS/Zonos evaluation.

@@ -7,7 +7,69 @@
 
 ---
 
-## Parte 1 — QA / Bugs encontrados
+## Estado de implementación (actualizado 2026-04-12)
+
+### Bugs — Todos resueltos
+- **C1** (path traversal): ARREGLADO — validación de filename + `Path.relative_to()` check.
+- **H1** (sin semáforo GPU en ConvertEngine): ARREGLADO — `gpu_semaphore` compartido + `wait_for(timeout=600s)`.
+- **H2** (experimental bypassea semáforo): ARREGLADO — usa `clone.raw_synthesize()` que adquiere el semáforo.
+- **H3** (uploads sin validación): ARREGLADO — `upload_utils.py` con `validate_audio_upload()` + chunked reader 100MB.
+- **H4** (output_format sin validar): ARREGLADO — validación en boundary de cada router.
+- **M1** (leak de interval): ARREGLADO — cleanup en useEffect.
+- **M2** (muestras huérfanas): Pendiente.
+- **M3** (output files sin cleanup): ARREGLADO — `background_tasks.add_task(cleanup_old_files)` en todos los routers.
+- **M4** (get() devuelve ref mutable): Pendiente (bajo riesgo en single-user).
+- **M5** (mutación de request): ARREGLADO — usa variable local `voice_id`.
+- **M6** (codec perdido en _apply_volume): ARREGLADO — pasa `AUDIO_FORMATS` config en re-export.
+- **M7** (preprocess/file sin límite): Pendiente.
+- **M8** (sin abort en FE): Pendiente.
+- **M9** (segmentación sin usar en ConvertEngine): Pendiente.
+- **L1-L6**: L1 (doble revoke) ARREGLADO, L2 (variable sin usar) ARREGLADO, L5 (language sin validar) ARREGLADO. Resto pendiente.
+
+### Roadmap de producto — Implementación
+
+#### Tier 1 (Quick Wins) — TODO IMPLEMENTADO
+1. Autosave de draft a localStorage
+2. Generación crash-safe con resume
+3. Progreso real per-chunk via polling
+4. Player interactivo (scrubber, +/-10s, velocidad)
+5. ID3 metadata embedding + filename configurable
+6. Atajos de teclado (Ctrl+Enter, Ctrl+S, Space)
+7. Presets custom del Lab guardables
+8. Estimación de duración junto al char counter
+9. Diccionario de pronunciación MVP
+
+#### Tier 2 (Workbench) — TODO IMPLEMENTADO
+1. Migración SQLite (projects, chapters, generations, takes)
+2. Gestor de capítulos (split por # o ---)
+3. Chunk map UI + regeneración por chunk
+4. Modo A/B comparación
+5. Preview multi-voz (primer párrafo vs todos los perfiles)
+6. Exportación batch de capítulos (ZIP)
+7. Casting de personajes via markup [Character]
+8. Analizador de calidad de muestra (SNR, clipping, rating)
+9. Múltiples muestras por perfil (schema ready)
+10. Mensajes de error mejorados (friendly + technical + code)
+
+#### Tier 3 (Transformativo) — Parcialmente implementado
+- wavesurfer.js editor component: HECHO
+- SSML-lite parser ([pause], [emph], [whisper]): HECHO
+- Emoción, IPA, plantillas, ambientación, eval F5-TTS: PENDIENTE (exploratorio)
+
+#### Monitorización (no en audit original) — IMPLEMENTADO
+- Logging estructurado (text + JSONL + colored console)
+- Request-ID end-to-end (FE genera, BE propaga, logs correlacionan)
+- Access log middleware
+- Logs tab con auto-refresh, filtro por request-ID, filtro por nivel/tiempo
+- Error badge en nav
+- Stats dashboard (requests, syntheses, errors, latency, endpoints, engines)
+- FE logger con sessionStorage persistence
+- ErrorBoundary + global error handlers
+- User action logging (synthesis, upload, conversion, lab)
+
+---
+
+## Parte 1 — QA / Bugs encontrados (original)
 
 ### 🔴 Crítico (1)
 
