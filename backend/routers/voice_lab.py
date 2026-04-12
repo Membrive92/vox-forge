@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from pydub import AudioSegment
 
 from ..catalogs import AUDIO_FORMATS
-from ..exceptions import UnsupportedFormatError
+from ..exceptions import InvalidSampleError, UnsupportedFormatError
 from ..paths import TEMP_DIR
 from ..services.voice_lab_engine import (
     BUILTIN_PRESETS,
@@ -114,7 +114,12 @@ async def process_audio(
     )
 
     try:
-        output_path = await _engine.process(input_path, params, output_format)
+        try:
+            output_path = await _engine.process(input_path, params, output_format)
+        except Exception as exc:
+            raise InvalidSampleError(
+                f"Could not process audio: the file may be corrupted or in an unsupported format. ({exc})"
+            ) from exc
 
         try:
             processed = AudioSegment.from_file(str(output_path))

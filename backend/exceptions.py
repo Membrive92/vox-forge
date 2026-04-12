@@ -50,6 +50,20 @@ class SynthesisError(DomainError):
     code = "synthesis_failed"
 
 
+_USER_FRIENDLY_MESSAGES: dict[str, str] = {
+    "profile_not_found": "The voice profile was not found. It may have been deleted.",
+    "unsupported_voice": "The selected voice is not available. Try a different one.",
+    "unsupported_format": "The selected audio format is not supported. Use MP3, WAV, OGG, or FLAC.",
+    "invalid_sample": "The audio sample is invalid or corrupted. Upload a clean .wav or .mp3 file.",
+    "sample_not_found": "The voice sample file was not found on disk.",
+    "synthesis_failed": "Audio synthesis failed. Check the logs tab for details.",
+}
+
+
+def _friendly_message(exc: DomainError) -> str:
+    return _USER_FRIENDLY_MESSAGES.get(exc.code, exc.message)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Translate domain exceptions to consistent JSON responses."""
 
@@ -57,5 +71,9 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def _handle_domain(_: Request, exc: DomainError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
-            content={"detail": exc.message, "code": exc.code},
+            content={
+                "detail": _friendly_message(exc),
+                "code": exc.code,
+                "technical": exc.message,
+            },
         )

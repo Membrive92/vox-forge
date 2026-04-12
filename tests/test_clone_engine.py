@@ -377,8 +377,8 @@ class TestCloneAPI:
         # Clone engine raises SynthesisError(CUDA not available) -> 500
         assert response.status_code == 500
         body = response.json()
-        assert "CUDA" in body["detail"]
         assert body["code"] == "synthesis_failed"
+        assert "CUDA" in body.get("technical", body.get("detail", ""))
 
     def test_profile_with_sample_shows_sample_info(self, client) -> None:
         """Verify the profile correctly stores sample metadata."""
@@ -417,7 +417,8 @@ class TestCloneAPI:
             "profile_id": profile["id"],
         })
         assert r2.status_code == 500
-        assert "CUDA" in r2.json()["detail"]
+        body = r2.json()
+        assert "CUDA" in body.get("technical", body.get("detail", ""))
 
     def test_delete_sample_profile_falls_back_to_edge(self, client) -> None:
         """After deleting a profile with sample, a new sampleless profile uses Edge-TTS."""

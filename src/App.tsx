@@ -3,13 +3,19 @@ import { useState } from "react";
 import { Toast } from "@/components/Toast";
 import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
+import { CompareTab } from "@/features/compare/CompareTab";
 import { ConvertTab } from "@/features/convert/ConvertTab";
 import { ExperimentalTab } from "@/features/experimental/ExperimentalTab";
 import { LabTab } from "@/features/lab/LabTab";
+import { ActivityTab } from "@/features/activity/ActivityTab";
+import { useErrorBadge } from "@/features/logs/LogsTab";
 import { ProfilesTab } from "@/features/profiles/ProfilesTab";
+import { WorkbenchTab } from "@/features/projects/WorkbenchTab";
+import { PronunciationTab } from "@/features/pronunciation/PronunciationTab";
 import { SynthTab } from "@/features/synth/SynthTab";
 import { VoicesTab } from "@/features/voices/VoicesTab";
 import type { ProfileDraft, SynthSettings } from "@/features/state";
+import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useToast } from "@/hooks/useToast";
 import { useSamplePlayer } from "@/hooks/useSamplePlayer";
@@ -18,7 +24,7 @@ import { getTranslations } from "@/i18n";
 import { colors, fonts, fontsHref } from "@/theme/tokens";
 import type { AudioFormat, Language, Profile, UploadedSample } from "@/types/domain";
 
-type Tab = "synth" | "voices" | "profiles" | "convert" | "lab" | "experimental";
+type Tab = "synth" | "workbench" | "voices" | "profiles" | "convert" | "compare" | "lab" | "experimental" | "pronunciation" | "activity";
 
 export default function App() {
   const [lang, setLang] = useState<Language>("es");
@@ -40,6 +46,8 @@ export default function App() {
   const [dragOver, setDragOver] = useState(false);
 
   const toast = useToast();
+  const errorBadge = useErrorBadge();
+  useDraftPersistence({ key: "voxforge.draft.synth", value: text, onRestore: setText });
   const { profiles, create, update, remove } = useProfiles();
   const voicePreview = useVoicePreview();
   const samplePlayer = useSamplePlayer();
@@ -141,12 +149,13 @@ export default function App() {
       <Toast message={toast.message} visible={toast.visible} />
 
       <Header t={t} lang={lang} onToggleLang={handleToggleLang} />
-      <TabsNav t={t} tab={tab} setTab={setTab} />
+      <TabsNav t={t} tab={tab} setTab={setTab} errorCount={errorBadge} />
 
       <main style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
         {tab === "synth" && (
           <SynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} />
         )}
+        {tab === "workbench" && <WorkbenchTab onToast={toast.show} />}
         {tab === "voices" && (
           <VoicesTab
             t={t}
@@ -178,6 +187,9 @@ export default function App() {
             onToast={toast.show}
           />
         )}
+        {tab === "compare" && (
+          <CompareTab t={t} profiles={profiles} onToast={toast.show} />
+        )}
         {tab === "lab" && (
           <LabTab
             t={t}
@@ -190,6 +202,8 @@ export default function App() {
             onToast={toast.show}
           />
         )}
+        {tab === "pronunciation" && <PronunciationTab onToast={toast.show} />}
+        {tab === "activity" && <ActivityTab />}
       </main>
     </div>
   );
@@ -320,16 +334,21 @@ interface TabsNavProps {
   t: ReturnType<typeof getTranslations>;
   tab: Tab;
   setTab: (t: Tab) => void;
+  errorCount: number;
 }
 
-function TabsNav({ t, tab, setTab }: TabsNavProps) {
+function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
   const tabs: readonly { id: Tab; icon: JSX.Element; label: string }[] = [
     { id: "synth", icon: <Icons.Waveform />, label: t.tabSynth },
+    { id: "workbench", icon: <Icons.Settings />, label: t.tabWorkbench },
     { id: "voices", icon: <Icons.Settings />, label: t.tabVoices },
     { id: "profiles", icon: <Icons.User />, label: t.tabProfiles },
     { id: "convert", icon: <Icons.Mic />, label: t.tabConvert },
+    { id: "compare", icon: <Icons.Waveform />, label: t.tabCompare },
     { id: "lab", icon: <Icons.Settings />, label: t.tabLab },
     { id: "experimental", icon: <Icons.Waveform />, label: t.tabExperimental },
+    { id: "pronunciation", icon: <Icons.Settings />, label: t.tabPronunciation },
+    { id: "activity", icon: <Icons.Settings />, label: errorCount > 0 ? `${t.tabActivity} (${errorCount})` : t.tabActivity },
   ];
   return (
     <nav
