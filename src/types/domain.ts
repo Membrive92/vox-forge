@@ -31,6 +31,18 @@ export interface SynthesisParams {
   pitch: number;
   volume: number;
   profileId?: string | undefined;
+  title?: string | undefined;
+  artist?: string | undefined;
+  album?: string | undefined;
+  trackNumber?: number | undefined;
+}
+
+export interface ExportSettings {
+  storyTitle: string;
+  artist: string;
+  album: string;
+  trackNumber: number;
+  filenamePattern: string;
 }
 
 export interface UploadedSample {

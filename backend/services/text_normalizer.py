@@ -255,6 +255,11 @@ def normalize_for_tts(text: str) -> str:
 
     The result reads like a narrator would speak it aloud.
     """
+    # 0. User pronunciation overrides (whole-word). Applied before the
+    # rest of the pipeline so custom spellings take precedence.
+    from .pronunciation import manager as _pron_manager
+    text = _pron_manager.apply(text)
+
     # 1. Single newlines → spaces (preserve paragraph breaks)
     text = re.sub(r"(?<!\n)\n(?!\n)", " ", text)
 

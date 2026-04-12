@@ -28,6 +28,11 @@ class SynthesisRequest(BaseModel):
     pitch: int = Field(default=0, ge=-10, le=10, description="Pitch in semitones")
     volume: int = Field(default=80, ge=0, le=100, description="Volume in %")
     profile_id: Optional[str] = Field(default=None, description="Profile ID (optional)")
+    # Optional metadata — embedded into the exported file as ID3/Vorbis tags.
+    title: Optional[str] = Field(default=None, max_length=200)
+    artist: Optional[str] = Field(default=None, max_length=200)
+    album: Optional[str] = Field(default=None, max_length=200)
+    track_number: Optional[int] = Field(default=None, ge=1, le=9999)
 
 
 class VoiceProfile(BaseModel):
@@ -42,6 +47,7 @@ class VoiceProfile(BaseModel):
     volume: int = Field(default=80, ge=0, le=100)
     sample_filename: Optional[str] = None
     sample_duration: Optional[float] = None
+    extra_samples: list[str] = Field(default_factory=list)
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)
 
@@ -80,3 +86,60 @@ class HealthResponse(BaseModel):
 class DeletedResponse(BaseModel):
     status: str
     id: str
+
+
+class LogEntry(BaseModel):
+    """Single parsed log line."""
+
+    timestamp: str
+    level: str
+    request_id: str
+    logger: str
+    message: str
+    raw: str
+
+
+class LogsResponse(BaseModel):
+    """Recent log lines."""
+
+    entries: list[LogEntry]
+    source: str
+    returned: int
+
+
+class PronunciationEntry(BaseModel):
+    word: str = Field(..., min_length=1, max_length=100)
+    replacement: str = Field(..., min_length=1, max_length=200)
+
+
+class PronunciationListResponse(BaseModel):
+    entries: dict[str, str]
+    count: int
+
+
+class IncompleteJobSummary(BaseModel):
+    job_id: str
+    engine: str
+    created_at: float
+    updated_at: float
+    chunks_available: int
+    text_preview: str
+    title: Optional[str] = None
+    output_format: str
+    profile_id: Optional[str] = None
+
+
+class IncompleteJobsResponse(BaseModel):
+    jobs: list[IncompleteJobSummary]
+    count: int
+
+
+class JobProgressResponse(BaseModel):
+    """Real-time progress snapshot for a synthesis job."""
+
+    job_id: str
+    status: str
+    chunks_done: int
+    chunks_total: int
+    current_step: str
+    error: str | None = None

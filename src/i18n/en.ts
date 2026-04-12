@@ -128,4 +128,12 @@ export const en: Record<TranslationKey, string> = {
   expGenerating: "Generating...",
   expReady: "Audio generated (experimental)",
   expWarning: "Experimental: the accent may not match the target language",
+  tabLogs: "Logs",
+  tabActivity: "Activity",
+  tabWorkbench: "Workbench",
+  tabCompare: "Compare",
+  tabPronunciation: "Pronunciation",
+  estimatedDuration: "≈ {dur} of audio",
+  draftRestored: "Draft restored",
+  shortcutHint: "Ctrl+Enter to generate · Ctrl+S to download · Space for play/pause",
 };

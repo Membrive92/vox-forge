@@ -429,6 +429,7 @@ class CloneEngine:
         format_config: dict,
         cancel_token: CancellationToken | None = None,
         speed: float = 1.0,
+        job_id: str | None = None,
     ) -> tuple[Path, int]:
         """Synthesize multiple chunks with cloning and concatenate.
 
@@ -439,6 +440,9 @@ class CloneEngine:
         output_path = OUTPUT_DIR / f"{file_id}.{output_format}"
         temp_files: list[Path] = []
 
+        # Local import to avoid a circular dep with tts_engine at module load.
+        from .progress import registry as progress_registry
+
         try:
             for i, chunk in enumerate(chunks):
                 chunk_text = chunk.text if hasattr(chunk, "text") else str(chunk)
@@ -448,6 +452,8 @@ class CloneEngine:
                 temp_files.append(chunk_path)
                 logger.info("Clone chunk %d/%d done: '%s'", i + 1, len(chunks),
                             chunk_text[:60] + ("..." if len(chunk_text) > 60 else ""))
+                if job_id:
+                    progress_registry.update(job_id, chunks_done=i + 1)
 
             # Concatenate with per-chunk pause durations
             combined = AudioSegment.empty()

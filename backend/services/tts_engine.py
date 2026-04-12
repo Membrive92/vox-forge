@@ -17,7 +17,9 @@ from ..exceptions import SynthesisError, UnsupportedFormatError, UnsupportedVoic
 from ..paths import OUTPUT_DIR, TEMP_DIR
 from ..schemas import SynthesisRequest
 from .clone_engine import CloneEngine
+from .job_store import chunk_path as job_chunk_path
 from .profile_manager import ProfileManager
+from .progress import registry as progress_registry
 from .text_normalizer import normalize_for_tts
 
 logger = logging.getLogger(__name__)
@@ -204,7 +206,12 @@ class TTSEngine:
             self._clone_engine = CloneEngine()
         return self._clone_engine
 
-    async def synthesize(self, request: SynthesisRequest, cancel_token: CancellationToken | None = None) -> SynthesisResult:
+    async def synthesize(
+        self,
+        request: SynthesisRequest,
+        cancel_token: CancellationToken | None = None,
+        job_id: str | None = None,
+    ) -> SynthesisResult:
         """Synthesize text and return the result with engine info.
 
         Routes to XTTS v2 if the profile has a voice sample, otherwise
@@ -223,6 +230,9 @@ class TTSEngine:
 
         if request.profile_id:
             profile = self._profiles.get(request.profile_id)
+            if profile is None:
+                from ..exceptions import ProfileNotFound
+                raise ProfileNotFound(f"Profile not found: {request.profile_id}")
             if profile is not None:
                 # Override voice_id from profile for routing. Speed/pitch/volume
                 # come from the request (frontend sliders), not the profile.
@@ -237,7 +247,7 @@ class TTSEngine:
 
         # Route to clone engine if we have a sample
         if sample_path is not None:
-            return await self._synthesize_cloned(request, sample_path, profile_language, cancel_token)
+            return await self._synthesize_cloned(request, sample_path, profile_language, cancel_token, job_id)
 
         # Otherwise use Edge-TTS
         if voice_id not in all_voice_ids():
@@ -249,11 +259,28 @@ class TTSEngine:
         file_id = str(uuid.uuid4())[:12]
         output_path = OUTPUT_DIR / f"{file_id}.{request.output_format}"
         temp_files: list[Path] = []
+        # When job_id is set, chunks are persisted to data/jobs/{id}/ so the
+        # job can be resumed on crash. Already-existing chunks are skipped.
+        use_job_dir = job_id is not None
+
+        if job_id:
+            progress_registry.update(job_id, chunks_total=len(chunks), step="synthesizing")
 
         try:
             for i, chunk in enumerate(chunks):
-                temp_mp3 = TEMP_DIR / f"{file_id}_chunk{i}.mp3"
-                temp_files.append(temp_mp3)
+                if use_job_dir:
+                    chunk_file = job_chunk_path(job_id, i, "mp3")
+                    chunk_file.parent.mkdir(parents=True, exist_ok=True)
+                else:
+                    chunk_file = TEMP_DIR / f"{file_id}_chunk{i}.mp3"
+                temp_files.append(chunk_file)
+
+                if use_job_dir and chunk_file.exists() and chunk_file.stat().st_size > 0:
+                    logger.info("Chunk %d/%d already present, skipping", i + 1, len(chunks))
+                    if job_id:
+                        progress_registry.update(job_id, chunks_done=i + 1)
+                    continue
+
                 communicate = edge_tts.Communicate(
                     text=chunk,
                     voice=voice_id,
@@ -261,11 +288,13 @@ class TTSEngine:
                     pitch=_pitch_str(request.pitch),
                     volume=_volume_str(request.volume),
                 )
-                await communicate.save(str(temp_mp3))
+                await communicate.save(str(chunk_file))
                 logger.info(
                     "Chunk %d/%d synthesized: %d bytes",
-                    i + 1, len(chunks), temp_mp3.stat().st_size,
+                    i + 1, len(chunks), chunk_file.stat().st_size,
                 )
+                if job_id:
+                    progress_registry.update(job_id, chunks_done=i + 1)
 
             # Single chunk + MP3: skip pydub entirely (no ffmpeg needed)
             if len(temp_files) == 1 and request.output_format == "mp3":
@@ -305,8 +334,12 @@ class TTSEngine:
             logger.error("Synthesis error: %s", exc)
             raise SynthesisError(f"Synthesis error: {exc}") from exc
         finally:
-            for tf in temp_files:
-                tf.unlink(missing_ok=True)
+            # Keep chunk files when they live in a job dir — the router
+            # cleans them up on success. On crash they're what makes
+            # resume possible.
+            if not use_job_dir:
+                for tf in temp_files:
+                    tf.unlink(missing_ok=True)
 
     @staticmethod
     def _apply_volume(path: Path, volume: int) -> None:
@@ -346,6 +379,7 @@ class TTSEngine:
         sample_path: Path,
         language: str,
         cancel_token: CancellationToken | None = None,
+        job_id: str | None = None,
     ) -> SynthesisResult:
         """Synthesize text using XTTS v2 voice cloning."""
         logger.info("Using XTTS v2 cloning with sample: %s", sample_path.name)
@@ -356,6 +390,9 @@ class TTSEngine:
         # XTTS v2 speed param: 1.0 = normal. Convert from our 50-200% scale.
         xtts_speed = request.speed / 100.0
 
+        if job_id:
+            progress_registry.update(job_id, chunks_total=len(chunks), step="cloning")
+
         path, chunk_count = await clone.synthesize_long(
             chunks=chunks,
             speaker_wav=sample_path,
@@ -364,6 +401,7 @@ class TTSEngine:
             format_config=fmt_cfg,
             cancel_token=cancel_token,
             speed=xtts_speed,
+            job_id=job_id,
         )
 
         # Volume post-processing (XTTS v2 doesn't support volume natively)

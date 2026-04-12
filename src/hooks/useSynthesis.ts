@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { synthesize } from "@/api/synthesis";
+import { fetchProgress, newJobId, synthesize } from "@/api/synthesis";
 import type { SynthesisParams } from "@/types/domain";
 
 export interface SynthesisState {
@@ -8,11 +8,13 @@ export interface SynthesisState {
   isGenerated: boolean;
   progress: number;
   stepLabel: string;
+  chunksDone: number;
+  chunksTotal: number;
   lastEngine: string | null;
   reset: () => void;
 }
 
-const STEP_INTERVAL_MS = 600;
+const POLL_INTERVAL_MS = 800;
 
 export interface RunSynthesisOptions {
   params: SynthesisParams;
@@ -30,53 +32,70 @@ export function useSynthesis(): SynthesisHook {
   const [isGenerated, setIsGenerated] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stepLabel, setStepLabel] = useState("");
+  const [chunksDone, setChunksDone] = useState(0);
+  const [chunksTotal, setChunksTotal] = useState(0);
   const [lastEngine, setLastEngine] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
 
-  const clearInterval = useCallback(() => {
+  const clearPoll = useCallback(() => {
     if (intervalRef.current !== null) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
   }, []);
 
-  // Clear interval on unmount to prevent leaks when navigating away mid-generation
   useEffect(() => {
-    return () => clearInterval();
-  }, [clearInterval]);
+    return () => clearPoll();
+  }, [clearPoll]);
 
   const reset = useCallback(() => {
-    clearInterval();
+    clearPoll();
     setIsGenerating(false);
     setIsGenerated(false);
     setProgress(0);
     setStepLabel("");
+    setChunksDone(0);
+    setChunksTotal(0);
     setLastEngine(null);
-  }, [clearInterval]);
+  }, [clearPoll]);
 
   const runningRef = useRef(false);
 
   const run = useCallback(
     async ({ params, steps, onSuccess, onError }: RunSynthesisOptions) => {
       if (!params.text.trim()) return;
-      if (runningRef.current) return; // Prevent double submission
+      if (runningRef.current) return;
       runningRef.current = true;
       setIsGenerating(true);
       setIsGenerated(false);
       setProgress(0);
+      setChunksDone(0);
+      setChunksTotal(0);
       setLastEngine(null);
       setStepLabel(steps[0] ?? "");
 
-      let stepIdx = 0;
+      const jobId = newJobId();
+
+      // Poll progress every 800ms. Backend reports chunks_done/chunks_total.
       intervalRef.current = window.setInterval(() => {
-        stepIdx = Math.min(stepIdx + 1, steps.length - 1);
-        setStepLabel(steps[stepIdx] ?? "");
-        setProgress(Math.min(95, ((stepIdx + 1) / steps.length) * 90));
-      }, STEP_INTERVAL_MS);
+        void fetchProgress(jobId)
+          .then((p) => {
+            setChunksDone(p.chunks_done);
+            setChunksTotal(p.chunks_total);
+            if (p.current_step) setStepLabel(p.current_step);
+            if (p.chunks_total > 0) {
+              // Reserve the last 5% for export/finalize after the HTTP returns.
+              setProgress(Math.min(95, (p.chunks_done / p.chunks_total) * 95));
+            }
+          })
+          .catch(() => {
+            // Job may not be registered yet, or finished already — harmless.
+          });
+      }, POLL_INTERVAL_MS);
 
       try {
-        const { blob, duration, engine } = await synthesize(params);
-        clearInterval();
+        const { blob, duration, engine } = await synthesize(params, jobId);
+        clearPoll();
         setProgress(100);
         setIsGenerating(false);
         setIsGenerated(true);
@@ -84,15 +103,18 @@ export function useSynthesis(): SynthesisHook {
         runningRef.current = false;
         onSuccess(blob, duration, engine);
       } catch (e) {
-        clearInterval();
+        clearPoll();
         setIsGenerating(false);
         setProgress(0);
         runningRef.current = false;
         onError(e instanceof Error ? e.message : "Unknown error");
       }
     },
-    [clearInterval],
+    [clearPoll],
   );
 
-  return { isGenerating, isGenerated, progress, stepLabel, lastEngine, reset, run };
+  return {
+    isGenerating, isGenerated, progress, stepLabel,
+    chunksDone, chunksTotal, lastEngine, reset, run,
+  };
 }

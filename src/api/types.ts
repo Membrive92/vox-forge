@@ -24,6 +24,10 @@ export interface SynthesisRequestDTO {
   pitch: number;
   volume: number;
   profile_id: string | null;
+  title?: string | null;
+  artist?: string | null;
+  album?: string | null;
+  track_number?: number | null;
 }
 
 export interface ApiErrorBody {

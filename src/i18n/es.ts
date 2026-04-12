@@ -126,6 +126,14 @@ export const es = {
   expGenerating: "Generando...",
   expReady: "Audio generado (experimental)",
   expWarning: "Experimental: el acento puede no coincidir con el idioma objetivo",
+  tabLogs: "Logs",
+  tabActivity: "Actividad",
+  tabWorkbench: "Proyecto",
+  tabCompare: "Comparar",
+  tabPronunciation: "Pronunciación",
+  estimatedDuration: "≈ {dur} de audio",
+  draftRestored: "Borrador restaurado",
+  shortcutHint: "Ctrl+Enter para generar · Ctrl+S para descargar · Space para play/pausa",
 } as const;
 
 export type TranslationKey = keyof typeof es;

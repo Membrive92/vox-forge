@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 
 import { convertVoice } from "@/api/conversion";
 import { Slider } from "@/components/Slider";
+import { logger } from "@/logging/logger";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { Translations } from "@/i18n";
@@ -37,6 +38,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
 
   const handleConvert = async (): Promise<void> => {
     if (!sourceFile || !canConvert) return;
+    logger.info("Voice conversion started", { targetMode, format, pitchShift, formantShift, bassBoost });
     setIsConverting(true);
     try {
       const result = await convertVoice(sourceFile, {

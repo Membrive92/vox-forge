@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { listPresets, processAudio, randomPreset, type Preset, type VoiceLabParams } from "@/api/voiceLab";
 import { AudioRecorder } from "@/components/AudioRecorder";
 import { Slider } from "@/components/Slider";
+import { logger } from "@/logging/logger";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { useCustomLabPresets } from "@/hooks/useCustomLabPresets";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii } from "@/theme/tokens";
 
@@ -27,7 +29,8 @@ const DEFAULT_PARAMS: VoiceLabParams = {
 export function LabTab({ t, onToast }: LabTabProps) {
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [params, setParams] = useState<VoiceLabParams>({ ...DEFAULT_PARAMS });
-  const [presets, setPresets] = useState<Preset[]>([]);
+  const [serverPresets, setServerPresets] = useState<Preset[]>([]);
+  const custom = useCustomLabPresets();
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [presetFilter, setPresetFilter] = useState<string>("all");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,8 +39,26 @@ export function LabTab({ t, onToast }: LabTabProps) {
   const player = useAudioPlayer();
 
   useEffect(() => {
-    listPresets().then(setPresets).catch(() => {});
+    listPresets().then(setServerPresets).catch(() => {});
   }, []);
+
+  const presets: Preset[] = [...serverPresets, ...custom.presets];
+
+  const handleSaveCustom = (): void => {
+    const name = window.prompt("Preset name?");
+    if (!name || !name.trim()) return;
+    const description = window.prompt("Short description (optional)") ?? "";
+    custom.save(name, description, params);
+    setActivePreset(name.trim());
+    onToast(`Preset saved: ${name.trim()}`);
+  };
+
+  const handleDeleteCustom = (e: React.MouseEvent, name: string): void => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete preset "${name}"?`)) return;
+    custom.remove(name);
+    if (activePreset === name) setActivePreset(null);
+  };
 
   const setParam = (key: keyof VoiceLabParams, value: number): void => {
     setParams((prev) => ({ ...prev, [key]: value }));
@@ -64,6 +85,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
 
   const handleProcess = async (): Promise<void> => {
     if (!sourceFile) return;
+    logger.info("Lab processing started", { preset: activePreset, format, params });
     setIsProcessing(true);
     try {
       const result = await processAudio(sourceFile, params, format);
@@ -212,20 +234,33 @@ export function LabTab({ t, onToast }: LabTabProps) {
 
       {/* Right: presets */}
       <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radii.xl, padding: 24, backdropFilter: "blur(12px)", display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{t.labPresets}</h3>
-          <button
-            onClick={() => void handleRandom()}
-            style={{
-              padding: "6px 14px", borderRadius: radii.sm, fontSize: 12, fontWeight: 600,
-              background: "linear-gradient(135deg, #f59e0b, #d97706)", border: "none",
-              color: "#fff", cursor: "pointer", fontFamily: fonts.sans,
-              display: "flex", alignItems: "center", gap: 4,
-              boxShadow: "0 2px 12px rgba(245,158,11,0.3)",
-            }}
-          >
-            {t.labRandom}
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={handleSaveCustom}
+              title="Save current settings as preset"
+              style={{
+                padding: "6px 12px", borderRadius: radii.sm, fontSize: 12, fontWeight: 600,
+                background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)",
+                color: "#34d399", cursor: "pointer", fontFamily: fonts.sans,
+              }}
+            >
+              + Save
+            </button>
+            <button
+              onClick={() => void handleRandom()}
+              style={{
+                padding: "6px 14px", borderRadius: radii.sm, fontSize: 12, fontWeight: 600,
+                background: "linear-gradient(135deg, #f59e0b, #d97706)", border: "none",
+                color: "#fff", cursor: "pointer", fontFamily: fonts.sans,
+                display: "flex", alignItems: "center", gap: 4,
+                boxShadow: "0 2px 12px rgba(245,158,11,0.3)",
+              }}
+            >
+              {t.labRandom}
+            </button>
+          </div>
         </div>
 
         {/* Category filter */}
@@ -235,6 +270,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
             { id: "narrator", label: t.labNarrators },
             { id: "character", label: t.labCharacters },
             { id: "effect", label: t.labEffects },
+            { id: "custom", label: "Custom" },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -256,9 +292,14 @@ export function LabTab({ t, onToast }: LabTabProps) {
         <div style={{ display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", flex: 1 }}>
           {filteredPresets.map((preset) => {
             const isActive = activePreset === preset.name;
-            const catColor = preset.category === "narrator" ? "#3b82f6" : preset.category === "character" ? "#f59e0b" : "#8b5cf6";
+            const catColor =
+              preset.category === "narrator" ? "#3b82f6"
+              : preset.category === "character" ? "#f59e0b"
+              : preset.category === "custom" ? "#10b981"
+              : "#8b5cf6";
+            const isCustom = preset.category === "custom";
             return (
-              <button
+              <div
                 key={preset.name}
                 onClick={() => applyPreset(preset)}
                 style={{
@@ -269,20 +310,39 @@ export function LabTab({ t, onToast }: LabTabProps) {
                   fontFamily: fonts.sans, color: colors.text,
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{preset.name}</span>
-                  <span style={{
-                    fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
-                    background: `${catColor}22`, color: catColor,
-                    textTransform: "uppercase", letterSpacing: "0.5px", fontFamily: fonts.mono,
-                  }}>
-                    {preset.category}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{
+                      fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
+                      background: `${catColor}22`, color: catColor,
+                      textTransform: "uppercase", letterSpacing: "0.5px", fontFamily: fonts.mono,
+                    }}>
+                      {preset.category}
+                    </span>
+                    {isCustom && (
+                      <button
+                        onClick={(e) => handleDeleteCustom(e, preset.name)}
+                        aria-label={`Delete ${preset.name}`}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: colors.textFaint,
+                          cursor: "pointer",
+                          fontSize: 14,
+                          lineHeight: 1,
+                          padding: 2,
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p style={{ margin: 0, fontSize: 11, color: colors.textDim, lineHeight: 1.4 }}>
                   {preset.description}
                 </p>
-              </button>
+              </div>
             );
           })}
         </div>
