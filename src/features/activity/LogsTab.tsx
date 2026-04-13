@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { fetchErrorCount, fetchServerLogs, fetchStats, type ServerLogEntry, type StatsResponse } from "@/api/logs";
+import { fetchServerLogs, fetchStats, type ServerLogEntry, type StatsResponse } from "@/api/logs";
 import { logger, type LogEntry } from "@/logging/logger";
 import { colors, fonts, radii } from "@/theme/tokens";
 
@@ -170,21 +170,6 @@ export function LogsTab() {
       )}
     </div>
   );
-}
-
-// ── Error badge hook (used by App.tsx nav) ──────────────────────────
-
-export function useErrorBadge(): number {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    const poll = (): void => {
-      void fetchErrorCount(60).then((d) => setCount(d.errors)).catch(() => {});
-    };
-    poll();
-    const id = window.setInterval(poll, 30_000);
-    return () => window.clearInterval(id);
-  }, []);
-  return count;
 }
 
 // ── Subcomponents ───────────────────────────────────────────────────

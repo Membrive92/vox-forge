@@ -189,26 +189,54 @@ src/
 │   ├── useExportSettings.ts   # ID3 metadata + filename pattern (localStorage)
 │   ├── useCustomLabPresets.ts # Save/load custom DSP presets (localStorage)
 │   ├── useVoicePreview.ts     # Live voice demo
-│   ├── useSamplePlayer.ts    # Play samples from backend
+│   ├── useSamplePlayer.ts     # Play samples from backend
+│   ├── useErrorBadge.ts       # Polls /logs/error-count for nav badge
 │   └── useToast.ts            # Timer + notification state
 ├── features/
-│   ├── synth/SynthTab.tsx          # Editor + player + export panel + keyboard shortcuts + resume banner
-│   ├── projects/WorkbenchTab.tsx   # Project sidebar + chapter cards + chunk map
-│   ├── projects/ChunkMap.tsx       # Per-chapter chunk list + synthesize + regen
-│   ├── voices/VoicesTab.tsx        # Upload + voice browser + profile form
-│   ├── profiles/ProfilesTab.tsx    # Profile cards with actions
-│   ├── convert/ConvertTab.tsx      # Voice conversion with DSP sliders
-│   ├── compare/CompareTab.tsx      # A/B comparison + quick preview all profiles
-│   ├── lab/LabTab.tsx              # DSP suite with presets (built-in + custom)
-│   ├── experimental/ExperimentalTab.tsx # Cross-lingual cloning
-│   ├── pronunciation/PronunciationTab.tsx # Dictionary editor
-│   └── logs/LogsTab.tsx            # Server/Client/Stats tabs, auto-refresh, error badge hook
+│   ├── tabs.ts                # Tab type + order + old-to-new mapping
+│   ├── state.ts               # Shared SynthSettings + ProfileDraft interfaces
+│   ├── projects/              # Workbench (default tab)
+│   │   ├── WorkbenchTab.tsx   # Sidebar + chapter cards
+│   │   ├── ChunkMap.tsx       # Per-chapter chunk list + regen
+│   │   ├── CharacterCasting.tsx  # [Character] markup detector + cast UI
+│   │   ├── QuickPreview.tsx   # First-300-chars audition
+│   │   └── AmbienceMixer.tsx  # 2-track narration + ambient mix
+│   ├── quick-synth/           # Quick TTS + cross-lingual mode
+│   │   ├── QuickSynthTab.tsx  # Mode toggle wrapper
+│   │   ├── SynthTab.tsx       # Standard TTS panel (editor, player, export)
+│   │   └── ExperimentalTab.tsx # Cross-lingual cloning panel
+│   ├── voices-unified/        # Voices, profiles, compare in one tab
+│   │   ├── VoicesUnifiedTab.tsx  # Sections + quality analyzer wiring
+│   │   ├── VoicesTab.tsx      # System voices grid + sample upload
+│   │   ├── ProfilesTab.tsx    # Profile cards
+│   │   └── CompareTab.tsx     # A/B + quick preview all profiles
+│   ├── audio-tools/           # Voice conversion + DSP effects
+│   │   ├── AudioToolsTab.tsx  # Mode toggle wrapper
+│   │   ├── ConvertTab.tsx     # OpenVoice change-voice mode
+│   │   └── LabTab.tsx         # DSP effects mode
+│   └── activity/              # Activity dashboard + settings + dev logs
+│       ├── ActivityTab.tsx    # Recent gens, errors, disk usage
+│       ├── SettingsSection.tsx # Pronunciation + export defaults (collapsible)
+│       ├── PronunciationTab.tsx # Pronunciation dictionary editor
+│       └── LogsTab.tsx        # Developer logs (hidden behind toggle)
 ├── i18n/
 │   ├── es.ts, en.ts, index.ts     # Typed translations
 ├── constants/voices.ts
 ├── theme/tokens.ts
 └── types/domain.ts
 ```
+
+### Tab structure
+
+The 5 user-facing tabs are organized by workflow, not by underlying technology:
+
+| Tab | Purpose |
+|-----|---------|
+| **Workbench** | Default. Project + chapter authoring with chunk map, character casting, ambient mix, batch export. |
+| **Quick Synth** | One-shot TTS for quick tests. Toggle for cross-lingual cloning mode. |
+| **Voices** | System voices, custom profiles, A/B comparison, sample quality analyzer — all in one place. |
+| **Audio Tools** | Two modes: Change Voice (OpenVoice) and Effects (DSP chain). |
+| **Activity** | Recent generations, errors, disk usage. Collapsible Settings (pronunciation + export defaults). Developer logs hidden behind a small toggle. |
 
 ### API Client
 

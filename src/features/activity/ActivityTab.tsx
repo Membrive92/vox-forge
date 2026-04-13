@@ -6,10 +6,18 @@ import {
   type GenerationActivity,
   type RecentError,
 } from "@/api/activity";
-import { LogsTab } from "@/features/logs/LogsTab";
+import { LogsTab } from "./LogsTab";
+import type { Translations } from "@/i18n";
 import { colors, fonts, radii } from "@/theme/tokens";
 
-export function ActivityTab() {
+import { SettingsSection } from "./SettingsSection";
+
+interface ActivityTabProps {
+  t: Translations;
+  onToast: (msg: string) => void;
+}
+
+export function ActivityTab({ t, onToast }: ActivityTabProps) {
   const [data, setData] = useState<ActivityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [devMode, setDevMode] = useState(false);
@@ -74,6 +82,9 @@ export function ActivityTab() {
           <DiskCard label="Total" value={data.disk.total} highlight />
         </div>
       </Section>
+
+      {/* Settings (pronunciation + export defaults) */}
+      <SettingsSection t={t} onToast={onToast} />
 
       {/* Dev toggle — inconspicuous, at the bottom */}
       <div style={{ textAlign: "right" }}>

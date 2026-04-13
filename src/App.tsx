@@ -3,17 +3,12 @@ import { useState } from "react";
 import { Toast } from "@/components/Toast";
 import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
-import { CompareTab } from "@/features/compare/CompareTab";
-import { ConvertTab } from "@/features/convert/ConvertTab";
-import { ExperimentalTab } from "@/features/experimental/ExperimentalTab";
-import { LabTab } from "@/features/lab/LabTab";
 import { ActivityTab } from "@/features/activity/ActivityTab";
-import { useErrorBadge } from "@/features/logs/LogsTab";
-import { ProfilesTab } from "@/features/profiles/ProfilesTab";
+import { AudioToolsTab } from "@/features/audio-tools/AudioToolsTab";
 import { WorkbenchTab } from "@/features/projects/WorkbenchTab";
-import { PronunciationTab } from "@/features/pronunciation/PronunciationTab";
-import { SynthTab } from "@/features/synth/SynthTab";
-import { VoicesTab } from "@/features/voices/VoicesTab";
+import { QuickSynthTab } from "@/features/quick-synth/QuickSynthTab";
+import { VoicesUnifiedTab } from "@/features/voices-unified/VoicesUnifiedTab";
+import { useErrorBadge } from "@/hooks/useErrorBadge";
 import type { ProfileDraft, SynthSettings } from "@/features/state";
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 import { useProfiles } from "@/hooks/useProfiles";
@@ -24,11 +19,11 @@ import { getTranslations } from "@/i18n";
 import { colors, fonts, fontsHref } from "@/theme/tokens";
 import type { AudioFormat, Language, Profile, UploadedSample } from "@/types/domain";
 
-type Tab = "synth" | "workbench" | "voices" | "profiles" | "convert" | "compare" | "lab" | "experimental" | "pronunciation" | "activity";
+type Tab = "quick-synth" | "workbench" | "voices" | "audio-tools" | "activity";
 
 export default function App() {
   const [lang, setLang] = useState<Language>("es");
-  const [tab, setTab] = useState<Tab>("synth");
+  const [tab, setTab] = useState<Tab>("workbench");
   const [text, setText] = useState("");
 
   const esVoices = VOICES.es;
@@ -111,7 +106,7 @@ export default function App() {
     setVolume(p.volume);
     setLang(p.lang);
     setActiveProfileId(p.id);
-    setTab("synth");
+    setTab("quick-synth");
   };
 
   const handleEditProfile = (p: Profile): void => {
@@ -152,58 +147,31 @@ export default function App() {
       <TabsNav t={t} tab={tab} setTab={setTab} errorCount={errorBadge} />
 
       <main style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
-        {tab === "synth" && (
-          <SynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} />
+        {tab === "quick-synth" && (
+          <QuickSynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} />
         )}
         {tab === "workbench" && <WorkbenchTab onToast={toast.show} />}
         {tab === "voices" && (
-          <VoicesTab
+          <VoicesUnifiedTab
             t={t}
             settings={settings}
             draft={draft}
+            profiles={profiles}
             dragOver={dragOver}
             setDragOver={setDragOver}
             onSaveProfile={handleSaveProfile}
+            onUseProfile={handleUseProfile}
+            onEditProfile={handleEditProfile}
+            onDeleteProfile={(id) => void handleDeleteProfile(id)}
             onToast={toast.show}
             voicePreview={voicePreview}
-          />
-        )}
-        {tab === "profiles" && (
-          <ProfilesTab
-            t={t}
-            profiles={profiles}
-            onUse={handleUseProfile}
-            onEdit={handleEditProfile}
-            onDelete={(id) => void handleDeleteProfile(id)}
-            onNew={() => setTab("voices")}
             samplePlayer={samplePlayer}
-            voicePreview={voicePreview}
           />
         )}
-        {tab === "convert" && (
-          <ConvertTab
-            t={t}
-            profiles={profiles}
-            onToast={toast.show}
-          />
+        {tab === "audio-tools" && (
+          <AudioToolsTab t={t} profiles={profiles} onToast={toast.show} />
         )}
-        {tab === "compare" && (
-          <CompareTab t={t} profiles={profiles} onToast={toast.show} />
-        )}
-        {tab === "lab" && (
-          <LabTab
-            t={t}
-            onToast={toast.show}
-          />
-        )}
-        {tab === "experimental" && (
-          <ExperimentalTab
-            t={t}
-            onToast={toast.show}
-          />
-        )}
-        {tab === "pronunciation" && <PronunciationTab onToast={toast.show} />}
-        {tab === "activity" && <ActivityTab />}
+        {tab === "activity" && <ActivityTab t={t} onToast={toast.show} />}
       </main>
     </div>
   );
@@ -339,15 +307,10 @@ interface TabsNavProps {
 
 function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
   const tabs: readonly { id: Tab; icon: JSX.Element; label: string }[] = [
-    { id: "synth", icon: <Icons.Waveform />, label: t.tabSynth },
     { id: "workbench", icon: <Icons.Settings />, label: t.tabWorkbench },
-    { id: "voices", icon: <Icons.Settings />, label: t.tabVoices },
-    { id: "profiles", icon: <Icons.User />, label: t.tabProfiles },
-    { id: "convert", icon: <Icons.Mic />, label: t.tabConvert },
-    { id: "compare", icon: <Icons.Waveform />, label: t.tabCompare },
-    { id: "lab", icon: <Icons.Settings />, label: t.tabLab },
-    { id: "experimental", icon: <Icons.Waveform />, label: t.tabExperimental },
-    { id: "pronunciation", icon: <Icons.Settings />, label: t.tabPronunciation },
+    { id: "quick-synth", icon: <Icons.Waveform />, label: t.tabQuickSynth },
+    { id: "voices", icon: <Icons.User />, label: t.tabVoices },
+    { id: "audio-tools", icon: <Icons.Mic />, label: t.tabAudioTools },
     { id: "activity", icon: <Icons.Settings />, label: errorCount > 0 ? `${t.tabActivity} (${errorCount})` : t.tabActivity },
   ];
   return (

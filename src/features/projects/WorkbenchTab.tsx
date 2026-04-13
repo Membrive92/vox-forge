@@ -18,7 +18,9 @@ import { ChevDown, Download } from "@/components/icons";
 import { colors, fonts, radii } from "@/theme/tokens";
 
 import { AmbienceMixer } from "./AmbienceMixer";
+import { CharacterCasting } from "./CharacterCasting";
 import { ChunkMap } from "./ChunkMap";
+import { QuickPreview } from "./QuickPreview";
 
 function shortDate(iso: string): string {
   const d = new Date(iso);
@@ -35,15 +37,18 @@ function estimateDuration(text: string): string {
 
 interface ChapterCardProps {
   chapter: Chapter;
+  project: Project;
   onUpdate: (id: string, data: Partial<Chapter>) => Promise<void>;
   onDelete: (id: string) => void;
   onToast: (msg: string) => void;
 }
 
-function ChapterCard({ chapter, onUpdate, onDelete, onToast }: ChapterCardProps) {
+function ChapterCard({ chapter, project, onUpdate, onDelete, onToast }: ChapterCardProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showChunks, setShowChunks] = useState(false);
   const [showAmbient, setShowAmbient] = useState(false);
+  const [showCasting, setShowCasting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [title, setTitle] = useState(chapter.title);
   const [text, setText] = useState(chapter.text);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,6 +138,38 @@ function ChapterCard({ chapter, onUpdate, onDelete, onToast }: ChapterCardProps)
                 {showChunks ? "Hide Chunks" : "Chunk Map"}
               </button>
               <button
+                onClick={() => setShowPreview(v => !v)}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: showPreview ? "rgba(59,130,246,0.15)" : colors.surfaceAlt,
+                  color: showPreview ? colors.primaryLight : colors.textDim,
+                  border: `1px solid ${showPreview ? colors.primaryBorder : colors.border}`,
+                  borderRadius: radii.sm,
+                  cursor: "pointer",
+                  fontFamily: fonts.sans,
+                }}
+              >
+                {showPreview ? "Hide Preview" : "Preview"}
+              </button>
+              <button
+                onClick={() => setShowCasting(v => !v)}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: showCasting ? "rgba(139,92,246,0.15)" : colors.surfaceAlt,
+                  color: showCasting ? "#a78bfa" : colors.textDim,
+                  border: `1px solid ${showCasting ? "rgba(139,92,246,0.3)" : colors.border}`,
+                  borderRadius: radii.sm,
+                  cursor: "pointer",
+                  fontFamily: fonts.sans,
+                }}
+              >
+                {showCasting ? "Hide Cast" : "Cast"}
+              </button>
+              <button
                 onClick={() => setShowAmbient(v => !v)}
                 style={{
                   padding: "4px 12px",
@@ -150,6 +187,29 @@ function ChapterCard({ chapter, onUpdate, onDelete, onToast }: ChapterCardProps)
               </button>
             </div>
           </div>
+          {showPreview && (
+            <div style={{ marginTop: 12 }}>
+              <QuickPreview
+                chapterText={text}
+                voiceId={project.voice_id}
+                profileId={project.profile_id}
+                speed={project.speed}
+                pitch={project.pitch}
+                volume={project.volume}
+                outputFormat={project.output_format}
+                onToast={onToast}
+              />
+            </div>
+          )}
+          {showCasting && (
+            <div style={{ marginTop: 12 }}>
+              <CharacterCasting
+                chapterText={text}
+                chapterTitle={chapter.title}
+                onToast={onToast}
+              />
+            </div>
+          )}
           {showChunks && (
             <div style={{ marginTop: 12 }}>
               <ChunkMap
@@ -388,6 +448,7 @@ export function WorkbenchTab({ onToast }: { onToast: (msg: string) => void }) {
               <ChapterCard
                 key={ch.id}
                 chapter={ch}
+                project={selected}
                 onUpdate={handleUpdateChapter}
                 onDelete={(id) => void handleDeleteChapter(id)}
                 onToast={onToast}

@@ -55,28 +55,34 @@ http://localhost:5173                 http://localhost:8000
        |                                     |
   Vite proxy /api/* ─────────────────> FastAPI routers
        |                                     |
-  10 tabs:                          ┌────────┼──────────┐
-  - Synthesize                      │  Services          │
-  - Workbench (Projects)            │  ├─ TTSEngine      │
-  - Voices                          │  ├─ CloneEngine    │
-  - Profiles                        │  ├─ ConvertEngine  │
-  - Convert                         │  ├─ VoiceLabEngine │
-  - Compare (A/B)                   │  ├─ ProjectManager │
-  - Lab                             │  ├─ ProfileManager │
-  - Experimental                    │  ├─ Pronunciation  │
-  - Pronunciation                   │  └─ JobStore       │
-  - Logs (+ Stats)                  │                    │
-       |                            │  Persistence       │
-  sessionStorage (logs)             │  ├─ SQLite (projects)
-  localStorage (draft,              │  ├─ JSON (profiles)
-   export settings,                 │  ├─ JSON (pronunciations)
-   custom presets)                  │  └─ Rotating logs  │
-                                    └────────────────────┘
-                                             |
-                              ┌──────────────┼──────────────┐
-                              │              │              │
-                          Edge-TTS       XTTS v2      OpenVoice V2
-                          (cloud)     (GPU, local)   (GPU, local)
+  5 tabs (workflow-oriented):       ┌────────┼──────────┐
+  ┌─────────────────────────┐       │  Services          │
+  │ Workbench (default)     │       │  ├─ TTSEngine      │
+  │  ├─ Projects + chapters │       │  ├─ CloneEngine    │
+  │  ├─ Quick Preview       │       │  ├─ ConvertEngine  │
+  │  ├─ Chunk Map + regen   │       │  ├─ VoiceLabEngine │
+  │  ├─ Character Casting   │       │  ├─ ProjectManager │
+  │  └─ Ambient Mixer       │       │  ├─ ProfileManager │
+  ├─────────────────────────┤       │  ├─ Pronunciation  │
+  │ Quick Synth             │       │  ├─ Ambience       │
+  │  ├─ Standard mode       │       │  └─ JobStore       │
+  │  └─ Cross-lingual mode  │       │                    │
+  ├─────────────────────────┤       │  Persistence       │
+  │ Voices                  │       │  ├─ SQLite (projects)
+  │  ├─ System voices       │       │  ├─ JSON (profiles)
+  │  ├─ My profiles         │       │  ├─ JSON (pronunciations)
+  │  └─ Compare A/B         │       │  ├─ JSON (ambience meta)
+  ├─────────────────────────┤       │  └─ Rotating logs  │
+  │ Audio Tools             │       └────────────────────┘
+  │  ├─ Change Voice        │                |
+  │  └─ Effects             │   ┌────────────┼────────────┐
+  ├─────────────────────────┤   │            │            │
+  │ Activity                │ Edge-TTS    XTTS v2    OpenVoice V2
+  │  ├─ Recent generations  │ (cloud)   (GPU local)  (GPU local)
+  │  ├─ Errors / disk       │
+  │  ├─ Settings            │
+  │  └─ Developer logs      │
+  └─────────────────────────┘
 ```
 
 ## Requirements

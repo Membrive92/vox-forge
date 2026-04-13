@@ -65,7 +65,6 @@ export const es = {
   uploadText: "Subir",
   uploadTextDesc: "Sube un archivo .txt, .docx o .pdf y se procesara automaticamente para lectura optima",
   textProcessed: "Texto procesado",
-  tabConvert: "Convertir",
   convertTitle: "Conversion de voz",
   convertDesc: "Sube un audio narrado y cambia su tono de voz por otro",
   sourceAudio: "Audio original",
@@ -83,7 +82,6 @@ export const es = {
   infoConvertPitch: "Baja o sube el tono del audio convertido. Util para eliminar brillo agudo residual de la voz original.",
   infoConvertFormant: "Desplaza los formantes (resonancia) sin cambiar el tono. Valores negativos dan una voz mas profunda y con mas cuerpo.",
   infoConvertBass: "Refuerza las frecuencias graves del audio convertido. Da mas cuerpo y presencia.",
-  tabLab: "Laboratorio",
   labTitle: "Laboratorio de voz",
   labDesc: "Modifica las propiedades de tu voz para narrar",
   labSourceAudio: "Tu audio de voz",
@@ -115,7 +113,6 @@ export const es = {
   infoCompression: "Iguala el volumen: las partes suaves se amplifican y las fuertes se atenuan. Da un sonido mas profesional y consistente. Valores altos pueden sonar artificial.",
   infoReverb: "Anade sensacion de espacio, como si narraras en una sala. Poco reverb (5-15%) da presencia de estudio, mucho (50%+) suena a catedral o cueva.",
   infoSpeed: "Cambia la velocidad de habla sin alterar el tono. Util para ajustar el ritmo narrativo. Valores por debajo de 1.0 ralentizan, por encima aceleran.",
-  tabExperimental: "Experimental",
   expTitle: "Clonacion cross-lingual",
   expDesc: "Prueba a generar texto en un idioma usando el timbre de una voz en otro idioma. Resultados variables.",
   expText: "Texto a sintetizar",
@@ -126,14 +123,41 @@ export const es = {
   expGenerating: "Generando...",
   expReady: "Audio generado (experimental)",
   expWarning: "Experimental: el acento puede no coincidir con el idioma objetivo",
-  tabLogs: "Logs",
   tabActivity: "Actividad",
   tabWorkbench: "Proyecto",
-  tabCompare: "Comparar",
-  tabPronunciation: "Pronunciación",
   estimatedDuration: "≈ {dur} de audio",
   draftRestored: "Borrador restaurado",
   shortcutHint: "Ctrl+Enter para generar · Ctrl+S para descargar · Space para play/pausa",
+
+  // ── New tabs (Phase 0 — coexist with old keys during migration) ──
+  tabQuickSynth: "Síntesis rápida",
+  tabAudioTools: "Herramientas de audio",
+
+  // Voices (unified)
+  sectionSystemVoices: "Voces del sistema",
+  sectionMyProfiles: "Mis perfiles",
+  sectionCompare: "Comparar voces",
+  sampleQuality: "Calidad de la muestra",
+  sampleQualityExcellent: "Excelente",
+  sampleQualityGood: "Buena",
+  sampleQualityFair: "Aceptable",
+  sampleQualityPoor: "Mejorable",
+
+  // Audio Tools
+  audioToolsChangeVoice: "Cambiar voz",
+  audioToolsEffects: "Efectos",
+  audioToolsFineTune: "Ajuste fino",
+
+  // Quick Synth (cross-lingual mode)
+  useVoiceSample: "Usar muestra de voz",
+  crossLingualMode: "Modo multilingüe",
+  crossLingualWarning: "Modo experimental — los resultados pueden variar",
+  targetLanguage: "Idioma del texto",
+
+  // Activity settings section
+  settingsSection: "Configuración",
+  settingsPronunciation: "Diccionario de pronunciación",
+  settingsExportDefaults: "Configuración de exportación",
 } as const;
 
 export type TranslationKey = keyof typeof es;

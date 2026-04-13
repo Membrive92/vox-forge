@@ -67,7 +67,6 @@ export const en: Record<TranslationKey, string> = {
   uploadText: "Upload",
   uploadTextDesc: "Upload a .txt, .docx or .pdf file and it will be automatically processed for optimal reading",
   textProcessed: "Text processed",
-  tabConvert: "Convert",
   convertTitle: "Voice conversion",
   convertDesc: "Upload a narrated audio and change its voice tone to another",
   sourceAudio: "Source audio",
@@ -85,7 +84,6 @@ export const en: Record<TranslationKey, string> = {
   infoConvertPitch: "Lower or raise the pitch of the converted audio. Useful for removing residual brightness from the original voice.",
   infoConvertFormant: "Shift the formants (resonance) without changing pitch. Negative values give a deeper voice with more body.",
   infoConvertBass: "Boost the low frequencies of the converted audio. Adds body and presence.",
-  tabLab: "Lab",
   labTitle: "Voice laboratory",
   labDesc: "Modify your voice properties for narration",
   labSourceAudio: "Your voice audio",
@@ -117,7 +115,6 @@ export const en: Record<TranslationKey, string> = {
   infoCompression: "Evens out volume: quiet parts get louder, loud parts get softer. Gives a more professional and consistent sound. High values may sound artificial.",
   infoReverb: "Add a sense of space, as if narrating in a room. Low reverb (5-15%) gives studio presence, high (50%+) sounds like a cathedral or cave.",
   infoSpeed: "Change speech speed without altering pitch. Useful for adjusting narrative rhythm. Values below 1.0 slow down, above 1.0 speed up.",
-  tabExperimental: "Experimental",
   expTitle: "Cross-lingual cloning",
   expDesc: "Try generating text in one language using the timbre of a voice in another language. Variable results.",
   expText: "Text to synthesize",
@@ -128,12 +125,39 @@ export const en: Record<TranslationKey, string> = {
   expGenerating: "Generating...",
   expReady: "Audio generated (experimental)",
   expWarning: "Experimental: the accent may not match the target language",
-  tabLogs: "Logs",
   tabActivity: "Activity",
   tabWorkbench: "Workbench",
-  tabCompare: "Compare",
-  tabPronunciation: "Pronunciation",
   estimatedDuration: "≈ {dur} of audio",
   draftRestored: "Draft restored",
   shortcutHint: "Ctrl+Enter to generate · Ctrl+S to download · Space for play/pause",
+
+  // ── New tabs (Phase 0 — coexist with old keys during migration) ──
+  tabQuickSynth: "Quick Synth",
+  tabAudioTools: "Audio Tools",
+
+  // Voices (unified)
+  sectionSystemVoices: "System voices",
+  sectionMyProfiles: "My profiles",
+  sectionCompare: "Compare voices",
+  sampleQuality: "Sample quality",
+  sampleQualityExcellent: "Excellent",
+  sampleQualityGood: "Good",
+  sampleQualityFair: "Fair",
+  sampleQualityPoor: "Poor",
+
+  // Audio Tools
+  audioToolsChangeVoice: "Change voice",
+  audioToolsEffects: "Effects",
+  audioToolsFineTune: "Fine-tune",
+
+  // Quick Synth (cross-lingual mode)
+  useVoiceSample: "Use voice sample",
+  crossLingualMode: "Cross-lingual mode",
+  crossLingualWarning: "Experimental mode — results may vary",
+  targetLanguage: "Target language",
+
+  // Activity settings section
+  settingsSection: "Settings",
+  settingsPronunciation: "Pronunciation dictionary",
+  settingsExportDefaults: "Export defaults",
 };
