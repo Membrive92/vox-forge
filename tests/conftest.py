@@ -168,6 +168,15 @@ def app(_session_env: None):
     """Import the FastAPI app once stubs are installed."""
     from backend import app as fastapi_app
 
+    # Lifespan startup is not invoked when TestClient is used outside
+    # a context manager. Initialize the SQLite schema explicitly so
+    # workbench tests have the projects/chapters tables available.
+    import asyncio
+
+    from backend.database import init_db
+
+    asyncio.new_event_loop().run_until_complete(init_db())
+
     return fastapi_app
 
 

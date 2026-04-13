@@ -6,7 +6,9 @@ from fastapi.responses import FileResponse
 from pydub import AudioSegment
 
 from ..cancellation import create_cancellation_token
-from ..dependencies import get_tts_engine
+from ..dependencies import get_profile_manager, get_tts_engine
+from ..exceptions import ProfileNotFound, UnsupportedFormatError
+from ..catalogs import AUDIO_FORMATS
 from ..schemas import (
     IncompleteJobsResponse,
     IncompleteJobSummary,
@@ -15,6 +17,7 @@ from ..schemas import (
 )
 from ..services import job_store
 from ..services.metadata import AudioMetadata, embed_metadata
+from ..services.profile_manager import ProfileManager
 from ..services.progress import registry as progress_registry
 from ..services.tts_engine import TTSEngine
 from ..utils import cleanup_old_files
@@ -28,6 +31,7 @@ async def synthesize_text(
     http_request: Request,
     background_tasks: BackgroundTasks,
     engine: TTSEngine = Depends(get_tts_engine),
+    profiles: ProfileManager = Depends(get_profile_manager),
 ) -> FileResponse:
     """Convert text to audio and return the generated file.
 
@@ -35,15 +39,17 @@ async def synthesize_text(
     otherwise uses Edge-TTS (Microsoft neural voices).
     Automatically cancels if the client disconnects mid-generation.
     """
-    # Validate format early — before creating a job record that would
-    # become a ghost if we reject the request.
-    from ..catalogs import AUDIO_FORMATS
-    from ..exceptions import UnsupportedFormatError
+    # Validate format AND profile_id early — before creating a job record
+    # that would become a ghost if we reject the request. The engine
+    # checks both again, but we can't let it get that far when the input
+    # is clearly bad.
     if request.output_format not in AUDIO_FORMATS:
         raise UnsupportedFormatError(
             f"Unsupported format: {request.output_format}. "
             f"Valid: {sorted(AUDIO_FORMATS)}"
         )
+    if request.profile_id and profiles.get(request.profile_id) is None:
+        raise ProfileNotFound(f"Profile not found: {request.profile_id}")
 
     cancel_token = create_cancellation_token(http_request)
     job_id = http_request.headers.get("x-synthesis-job-id") or job_store.new_job_id()
