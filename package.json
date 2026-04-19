@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "openapi:export": "python scripts/export_openapi.py",
+    "openapi:gen": "openapi-typescript schema/openapi.json -o src/api/generated.ts",
+    "openapi": "npm run openapi:export && npm run openapi:gen"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -26,6 +29,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "happy-dom": "^20.8.9",
     "msw": "^2.12.14",
+    "openapi-typescript": "^7.13.0",
     "typescript": "^5.6.3",
     "vite": "^8.0.4",
     "vitest": "^4.1.2"

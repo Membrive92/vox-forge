@@ -6,16 +6,20 @@ import { deleteResource, getJson, patchJson, postForm } from "./client";
 import type { ProfileDTO } from "./types";
 
 function toProfile(dto: ProfileDTO): Profile {
+  // The schema marks ``id`` / ``language`` as optional because Pydantic has
+  // defaults for them (id=_new_id, language="es"), but the backend always
+  // serializes them in responses. The fallbacks keep TS happy without
+  // splitting the Pydantic model into separate create/response variants.
   return {
-    id: dto.id,
+    id: dto.id ?? "",
     name: dto.name,
     voiceId: dto.voice_id,
-    lang: dto.language,
+    lang: (dto.language ?? "es") as Language,
     speed: dto.speed,
     pitch: dto.pitch,
     volume: dto.volume,
-    sampleName: dto.sample_filename,
-    sampleDuration: dto.sample_duration,
+    sampleName: dto.sample_filename ?? null,
+    sampleDuration: dto.sample_duration ?? null,
   };
 }
 

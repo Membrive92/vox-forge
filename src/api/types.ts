@@ -1,34 +1,30 @@
-/** Backend DTOs (snake_case). */
+/** Backend DTOs (snake_case).
+ *
+ * The schemas listed here are aliases over the auto-generated types in
+ * ``generated.ts``. Regenerate with ``npm run openapi`` whenever the
+ * backend's Pydantic models change.
+ *
+ * Hand-written additions (``ApiErrorBody``) stay below — they are not
+ * part of the FastAPI-exposed schema but are the shape returned by our
+ * custom exception handler.
+ */
 
-import type { AudioFormat, Language } from "@/types/domain";
+import type { components } from "./generated";
 
-export interface ProfileDTO {
-  id: string;
-  name: string;
-  voice_id: string;
-  language: Language;
-  speed: number;
-  pitch: number;
-  volume: number;
-  sample_filename: string | null;
-  sample_duration: number | null;
-  created_at: string;
-  updated_at: string;
-}
+type Schema = components["schemas"];
 
-export interface SynthesisRequestDTO {
-  text: string;
-  voice_id: string;
-  output_format: AudioFormat;
-  speed: number;
-  pitch: number;
-  volume: number;
-  profile_id: string | null;
-  title?: string | null;
-  artist?: string | null;
-  album?: string | null;
-  track_number?: number | null;
-}
+export type ProfileDTO = Schema["VoiceProfile"];
+export type SynthesisRequestDTO = Schema["SynthesisRequest"];
+export type ProfileUpdateDTO = Schema["ProfileUpdate"];
+export type SampleUploadResponseDTO = Schema["SampleUploadResponse"];
+export type HealthResponseDTO = Schema["HealthResponse"];
+export type LogEntryDTO = Schema["LogEntry"];
+export type PronunciationEntryDTO = Schema["PronunciationEntry"];
+export type IncompleteJobSummaryDTO = Schema["IncompleteJobSummary"];
+export type JobProgressResponseDTO = Schema["JobProgressResponse"];
+export type StudioSourceDTO = Schema["StudioSource"];
+export type StudioEditRequestDTO = Schema["StudioEditRequest"];
+export type StudioOperationDTO = Schema["StudioOperation"];
 
 export interface ApiErrorBody {
   detail: string;
