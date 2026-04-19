@@ -1,12 +1,18 @@
 # Frontend polish plan — UX/UI/FE improvements
 
 **Fecha**: 2026-04-13
-**Estado**: Planificado, pendiente de implementacion
+**Estado**: ✅ Fases 1-7 implementadas. Commit squashed en `5339615`.
 **Motivacion**: Tras el rediseno UX (10 -> 5 tabs) la aplicacion es funcionalmente coherente pero visualmente inconsistente: 8+ variantes de boton inline, 10+ tamanos de fuente sin escala, colores hardcoded fuera de tokens, zero focus states, empty states pobres, y el tab por defecto (Workbench) no guia a un usuario nuevo.
 
 Alcance: puro frontend. Cero cambios en backend. De una app funcional y fea a una app funcional y pulida.
 
 Total estimado: ~20-25h de trabajo, repartido en 7 fases.
+
+> **Nota posterior (2026-04-15)**: el tab **Studio** se anadio despues de
+> este polish y reutiliza todos los primitives (Button, IconButton,
+> Card, Skeleton, EmptyState) + responsive utilities (`vf-studio-grid`)
+> introducidos aqui. Los 5 iconos documentados en la Fase 4 (Book, Zap,
+> Mic2, SlidersIcon, Clock) se complementan con **Scissors** para Studio.
 
 ---
 

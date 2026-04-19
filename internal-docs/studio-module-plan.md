@@ -376,118 +376,323 @@ Recomendacion: **crear `StudioWaveform.tsx`**. El editor actual es read-only (lo
 
 ---
 
-## Fase B — Video Level 1 (design inicial)
+## ✅ Estado de la Fase A (POC audio editor)
 
-Cuando la Fase A funcione, la Fase B se construye encima sin tocar nada del audio editor.
+**Implementada** en los commits `cb35c98` (backend) y `5339615` (frontend).
+
+### Lo que quedó dentro
+
+- **Backend**: `backend/services/audio_editor.py` + `backend/routers/studio.py` (3 endpoints), 17 tests en `tests/test_studio.py`. Operaciones: trim, delete_region, fade_in, fade_out, normalize. Storage en `data/studio/`.
+- **Frontend**: `src/features/studio/` completo (5 archivos), `src/api/studio.ts`, icono `Scissors`, i18n ES/EN, tab registrado en `App.tsx` como 6ª posición. Responsive via `.vf-studio-grid`.
+- **Seguridad**: path-traversal blindado en `/api/studio/audio` y `/api/studio/edit` (validación contra `OUTPUT_DIR` / `STUDIO_DIR` / `JOBS_DIR`).
+
+### Lo que quedó fuera (intencionalmente)
+
+- **Ambient mixes como fuente**: no listadas en `/api/studio/sources`. Requieren persistencia adicional (ver "Fase A.1" abajo).
+- **Save as new generation**: el resultado solo se descarga; no se inserta en `generations`.
+- **Undo/redo histórico**: sólo eliminar items de la cola.
+- **Reordering drag-drop de ops**: el hook expone `moveOperation(from, to)` pero la UI todavía no lo cablea. Fácil de añadir.
+- **Zoom-to-selection en el waveform**: sólo el slider genérico.
+
+---
+
+## Fase A.1 — Ambient mixes como fuente (opcional, pequeña)
+
+Hoy `POST /api/ambience/mix-chapter/{chapter_id}` devuelve el archivo al cliente pero no lo guarda en un lugar estable. Si en algún momento quieres poder editarlas en Studio:
+
+1. Antes de borrar el archivo de mezcla, moverlo a `data/ambience-mixes/mix_{chapter_id}_{timestamp}.{fmt}`
+2. Nueva tabla SQLite `ambience_mixes`: `id`, `chapter_id`, `file_path`, `created_at`, `ambient_track_id`, `settings` (JSON)
+3. Incluirlas en `GET /api/studio/sources` con `kind: "mix"` (el schema ya lo contempla)
+4. Añadir `AMBIENCE_MIXES_DIR` al whitelist de `_ALLOWED_ROOTS` en `studio.py`
+
+**Esfuerzo**: ~1-2h. No es prioritario hasta que tengas una librería de mezclas guardadas con la que quieras trabajar.
+
+---
+
+## Fase B — Video Level 1 (render MP4)
+
+La Fase B se construye encima sin tocar el audio editor. Sigue en el mismo tab Studio como una sub-sección "Render video" que aparece tras aplicar una edición (o directamente sobre una fuente).
 
 ### Scope
 
-- **Cover image**: upload del usuario o cover autogenerado (en C sale de SD, en B es upload manual)
+- **Cover image**: upload manual del usuario (la auto-generación con SD es Fase C)
 - **Ken Burns effect**: pan/zoom lento sobre la cover con ffmpeg `zoompan` filter
-- **Waveform overlay**: opcional, barra reactiva al audio al pie del frame
-- **Subtitulos automaticos**: generacion via `faster-whisper` (model `small` para espanol, ~244 MB), formato SRT, burn-in con ffmpeg `subtitles` filter o soft-track
-- **Output**: MP4 H.264 + AAC audio, 1920x1080, ~2-3 MB/min
+- **Waveform overlay**: opcional, barra reactiva al audio al pie del frame, renderizada offline con `showwaves` de ffmpeg
+- **Subtítulos automáticos**: transcripción via `faster-whisper` (model `small`, ~244 MB) → SRT → burn-in con filter `subtitles` o soft-track opcional
+- **Título opcional**: text overlay centrado los primeros N segundos, con fade-out
+- **Output**: MP4 H.264 + AAC, 1920x1080 o 1280x720, ~2-3 MB/min
 
-### Nueva dependencia: faster-whisper
+### Nuevas dependencias
 
-```bash
-pip install faster-whisper
+```
+faster-whisper          # transcripción (CUDA + CPU)
 ```
 
-Primera descarga del modelo: ~244 MB para small, cacheado en `~/.cache/huggingface/`. Modelo se carga lazy (como CloneEngine) y se queda residente. CPU o GPU — en RTX 4070 Super la transcripcion de un capitulo de 30 min tarda <30s con `small`.
+Primera descarga del modelo `small`: ~244 MB, cacheado en `~/.cache/huggingface/`. Carga lazy (como CloneEngine) y queda residente. En RTX 4070 Super, 30 min de audio se transcriben en <30s.
 
-### Nuevo servicio: `backend/services/video_renderer.py`
+ffmpeg ya está instalado (Fase A lo usa via pydub), así que no hay deps extra para el render.
 
-Composicion via subprocess a ffmpeg:
+### Servicios nuevos
+
+```
+backend/services/transcriber.py    # wrap de faster-whisper
+backend/services/video_renderer.py # build + run ffmpeg command, parse progress
+```
+
+Estructura orientativa de `video_renderer.render_video`:
 
 ```python
-def render_video(
+@dataclass(frozen=True)
+class VideoOptions:
+    resolution: Literal["1920x1080", "1280x720"] = "1920x1080"
+    ken_burns: bool = True
+    waveform_overlay: bool = True
+    title_text: str | None = None
+    subtitles_mode: Literal["none", "burn", "soft"] = "burn"
+
+async def render_video(
     audio_path: Path,
     cover_path: Path | None,
     subtitles_path: Path | None,
     options: VideoOptions,
+    progress_cb: Callable[[float], None] | None = None,
 ) -> Path:
-    # 1. Build ffmpeg command
-    # 2. Run subprocess with progress parsing
-    # 3. Return output path
+    # 1. Build ffmpeg argv (zoompan + showwaves + subtitles + aac)
+    # 2. Run via asyncio.create_subprocess_exec, capture stderr for -progress pipe
+    # 3. Parse "out_time=..." lines → progress_cb
+    # 4. Output to data/studio/video_{uuid}.mp4
+```
+
+El comando ffmpeg es la pieza con más detalle técnico. Un render típico (Ken Burns + wave overlay + burned subs, 1080p):
+
+```bash
+ffmpeg -loop 1 -i cover.png -i audio.wav \
+  -filter_complex "
+    [0:v]zoompan=z='min(zoom+0.0002,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1920x1080,fps=30[v];
+    [1:a]showwaves=s=1920x120:mode=cline:colors=white|cyan[wv];
+    [v][wv]overlay=0:H-h:format=auto[vw];
+    [vw]subtitles=subs.srt:force_style='FontName=Inter,FontSize=28'[vout]
+  " \
+  -map "[vout]" -map 1:a \
+  -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p \
+  -c:a aac -b:a 192k \
+  -shortest -movflags +faststart \
+  output.mp4
 ```
 
 ### Endpoints
 
 ```
 POST /api/studio/transcribe
-     Body: { audio_path }
-     Returns: { srt_path, duration_s, word_count }
+     Body: { source_path }
+     Returns: { srt_path, duration_s, word_count, engine: "faster-whisper:small" }
 
 POST /api/studio/render-video
-     Body: { audio_path, cover_path?, subtitles_path?, options: {
-             resolution: "1920x1080" | "1280x720",
-             ken_burns: boolean,
-             waveform_overlay: boolean,
-             title_text?: string,
-           }}
+     Body: { audio_path, cover_path?, subtitles_path?, options: {...} }
      Returns: FileResponse del MP4
+     Headers: X-Video-Duration, X-Video-Size, X-Video-Resolution
 ```
 
-### Persistencia
+Subidas de cover: reutilizar `upload_utils.validate_image_upload` (nuevo, pequeño) → storage en `data/studio/covers/{uuid}.{png|jpg}`.
 
-Es el momento de anadir tabla `studio_renders` para persistir tanto ediciones de audio (Fase A) como videos (Fase B):
+### Persistencia — tabla `studio_renders`
+
+Es el momento de añadir persistencia. La Fase A vive sin SQL, pero con video los archivos son grandes (~100 MB por capítulo) y el usuario querrá volver a ellos:
 
 ```sql
 CREATE TABLE studio_renders (
-  id TEXT PRIMARY KEY,
-  kind TEXT NOT NULL,           -- "audio" | "video"
-  source_path TEXT NOT NULL,
-  output_path TEXT NOT NULL,
-  operations TEXT,               -- JSON array (audio edits) o options (video)
-  project_id TEXT REFERENCES projects(id),
-  chapter_id TEXT REFERENCES chapters(id),
-  created_at TEXT NOT NULL
+  id            TEXT PRIMARY KEY,
+  kind          TEXT NOT NULL,       -- "audio" | "video"
+  source_path   TEXT NOT NULL,
+  output_path   TEXT NOT NULL,
+  operations    TEXT,                -- JSON de la queue (audio) o VideoOptions (video)
+  project_id    TEXT REFERENCES projects(id),
+  chapter_id    TEXT REFERENCES chapters(id),
+  duration_s    REAL DEFAULT 0,
+  size_bytes    INTEGER DEFAULT 0,
+  created_at    TEXT NOT NULL
 );
+CREATE INDEX idx_studio_renders_chapter ON studio_renders(chapter_id);
 ```
 
-Studio tendra una seccion "Recent renders" listando estas rows.
+Con esta tabla, Studio muestra un panel "Recent renders" a la izquierda o debajo de SourcePicker. Click → carga el output en el player.
+
+### Frontend — componentes nuevos en `src/features/studio/`
+
+```
+VideoRenderPanel.tsx     # Cover upload + opciones + botón render
+TranscribePanel.tsx      # Botón transcribir + preview SRT + editar lineas
+RecentRenders.tsx        # Lista de studio_renders, play + download
+```
+
+Integración con `useStudioSession`: añadir `transcribe()` y `renderVideo(options)` al API del hook; el estado de la sesión se extiende con `{ transcript: SrtEntry[] | null, videoResult: Blob | null }`.
+
+Layout: debajo del panel "Result" actual, añadir colapsable "Video" con tabs Cover / Subtítulos / Opciones.
+
+### Tests
+
+Backend (añadir a `tests/test_studio.py` o en `test_video.py`):
+- `test_transcribe_returns_srt` — con audio stub, valida que vuelve SRT con formato correcto
+- `test_render_video_minimal` — mock ffmpeg via subprocess stub, valida argv
+- `test_render_video_rejects_bad_resolution` — 400
+- `test_studio_renders_table_inserted_after_video`
+
+Frontend (MSW):
+- `useStudioSession.transcribe` popula state con entries parseadas
+- `VideoRenderPanel` muestra progress cuando `isRendering`
+
+### Tiempo estimado: 10-12h
+
+Desglose:
+- Whisper wrap + transcribe endpoint + test (~2h)
+- Video renderer service + ffmpeg recipe + progress parsing (~3h)
+- `studio_renders` table + CRUD helpers (~1h)
+- FE: VideoRenderPanel + TranscribePanel + RecentRenders (~3h)
+- FE: wire hook, layout, i18n keys, iconos (~1h)
+- Tests BE + FE + pulido visual (~2h)
 
 ---
 
 ## Fase C — Visual storytelling (esquema)
 
-- **Transcripcion** via Whisper ya disponible desde B
-- **Local LLM** (Ollama + Llama 3.1 8B o Phi-3-mini) extrae prompts visuales por escena
-- **Stable Diffusion** (diffusers + SDXL o SD 1.5) genera 1-4 imagenes por capitulo
-- **Slideshow** con crossfade entre imagenes, sincronizado al audio
-- **Opcional**: character LoRA para consistencia de personajes
+La Fase B produce un video estático (cover fijo con Ken Burns). La Fase C lo convierte en un slideshow narrativo: imágenes generadas por IA que cambian según lo que se cuenta en cada escena.
 
-Esto es el salto grande de complejidad. Se disena cuando la B este estable.
+### Scope
+
+- **Escenas**: la transcripción de B se agrupa en bloques semánticos (~20-30s cada uno) como "escenas"
+- **Prompt extraction**: un LLM local lee cada escena y produce un prompt visual tipo SD (estilo, personajes presentes, ambiente, acción)
+- **Image generation**: Stable Diffusion genera 1-4 variantes por escena; el usuario aprueba
+- **Slideshow video**: ffmpeg encadena las imágenes aprobadas con crossfade de 1-2s, sincronizado a los timestamps de la escena
+- **Consistencia de personajes** (opcional): LoRAs entrenados con las descripciones de personajes del proyecto
+
+### Dependencias potenciales
+
+| Componente | Opciones | VRAM |
+|------------|----------|------|
+| LLM local | Ollama + Llama 3.1 8B (Q4) / Phi-3-mini-128k | ~6 GB |
+| Stable Diffusion | `diffusers` + SDXL-Turbo o SD 1.5 | ~6 GB |
+| LoRA training | `kohya_ss` externo; cargar LoRAs via diffusers | offline |
+
+En una RTX 4070 Super (12 GB) los tres corren secuencialmente — el LLM saca los prompts, se descarga, luego SD genera. No intentar los dos en paralelo.
+
+### Flujo propuesto
+
+1. **Transcribir** (ya está en B) → SRT con timestamps
+2. **Segmentar en escenas**: regla simple — agrupar líneas hasta alcanzar N segundos o un cambio de personaje/ambiente detectado
+3. **LLM → prompts**: prompt system "You are a visual director. Given this paragraph of audiobook text, output a single JSON with { style: '...', setting: '...', characters: [...], action: '...' }"
+4. **Render prompts a SD**: generar 4 variantes, mostrar al usuario en un grid, deja aprobar una
+5. **Ensamblar slideshow**: para cada escena, frame de la imagen aprobada dura hasta el timestamp siguiente, con crossfade de 1.5s
+
+### Nuevos endpoints
+
+```
+POST /api/studio/scenes/extract       # SRT → list of scenes
+POST /api/studio/scenes/{id}/prompt   # scene text → SD prompt via LLM
+POST /api/studio/scenes/{id}/image    # prompt → N image variants
+PATCH /api/studio/scenes/{id}         # approve variant / edit prompt
+POST /api/studio/slideshow/{render_id} # ensamblar MP4 con escenas aprobadas
+```
+
+### Tablas SQLite nuevas
+
+```sql
+CREATE TABLE studio_scenes (
+  id          TEXT PRIMARY KEY,
+  chapter_id  TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+  start_s     REAL NOT NULL,
+  end_s       REAL NOT NULL,
+  text        TEXT NOT NULL,
+  prompt      TEXT,
+  approved_image_path TEXT,
+  sort_order  INTEGER NOT NULL
+);
+
+CREATE TABLE studio_scene_images (
+  id          TEXT PRIMARY KEY,
+  scene_id    TEXT NOT NULL REFERENCES studio_scenes(id) ON DELETE CASCADE,
+  image_path  TEXT NOT NULL,
+  seed        INTEGER,
+  created_at  TEXT NOT NULL
+);
+```
+
+### Complejidad
+
+Esta es la fase grande. El salto de "un cover estático" a "generar imágenes coherentes sincronizadas al audio" mete LLM + difusión + UI de aprobación. Estimación: **15-20h**, pero muchas más si hay que iterar sobre la calidad de los prompts.
+
+Se diseña en detalle **cuando la Fase B esté estable y realmente quieras usar video narrativo**, no antes.
 
 ---
 
-## Fase D — Video generativo (esquema)
+## Fase D — Video generativo (exploratoria)
 
-Reservado para experimentacion. Requiere modelo de video local (LTX-Video o CogVideoX). Clips cortos (2-6s) por escena clave, no todo el capitulo. El usuario marca puntos de interes, cada punto genera un clip, se intercalan con las imagenes estaticas de la Fase C.
+Reservado para experimentación. Clips cortos (2-6s) animados por escena clave, no para el capítulo entero. Se **intercalan** con las imágenes estáticas de la Fase C para dar vida a momentos de acción.
+
+### Opciones de modelo
+
+| Modelo | VRAM pico | Calidad | Velocidad |
+|--------|-----------|---------|-----------|
+| LTX-Video | ~8 GB | media | rápida (2-5s por clip) |
+| CogVideoX-2b | ~12 GB | alta | lenta (30s-1min por clip) |
+| HunyuanVideo | ~24 GB+ | muy alta | no cabe en 4070S |
+
+En la RTX 4070 Super, **LTX-Video** es el único viable con margen. CogVideoX-2b cabe justo pero compite con SD y LLM.
+
+### Scope mínimo viable
+
+- En Fase C, al aprobar una escena, un toggle "Animar (experimental)" genera un clip 4s
+- El clip reemplaza la imagen estática en el slideshow, con crossfade a la imagen aprobada de la escena siguiente
+- Un panel de "video variants" muestra regeneraciones con seeds distintos
+
+### Por qué dejarlo para el final
+
+1. Los modelos de video generativo local cambian rápido — lo que vale hoy puede estar obsoleto en 3 meses
+2. Los fallos son más visibles que en SD (warping, motion artifacts)
+3. El valor marginal sobre un slideshow bien hecho de Fase C no siempre es alto para un audiolibro
+
+Se diseña cuando quieras presumir de reel, no cuando quieras producir episodios.
 
 ---
 
-## Decisiones abiertas para revisitar
+## Decisiones abiertas (para revisitar con cada fase)
 
-1. **Ambient mixes**: las incluimos desde el POC (requiere persistencia minima), o empezamos solo con chapters? — Mi recomendacion: **empezar con chapters**, anadir ambient mixes como Fase A.1 si el POC va bien.
-2. **Save as new generation**: la edicion de audio se guarda como una nueva row en `generations` o siempre es download puro? — Mi recomendacion: **download puro en A**, persistencia como row en B junto con video renders.
-3. **Undo/redo**: solo remove from queue o historial completo? — Mi recomendacion: **solo remove from queue en A**, historial en B o C cuando haya sesiones persistidas.
-4. **Multi-track**: si o no? — Mi recomendacion: **no** en todo el plan. El caso narrador+ambient lo cubre ya el Workbench.
+1. ~~**Ambient mixes** como fuente en Fase A — pospuesto a Fase A.1.~~ Resuelto.
+2. **Save edit as new generation**: la edición de audio se guarda como row en `generations` (útil para el Workbench) o siempre es download puro? — Mi recomendación: **con la tabla `studio_renders` de Fase B, los audios editados se persisten ahí, no en `generations`**. `generations` queda como audio directo-de-TTS.
+3. **Undo/redo**: sólo remove-from-queue o historial completo? — Mi recomendación: **sólo remove en A y B**; historial si vemos que el usuario lo pide tras usar la app un tiempo.
+4. **Multi-track**: no en todo el plan. El caso narrador+ambient ya vive en el Workbench.
+5. **Cola de render en background**: para videos largos (>30 min de audio) el render puede tardar minutos. Fase B lo hace síncrono en el primer corte; si el usuario se queja, mover a `BackgroundTasks` + polling tipo `/progress/{job_id}`.
 
 ---
 
-## Orden de implementacion del POC
+## Orden de implementación — histórico
 
-1. Backend: paths + service + router + tests (~2h)
-2. Backend: integrar con el router registry en main.py + verificar endpoints con curl
-3. Frontend: API client + useStudioSession hook (~1h)
-4. Frontend: SourcePicker + llamada a /sources (~1h)
-5. Frontend: StudioWaveform (extiende del WaveformEditor existente o copia) (~1.5h)
-6. Frontend: EditOperationsPanel + UI de operaciones (~1.5h)
-7. Frontend: StudioTab layout + wiring (~1h)
-8. Test visual manual del flujo completo (~30 min)
-9. Tests unitarios FE (~30 min)
-10. Wire el tab en App.tsx + i18n keys + icono nuevo (~15 min)
+### Fase A (POC) — ✅ hecha
 
-**Total estimado**: 8-9h. Al final de la Fase A tendras un tab funcional que recorta, normaliza y exporta audio.
+1. ✅ Backend: paths + service + router + tests (~2h)
+2. ✅ Backend: registrar router en main.py + verificar con curl
+3. ✅ Frontend: API client + useStudioSession hook (~1h)
+4. ✅ Frontend: SourcePicker + llamada a /sources (~1h)
+5. ✅ Frontend: StudioWaveform con wavesurfer + regions plugin (~1.5h)
+6. ✅ Frontend: EditOperationsPanel + UI de operaciones (~1.5h)
+7. ✅ Frontend: StudioTab layout + wiring (~1h)
+8. ⏳ Test visual manual del flujo completo (pendiente por parte del usuario)
+9. ✅ Tests unitarios BE (17 tests); FE tests opcionales
+10. ✅ Wire el tab en App.tsx + i18n keys + icono Scissors
+
+### Fase B (video Level 1) — orden recomendado
+
+1. Backend: `services/transcriber.py` (faster-whisper wrap) + test con stub (~1.5h)
+2. Backend: `services/video_renderer.py` con el ffmpeg recipe + progress parsing (~2.5h)
+3. Backend: migración SQLite para `studio_renders` + CRUD helpers (~1h)
+4. Backend: endpoints `/transcribe` y `/render-video` + tests (~1h)
+5. Frontend: `TranscribePanel.tsx` (ver SRT, editar lineas) (~1.5h)
+6. Frontend: `VideoRenderPanel.tsx` + cover upload (~2h)
+7. Frontend: `RecentRenders.tsx` + wire al SourcePicker layout (~1h)
+8. Frontend: hook extensions + i18n + iconos (~0.5h)
+9. Test manual del flujo completo + pulido (~1h)
+
+**Total estimado Fase B**: 10-12h.
+
+### Fase C y D
+
+Se planifican con detalle cuando llegue el momento — la brecha de alcance entre "MP4 con cover" (B) y "slideshow narrativo" (C) es grande, y entre C y D es mayor. Iterar en B unas cuantas semanas antes de decidir si C merece la pena.

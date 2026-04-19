@@ -221,7 +221,64 @@ Esto es el segundo capítulo.
 
 ---
 
-## Tab 5: Activity
+## Tab 5: Studio (post-produccion de audio)
+
+> Prerequisito: debe existir al menos un capítulo con una generación
+> completa (status=done, file_path en disco). Si la lista de fuentes
+> está vacía, crea un proyecto + capítulo + sintetízalo desde Workbench
+> primero.
+
+### S1. Vista principal
+- [ ] Abre Studio — debe cargar el tab sin errores en la consola
+- [ ] La columna izquierda lista las fuentes editables (capítulos sintetizados)
+- [ ] Si no hay fuentes, muestra empty state con hint claro
+- [ ] El botón "Recargar" refresca la lista
+- [ ] El waveform central muestra "Selecciona un capítulo a la izquierda..."
+
+### S2. Cargar un capítulo
+- [ ] Click en una fuente — el waveform se carga (barras azules + cursor)
+- [ ] Aparecen controles Play / Stop + tiempo 0:00 / m:ss + slider de Zoom
+- [ ] Al arrastrar sobre el waveform, aparece una región azul translucida
+- [ ] Redimensionando los bordes de la región, los ms cambian en la cola
+
+### S3. Operaciones — Trim
+- [ ] Sin región, click "Recortar a la selección" → toast "Selecciona una región"
+- [ ] Con región seleccionada, click "Recortar" → op añadida a la cola con "1:30 → 1:50"
+- [ ] El botón "Aplicar 1 operación" ahora está habilitado
+- [ ] Click "Aplicar" → spinner brevemente, luego el resultado aparece en "Resultado"
+- [ ] El audio del resultado es reproducible con los controles HTML5
+
+### S4. Operaciones — Delete region
+- [ ] Arrastra otra región → click "Borrar región" → se añade a la cola (op #2)
+- [ ] En la cola se ve el índice `1.` y `2.` con rango de ms
+- [ ] Click en el botón `×` (trash) de la op #1 → se borra, la op #2 pasa a ser `1.`
+
+### S5. Operaciones — Fade in / out / Normalize
+- [ ] Ajusta "Duración (ms)" a 500 → click "Fade in" → op añadida con "500ms"
+- [ ] Click "Fade out" con 1000ms → op añadida con "1000ms"
+- [ ] Ajusta "Headroom (dB)" a -3 → click "Normalizar" → op añadida con "-3dB"
+- [ ] Aplica todas — resultado carga
+
+### S6. Formato de salida
+- [ ] Cambia el formato a WAV → aplica → el blob resultante es .wav
+- [ ] Click "Descargar" → el archivo baja con nombre `studio_edit.wav`
+- [ ] Repite con OGG y FLAC
+
+### S7. Cola de operaciones — edge cases
+- [ ] Cola vacía → botón "Aplicar" está deshabilitado
+- [ ] "Vaciar cola" limpia la lista y deshabilita "Aplicar"
+- [ ] "Quitar selección" elimina la región del waveform
+
+### S8. Seguridad (manual con DevTools)
+- [ ] Con DevTools Network abierto, click en una fuente — observa que
+  la request a `/api/studio/audio?path=...` incluye la ruta absoluta
+- [ ] Intenta modificar el path a `/etc/passwd` en la URL → debe responder 404
+- [ ] Misma prueba con un path fuera de `data/output` / `data/studio`
+  / `data/jobs` → 404
+
+---
+
+## Tab 6: Activity
 
 ### AC1. Vista principal
 - [ ] Click en tab "Actividad"

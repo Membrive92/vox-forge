@@ -87,6 +87,7 @@ backend/
 │   ├── clone_engine.py      # XTTS v2 with candidates, scoring, retries, silence trim
 │   ├── convert_engine.py    # OpenVoice V2 tone color converter
 │   ├── voice_lab_engine.py  # DSP suite (pedalboard, parselmouth, librosa)
+│   ├── audio_editor.py      # Stateless pydub batch editor (Studio module)
 │   ├── profile_manager.py   # JSON CRUD with asyncio.Lock + atomic writes
 │   ├── project_manager.py   # SQLite CRUD for projects/chapters/generations/takes
 │   ├── text_normalizer.py   # Spanish normalization (abbreviations, numbers, siglas)
@@ -106,6 +107,7 @@ backend/
     ├── character_synth.py    # Character-cast multi-voice synthesis
     ├── conversion.py         # Voice conversion (audio-to-audio)
     ├── voice_lab.py          # DSP processing + presets
+    ├── studio.py             # Audio editor: sources / apply ops / serve audio
     ├── analyze.py            # Voice sample quality analysis
     ├── pronunciation.py      # Pronunciation dictionary CRUD
     ├── preprocess.py         # Text normalization + document upload
@@ -180,13 +182,15 @@ src/
 ├── main.tsx                   # Entry: ErrorBoundary + global error handlers + logger init
 ├── api/
 │   ├── client.ts              # Centralized fetch with logging + X-Request-ID
-│   ├── types.ts               # Backend DTOs (snake_case)
+│   ├── types.ts               # DTO aliases re-exporting from generated.ts
+│   ├── generated.ts           # AUTO — run `npm run openapi` after schema edits
 │   ├── profiles.ts            # Profile CRUD (normalizes to camelCase)
 │   ├── synthesis.ts           # Synthesis + progress polling + resume + incomplete
 │   ├── conversion.ts          # Voice conversion
 │   ├── voiceLab.ts            # Lab processing + presets
 │   ├── projects.ts            # Projects + chapters CRUD
 │   ├── chapterSynth.ts        # Chapter synthesis + chunk map + regen
+│   ├── studio.ts              # Studio sources + apply-edit + serve-audio URL
 │   ├── pronunciation.ts       # Pronunciation dict CRUD
 │   ├── logs.ts                # Server logs + error count + stats
 │   └── preprocess.ts          # Text normalization
@@ -195,13 +199,20 @@ src/
 ├── logging/
 │   └── logger.ts              # FE logger: ring buffer + sessionStorage + global handlers
 ├── components/
+│   ├── Button.tsx             # Primitive: 6 variants, 3 sizes, loading state
+│   ├── IconButton.tsx         # Circular variant; aria-label required
+│   ├── Card.tsx               # Surface primitive with padding/glass/subtle
+│   ├── Skeleton.tsx           # Shimmer placeholder
+│   ├── EmptyState.tsx         # Hero empty-state block (icon + title + action)
+│   ├── Breadcrumb.tsx         # Nav path breadcrumb
+│   ├── PromptDialog.tsx       # Accessible window.prompt replacement
 │   ├── Slider.tsx             # Accessible range input with info tooltip
 │   ├── InteractivePlayer.tsx  # Scrubber, +/-10s, playback rates, time display
 │   ├── WaveformEditor.tsx     # wavesurfer.js interactive waveform with regions
 │   ├── WaveformVisualizer.tsx # DPR-aware animated canvas (decorative)
-│   ├── ErrorBoundary.tsx      # React error catch with recovery UI
+│   ├── ErrorBoundary.tsx      # Friendly crash UI (navigator.language → locale)
 │   ├── AudioRecorder.tsx      # Microphone recording (MediaRecorder API)
-│   ├── Toast.tsx              # Notification with aria-live
+│   ├── Toast.tsx              # Toast stack with per-type icons + progress bar
 │   └── icons.tsx              # Inline SVGs
 ├── hooks/
 │   ├── useProfiles.ts         # Load + remote CRUD
@@ -236,6 +247,12 @@ src/
 │   │   ├── AudioToolsTab.tsx  # Mode toggle wrapper
 │   │   ├── ConvertTab.tsx     # OpenVoice change-voice mode
 │   │   └── LabTab.tsx         # DSP effects mode
+│   ├── studio/                # Post-production audio editor (Phase A)
+│   │   ├── StudioTab.tsx          # Layout: source picker + waveform + queue + result
+│   │   ├── SourcePicker.tsx       # List of done chapter generations
+│   │   ├── StudioWaveform.tsx     # wavesurfer.js + regions plugin (drag-to-select)
+│   │   ├── EditOperationsPanel.tsx # Add ops, reorder, apply batch
+│   │   └── useStudioSession.ts    # Client-side op queue + apply + download
 │   └── activity/              # Activity dashboard + settings + dev logs
 │       ├── ActivityTab.tsx    # Recent gens, errors, disk usage
 │       ├── SettingsSection.tsx # Pronunciation + export defaults (collapsible)
@@ -250,7 +267,7 @@ src/
 
 ### Tab structure
 
-The 5 user-facing tabs are organized by workflow, not by underlying technology:
+The 6 user-facing tabs are organized by workflow, not by underlying technology:
 
 | Tab | Purpose |
 |-----|---------|
@@ -258,6 +275,7 @@ The 5 user-facing tabs are organized by workflow, not by underlying technology:
 | **Quick Synth** | One-shot TTS for quick tests. Toggle for cross-lingual cloning mode. |
 | **Voices** | System voices, custom profiles, A/B comparison, sample quality analyzer — all in one place. |
 | **Audio Tools** | Two modes: Change Voice (OpenVoice) and Effects (DSP chain). |
+| **Studio** | Post-production audio editor: load a chapter generation, select a waveform region, queue trim / delete / fade / normalize operations, apply the batch and download. |
 | **Activity** | Recent generations, errors, disk usage. Collapsible Settings (pronunciation + export defaults). Developer logs hidden behind a small toggle. |
 
 ### API Client

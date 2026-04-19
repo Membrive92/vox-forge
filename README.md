@@ -40,12 +40,19 @@ VoxForge is a local-first audiobook production workbench for narrating fantasy s
 - **Frontend logger**: ring buffer persisted in sessionStorage (survives reload), global error + unhandled rejection capture
 - **ErrorBoundary**: catches React render crashes with recovery UI
 
+### Studio (post-production)
+- **Audio editor** (Phase A POC): load a synthesized chapter, select a region on the waveform, queue trim / delete / fade-in / fade-out / normalize operations, apply the batch, preview and download
+- **wavesurfer.js** integration with the regions plugin: drag to select, resize by edges
+- **Stateless pipeline**: operations live in client state, backend is pure (batch in → edited audio out). Output persists in `data/studio/`
+- **Planned** (Phase B and beyond): cover + Ken Burns + waveform overlay + auto-subtitles via `faster-whisper` → MP4; later phases add SD-generated imagery and generative video clips
+
 ### UX
 - **Autosave**: draft text persisted to localStorage with 1s debounce
 - **Duration estimate**: `~ 4m 20s of audio` next to character count
 - **Keyboard shortcuts**: Ctrl+Enter (generate), Ctrl+S (download), Space (play/pause)
 - **Interactive player**: scrubber, +/-10s, playback rates 0.75x-2x, current/total time
 - **Bilingual UI**: Spanish and English with typed i18n (compile error if a key is missing)
+- **Design system**: unified Button / IconButton / Card / Skeleton / EmptyState primitives, WCAG-AA contrast, `:focus-visible` rings, responsive utility classes, toast stack
 
 ## System Architecture
 
@@ -55,30 +62,35 @@ http://localhost:5173                 http://localhost:8000
        |                                     |
   Vite proxy /api/* ─────────────────> FastAPI routers
        |                                     |
-  5 tabs (workflow-oriented):       ┌────────┼──────────┐
+  6 tabs (workflow-oriented):       ┌────────┼──────────┐
   ┌─────────────────────────┐       │  Services          │
   │ Workbench (default)     │       │  ├─ TTSEngine      │
   │  ├─ Projects + chapters │       │  ├─ CloneEngine    │
   │  ├─ Quick Preview       │       │  ├─ ConvertEngine  │
   │  ├─ Chunk Map + regen   │       │  ├─ VoiceLabEngine │
-  │  ├─ Character Casting   │       │  ├─ ProjectManager │
-  │  └─ Ambient Mixer       │       │  ├─ ProfileManager │
-  ├─────────────────────────┤       │  ├─ Pronunciation  │
-  │ Quick Synth             │       │  ├─ Ambience       │
-  │  ├─ Standard mode       │       │  └─ JobStore       │
-  │  └─ Cross-lingual mode  │       │                    │
-  ├─────────────────────────┤       │  Persistence       │
-  │ Voices                  │       │  ├─ SQLite (projects)
-  │  ├─ System voices       │       │  ├─ JSON (profiles)
-  │  ├─ My profiles         │       │  ├─ JSON (pronunciations)
-  │  └─ Compare A/B         │       │  ├─ JSON (ambience meta)
-  ├─────────────────────────┤       │  └─ Rotating logs  │
-  │ Audio Tools             │       └────────────────────┘
-  │  ├─ Change Voice        │                |
-  │  └─ Effects             │   ┌────────────┼────────────┐
-  ├─────────────────────────┤   │            │            │
-  │ Activity                │ Edge-TTS    XTTS v2    OpenVoice V2
-  │  ├─ Recent generations  │ (cloud)   (GPU local)  (GPU local)
+  │  ├─ Character Casting   │       │  ├─ AudioEditor    │
+  │  └─ Ambient Mixer       │       │  ├─ ProjectManager │
+  ├─────────────────────────┤       │  ├─ ProfileManager │
+  │ Quick Synth             │       │  ├─ Pronunciation  │
+  │  ├─ Standard mode       │       │  ├─ Ambience       │
+  │  └─ Cross-lingual mode  │       │  └─ JobStore       │
+  ├─────────────────────────┤       │                    │
+  │ Voices                  │       │  Persistence       │
+  │  ├─ System voices       │       │  ├─ SQLite (projects)
+  │  ├─ My profiles         │       │  ├─ JSON (profiles)
+  │  └─ Compare A/B         │       │  ├─ JSON (pronunciations)
+  ├─────────────────────────┤       │  ├─ JSON (ambience meta)
+  │ Audio Tools             │       │  └─ Rotating logs  │
+  │  ├─ Change Voice        │       └────────────────────┘
+  │  └─ Effects             │                |
+  ├─────────────────────────┤   ┌────────────┼────────────┐
+  │ Studio                  │   │            │            │
+  │  ├─ Source picker       │ Edge-TTS    XTTS v2    OpenVoice V2
+  │  ├─ Waveform + regions  │ (cloud)   (GPU local)  (GPU local)
+  │  └─ Op queue + apply    │
+  ├─────────────────────────┤
+  │ Activity                │
+  │  ├─ Recent generations  │
   │  ├─ Errors / disk       │
   │  ├─ Settings            │
   │  └─ Developer logs      │
@@ -96,27 +108,19 @@ http://localhost:5173                 http://localhost:8000
 ### Installation
 
 ```bash
-# 1. Backend core
-pip install fastapi uvicorn edge-tts pydub aiofiles python-multipart pydantic-settings aiosqlite mutagen
+# 1. Backend — full install (Edge-TTS + XTTS v2 + OpenVoice + DSP)
+pip install -r requirements.txt
 
-# Python 3.13+ needs audioop shim
-pip install audioop-lts
+# For a lean install without GPU engines (tests + Studio audio editor only):
+# pip install -r requirements-ci.txt
 
-# 2. ffmpeg
-python scripts/setup_ffmpeg.py    # Auto-downloads on Windows
+# 2. ffmpeg (Windows only — Linux/macOS: install via package manager)
+python scripts/setup_ffmpeg.py
 
-# 3. Voice cloning (optional — requires NVIDIA GPU with CUDA)
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-pip install coqui-tts
-pip install "transformers>=4.43,<5"
+# 3. OpenVoice V2 is not on PyPI — install from source if you want voice conversion
+pip install git+https://github.com/myshell-ai/OpenVoice.git --no-deps
 
-# 4. Voice conversion (optional — requires NVIDIA GPU)
-pip install openvoice --no-deps
-
-# 5. Voice Lab DSP (optional)
-pip install pedalboard praat-parselmouth librosa noisereduce
-
-# 6. Frontend
+# 4. Frontend
 npm install
 ```
 
@@ -135,10 +139,10 @@ Open **http://localhost:5173**. The frontend proxies `/api/*` to the backend.
 ### Tests
 
 ```bash
-# Backend: 86 tests
+# Backend: 132 tests
 python -m pytest -xvs
 
-# Frontend: 26 tests
+# Frontend: 46 tests
 npm test
 
 # TypeScript strict check
@@ -146,6 +150,15 @@ npm run typecheck
 
 # All together
 python -m pytest -q && npm test -- --run && npm run typecheck
+```
+
+### Regenerating API types
+
+The frontend's `src/api/generated.ts` is derived from the backend's
+OpenAPI schema. Regenerate whenever a Pydantic model changes:
+
+```bash
+npm run openapi   # export schema + regenerate TS types
 ```
 
 ## API Overview
@@ -170,6 +183,9 @@ python -m pytest -q && npm test -- --run && npm run typecheck
 | POST | `/api/voice-lab/process` | Apply DSP effects |
 | GET | `/api/voice-lab/presets` | Built-in DSP presets |
 | POST | `/api/character-synth/synthesize` | Character-cast synthesis |
+| GET | `/api/studio/sources` | List chapters editable in Studio |
+| POST | `/api/studio/edit` | Apply a batch of edit operations |
+| GET | `/api/studio/audio?path=...` | Serve an audio file (path-traversal protected) |
 | POST | `/api/analyze/sample` | Voice sample quality analysis |
 | GET/POST/DELETE | `/api/pronunciations` | Pronunciation dictionary CRUD |
 | POST | `/api/preprocess` | Text normalization |
@@ -198,6 +214,8 @@ data/
 ├── pronunciations.json  # Pronunciation overrides
 ├── output/           # Generated audio (auto-cleaned after 24h)
 ├── temp/             # Processing intermediaries
+├── studio/           # Studio audio edits (persists until manually removed)
+├── ambience/         # Ambient track library
 ├── jobs/             # Crash-safe job records + chunk files
 ├── logs/
 │   ├── app.log       # Text log (INFO+, 10MB x 5 rotation)

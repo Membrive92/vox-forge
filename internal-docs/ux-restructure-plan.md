@@ -1,8 +1,14 @@
 # UX Restructure Plan — De 10 tabs a 5
 
 **Fecha**: 2026-04-12
-**Estado**: Planificado, pendiente de implementacion
+**Estado**: ✅ Implementado (Phases 0-6 en commits `704fc24` ... `9e1a329`)
 **Motivacion**: La aplicacion ha crecido a 10 tabs organizados por tecnologia (Convert, Lab, Experimental) en vez de por flujo de trabajo del usuario. Un narrador de audiolibros no piensa en "OpenVoice vs DSP" — piensa en "quiero modificar este audio". Esta reestructuracion agrupa por tarea, no por engine.
+
+> **Nota posterior (2026-04-15)**: tras esta reestructuracion se anadio un
+> **sexto tab** — **Studio** — entre Audio Tools y Activity, para
+> post-produccion (editor de audio, futuro render de video). Ver
+> [studio-module-plan.md](studio-module-plan.md). La distribucion final
+> es: `Workbench | Quick Synth | Voices | Audio Tools | Studio | Activity`.
 
 ---
 

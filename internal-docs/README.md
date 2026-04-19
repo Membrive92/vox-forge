@@ -23,3 +23,9 @@ Documentacion tecnica interna del proyecto. Explica la arquitectura, los flujos 
 
 ### Teoria
 - [Modelos de sintesis de voz](teoria-modelos-voz.md) — TTS neuronal, clonacion, Edge-TTS vs XTTS v2
+
+### Planes de trabajo
+- [UX Restructure Plan](ux-restructure-plan.md) — ✅ Reestructuracion 10 → 5 tabs (implementada)
+- [Frontend polish plan](frontend-polish-plan.md) — ✅ Fases 1-7 de pulido visual (implementadas)
+- [Studio module plan](studio-module-plan.md) — Editor de audio + render de video. Fase A (POC audio) implementada; B/C/D pendientes
+- [Manual test plan](manual-test-plan.md) — Checklist de regresion por tab
