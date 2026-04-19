@@ -46,12 +46,14 @@ class _FakeAudioSegment:
     """Minimal ``pydub.AudioSegment`` fake.
 
     Each instance represents a 1-second clip, mono, 16-bit, 44.1 kHz.
-    Supports concatenation (+=) for chunking tests.
+    Supports concatenation (+=) for chunking tests, slicing for the
+    audio editor, and gain helpers used by ``normalize``.
     """
 
     channels = 1
     frame_rate = 44100
     sample_width = 2  # bytes -> 16 bit
+    max_dBFS = -3.0
 
     def __init__(self, duration_ms: int = 1000) -> None:
         self._duration_ms = duration_ms
@@ -64,6 +66,24 @@ class _FakeAudioSegment:
 
     def __iadd__(self, other: "_FakeAudioSegment") -> "_FakeAudioSegment":
         return self.__add__(other)
+
+    def __getitem__(self, key: object) -> "_FakeAudioSegment":
+        if isinstance(key, slice):
+            start = 0 if key.start is None else int(key.start)
+            stop = self._duration_ms if key.stop is None else int(key.stop)
+            start = max(0, min(start, self._duration_ms))
+            stop = max(start, min(stop, self._duration_ms))
+            return _FakeAudioSegment(stop - start)
+        raise TypeError(f"Unsupported index type: {type(key)}")
+
+    def fade_in(self, _duration: int) -> "_FakeAudioSegment":
+        return _FakeAudioSegment(self._duration_ms)
+
+    def fade_out(self, _duration: int) -> "_FakeAudioSegment":
+        return _FakeAudioSegment(self._duration_ms)
+
+    def apply_gain(self, _gain: float) -> "_FakeAudioSegment":
+        return _FakeAudioSegment(self._duration_ms)
 
     @classmethod
     def from_mp3(cls, _path: str) -> "_FakeAudioSegment":

@@ -143,3 +143,38 @@ class JobProgressResponse(BaseModel):
     chunks_total: int
     current_step: str
     error: str | None = None
+
+
+# ── Studio module ───────────────────────────────────────────────────
+
+
+class StudioSource(BaseModel):
+    """An audio file the Studio editor can load."""
+
+    id: str
+    kind: str  # "chapter" | "mix"
+    project_name: str
+    chapter_title: str
+    source_path: str
+    duration_s: float
+    created_at: str
+
+
+class StudioSourcesResponse(BaseModel):
+    sources: list[StudioSource]
+    count: int
+
+
+class StudioOperation(BaseModel):
+    """A single edit step in a Studio batch."""
+
+    type: str = Field(..., description="trim | delete_region | fade_in | fade_out | normalize")
+    params: dict[str, float] = Field(default_factory=dict)
+
+
+class StudioEditRequest(BaseModel):
+    """Apply a sequence of edit operations to a source audio file."""
+
+    source_path: str = Field(..., min_length=1)
+    operations: list[StudioOperation] = Field(..., min_length=1)
+    output_format: str = Field(default="mp3")

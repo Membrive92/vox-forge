@@ -11,13 +11,15 @@ PROFILES_DIR: Path = DATA_DIR / "profiles"
 OUTPUT_DIR: Path = DATA_DIR / "output"
 TEMP_DIR: Path = DATA_DIR / "temp"
 AMBIENCE_DIR: Path = DATA_DIR / "ambience"
+STUDIO_DIR: Path = DATA_DIR / "studio"
+JOBS_DIR: Path = DATA_DIR / "jobs"
 
 PROFILES_FILE: Path = PROFILES_DIR / "profiles.json"
 
 
 def ensure_dirs() -> None:
     """Create data directories if they don't exist."""
-    for d in (VOICES_DIR, PROFILES_DIR, OUTPUT_DIR, TEMP_DIR, AMBIENCE_DIR):
+    for d in (VOICES_DIR, PROFILES_DIR, OUTPUT_DIR, TEMP_DIR, AMBIENCE_DIR, STUDIO_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
 

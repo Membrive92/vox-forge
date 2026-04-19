@@ -15,7 +15,7 @@ from .database import init_db
 from .exceptions import register_exception_handlers
 from .logging_config import configure_logging
 from .middleware import AccessLogMiddleware, RequestIdMiddleware
-from .routers import activity, ambience, analyze, batch_export, chapter_synth, character_synth, conversion, stats as stats_router, experimental, health, logs, preprocess, profiles, projects, pronunciation, synthesis, voice_lab, voices
+from .routers import activity, ambience, analyze, batch_export, chapter_synth, character_synth, conversion, stats as stats_router, experimental, health, logs, preprocess, profiles, projects, pronunciation, studio, synthesis, voice_lab, voices
 
 logger = logging.getLogger("backend")
 
@@ -84,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(pronunciation.router, prefix="/api")
     app.include_router(logs.router, prefix="/api")
     app.include_router(stats_router.router, prefix="/api")
+    app.include_router(studio.router, prefix="/api")
     app.include_router(health.router, prefix="/api")
 
     return app
