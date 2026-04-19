@@ -1,12 +1,13 @@
 import { useRef, useState } from "react";
 
 import { convertVoice } from "@/api/conversion";
+import { Button } from "@/components/Button";
 import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
 
 interface ConvertTabProps {
@@ -69,7 +70,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+    <div className="vf-grid-2col">
       {/* Left: source + result */}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div
@@ -81,10 +82,10 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
             backdropFilter: "blur(12px)",
           }}
         >
-          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700 }}>
+          <h3 style={{ margin: "0 0 4px", fontSize: typography.size.lg, fontWeight: 700 }}>
             {t.sourceAudio}
           </h3>
-          <p style={{ margin: "0 0 16px", fontSize: 12, color: colors.textDim }}>
+          <p style={{ margin: "0 0 16px", fontSize: typography.size.sm, color: colors.textDim }}>
             {t.sourceAudioHint}
           </p>
 
@@ -107,7 +108,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
                 : `2px dashed ${colors.border}`,
               color: sourceFile ? colors.primaryLight : colors.textMuted,
               cursor: "pointer",
-              fontSize: 13,
+              fontSize: typography.size.sm,
               fontWeight: 600,
               fontFamily: fonts.sans,
               display: "flex",
@@ -183,7 +184,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
                   <Icons.Stop />
                 </button>
                 {player.duration > 0 && (
-                  <span style={{ fontSize: 11, color: colors.textDim, fontFamily: fonts.mono }}>
+                  <span style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono }}>
                     {player.duration.toFixed(1)}s
                   </span>
                 )}
@@ -214,7 +215,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
                   border: `1px solid ${colors.primaryBorder}`,
                   color: colors.primaryLight,
                   cursor: "pointer",
-                  fontSize: 13,
+                  fontSize: typography.size.sm,
                   fontWeight: 600,
                   fontFamily: fonts.sans,
                 }}
@@ -239,8 +240,8 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
           gap: 16,
         }}
       >
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{t.targetVoice}</h3>
-        <p style={{ margin: 0, fontSize: 12, color: colors.textDim }}>{t.targetVoiceOption}</p>
+        <h3 style={{ margin: 0, fontSize: typography.size.lg, fontWeight: 700 }}>{t.targetVoice}</h3>
+        <p style={{ margin: 0, fontSize: typography.size.sm, color: colors.textDim }}>{t.targetVoiceOption}</p>
 
         {/* Mode toggle */}
         <div style={{ display: "flex", gap: 8 }}>
@@ -250,7 +251,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
               flex: 1,
               padding: "8px 0",
               borderRadius: radii.sm,
-              fontSize: 12,
+              fontSize: typography.size.sm,
               fontWeight: 600,
               background: targetMode === "profile" ? colors.primary : colors.surfaceAlt,
               color: targetMode === "profile" ? "#fff" : colors.textDim,
@@ -267,7 +268,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
               flex: 1,
               padding: "8px 0",
               borderRadius: radii.sm,
-              fontSize: 12,
+              fontSize: typography.size.sm,
               fontWeight: 600,
               background: targetMode === "file" ? colors.primary : colors.surfaceAlt,
               color: targetMode === "file" ? "#fff" : colors.textDim,
@@ -284,7 +285,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
         {targetMode === "profile" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
             {profilesWithSample.length === 0 ? (
-              <p style={{ fontSize: 12, color: colors.textDim, textAlign: "center", padding: 20 }}>
+              <p style={{ fontSize: typography.size.sm, color: colors.textDim, textAlign: "center", padding: 20 }}>
                 {t.noProfiles}
               </p>
             ) : (
@@ -308,7 +309,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
                     transition: "all 0.15s",
                   }}
                 >
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</span>
+                  <span style={{ fontSize: typography.size.sm, fontWeight: 500 }}>{p.name}</span>
                   {selectedProfileId === p.id && <Icons.Check />}
                 </button>
               ))
@@ -338,7 +339,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
                   : `2px dashed ${colors.border}`,
                 color: targetFile ? colors.primaryLight : colors.textMuted,
                 cursor: "pointer",
-                fontSize: 13,
+                fontSize: typography.size.sm,
                 fontWeight: 600,
                 fontFamily: fonts.sans,
                 display: "flex",
@@ -359,7 +360,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
           borderTop: `1px solid ${colors.borderFaint}`,
         }}>
           <label style={{
-            fontSize: 11, color: colors.textDim, fontWeight: 600,
+            fontSize: typography.size.xs, color: colors.textDim, fontWeight: 600,
             textTransform: "uppercase", letterSpacing: "1.5px",
             marginBottom: 12, display: "block",
           }}>
@@ -406,7 +407,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
               style={{
                 flex: 1,
                 padding: "6px 0",
-                fontSize: 10,
+                fontSize: typography.size.xs,
                 fontWeight: 600,
                 background: format === f ? colors.primary : colors.surfaceAlt,
                 color: format === f ? "#fff" : colors.textDim,
@@ -423,34 +424,17 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
         </div>
 
         {/* Convert button */}
-        <button
-          onClick={() => void handleConvert()}
+        <Button
+          variant="primary"
+          size="lg"
+          icon={<Icons.Waveform />}
+          loading={isConverting}
           disabled={!canConvert}
-          style={{
-            width: "100%",
-            padding: "14px 0",
-            borderRadius: radii.lg,
-            background: canConvert
-              ? "linear-gradient(135deg, #8b5cf6, #7c3aed)"
-              : colors.textDark,
-            border: "none",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: canConvert ? "pointer" : "default",
-            fontFamily: fonts.sans,
-            opacity: canConvert ? 1 : 0.4,
-            boxShadow: canConvert ? "0 4px 24px rgba(139,92,246,0.35)" : "none",
-            transition: "all 0.2s",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
+          fullWidth
+          onClick={() => void handleConvert()}
         >
-          <Icons.Waveform />
           {isConverting ? t.converting : t.convertButton}
-        </button>
+        </Button>
       </div>
     </div>
   );

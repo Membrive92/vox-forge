@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 import * as Icons from "./icons";
 
@@ -80,7 +80,7 @@ export function AudioRecorder({ onRecorded, labelRecord, labelStop, labelRecordi
           : `1px solid ${colors.border}`,
         color: isRecording ? "#fff" : colors.textMuted,
         cursor: "pointer",
-        fontSize: 13,
+        fontSize: typography.size.sm,
         fontWeight: 600,
         fontFamily: fonts.sans,
         display: "flex",

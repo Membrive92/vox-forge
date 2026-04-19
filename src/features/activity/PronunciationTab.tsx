@@ -5,7 +5,8 @@ import {
   listPronunciations,
   upsertPronunciation,
 } from "@/api/pronunciation";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { Button } from "@/components/Button";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 interface Props {
   onToast: (msg: string) => void;
@@ -71,8 +72,8 @@ export function PronunciationTab({ onToast }: Props) {
         margin: "0 auto",
       }}
     >
-      <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700 }}>Pronunciation dictionary</h3>
-      <p style={{ margin: "0 0 20px", fontSize: 12, color: colors.textDim }}>
+      <h3 style={{ margin: "0 0 4px", fontSize: typography.size.lg, fontWeight: 700 }}>Pronunciation dictionary</h3>
+      <p style={{ margin: "0 0 20px", fontSize: typography.size.sm, color: colors.textDim }}>
         Override how specific words are spoken. Useful for fantasy names, acronyms, or loanwords
         the TTS engine mispronounces. Replacements are applied as whole-word, case-insensitive
         substitutions before all other normalization.
@@ -91,29 +92,19 @@ export function PronunciationTab({ onToast }: Props) {
           placeholder="Phonetic spelling (e.g. Quelzir)"
           style={inputStyle}
         />
-        <button
+        <Button
+          variant="primary"
+          loading={loading}
+          disabled={!word.trim() || !replacement.trim()}
           onClick={() => void handleAdd()}
-          disabled={loading || !word.trim() || !replacement.trim()}
-          style={{
-            padding: "8px 18px",
-            background: colors.primary,
-            color: "#fff",
-            border: "none",
-            borderRadius: radii.sm,
-            fontSize: 13,
-            fontWeight: 600,
-            fontFamily: fonts.sans,
-            cursor: loading ? "default" : "pointer",
-            opacity: loading ? 0.5 : 1,
-          }}
         >
           Add
-        </button>
+        </Button>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {sortedEntries.length === 0 ? (
-          <p style={{ fontSize: 12, color: colors.textDim, textAlign: "center", padding: 20 }}>
+          <p style={{ fontSize: typography.size.sm, color: colors.textDim, textAlign: "center", padding: 20 }}>
             No entries yet
           </p>
         ) : (
@@ -128,7 +119,7 @@ export function PronunciationTab({ onToast }: Props) {
                 border: `1px solid ${colors.borderFaint}`,
                 borderRadius: radii.sm,
                 fontFamily: fonts.mono,
-                fontSize: 12,
+                fontSize: typography.size.sm,
               }}
             >
               <span style={{ flex: 1, color: colors.text }}>{w}</span>
@@ -142,7 +133,7 @@ export function PronunciationTab({ onToast }: Props) {
                   border: "none",
                   color: colors.textFaint,
                   cursor: "pointer",
-                  fontSize: 16,
+                  fontSize: typography.size.lg,
                   padding: "0 6px",
                 }}
               >
@@ -163,7 +154,7 @@ const inputStyle: React.CSSProperties = {
   border: `1px solid ${colors.border}`,
   borderRadius: radii.sm,
   color: colors.text,
-  fontSize: 13,
+  fontSize: typography.size.sm,
   fontFamily: fonts.sans,
   outline: "none",
 };

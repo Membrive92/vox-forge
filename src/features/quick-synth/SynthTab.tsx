@@ -7,6 +7,7 @@ import {
   resumeJob,
   type IncompleteJobDTO,
 } from "@/api/synthesis";
+import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
@@ -17,7 +18,7 @@ import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useExportSettings } from "@/hooks/useExportSettings";
 import { useSynthesis } from "@/hooks/useSynthesis";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 import type { SynthSettings } from "../state";
 
@@ -192,7 +193,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
   }, [canGenerate, player.url]);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24 }}>
+    <div className="vf-grid-editor-sidebar">
       {/* Left: text + waveform */}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {incomplete.length > 0 && (
@@ -224,7 +225,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
               background: "none",
               border: "none",
               color: colors.text,
-              fontSize: 15,
+              fontSize: typography.size.base,
               lineHeight: 1.7,
               fontFamily: fonts.sans,
               outline: "none",
@@ -240,7 +241,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
               alignItems: "center",
             }}
           >
-            <span style={{ fontSize: 11, color: colors.textFaint, fontFamily: fonts.mono }}>
+            <span style={{ fontSize: typography.size.xs, color: colors.textFaint, fontFamily: fonts.mono }}>
               {text.length} {t.charCount}
               {text.length > 0 && (
                 <span style={{ marginLeft: 8, color: colors.textDim, fontFamily: fonts.sans }}>
@@ -266,7 +267,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
                     title={f.desc}
                     style={{
                       padding: "4px 10px",
-                      fontSize: 10,
+                      fontSize: typography.size.xs,
                       fontWeight: 600,
                       background: active ? colors.primary : colors.surfaceAlt,
                       color: active ? "#fff" : colors.textDim,
@@ -355,7 +356,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
                   border: `1px solid ${colors.primaryBorder}`,
                   color: colors.primaryLight,
                   cursor: "pointer",
-                  fontSize: 13,
+                  fontSize: typography.size.sm,
                   fontWeight: 600,
                   fontFamily: fonts.sans,
                   marginLeft: "auto",
@@ -394,7 +395,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
         <div>
           <label
             style={{
-              fontSize: 11,
+              fontSize: typography.size.xs,
               color: colors.textDim,
               fontWeight: 600,
               textTransform: "uppercase",
@@ -416,7 +417,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                fontSize: 11,
+                fontSize: typography.size.xs,
                 fontWeight: 600,
                 color: colors.accent,
               }}
@@ -429,7 +430,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
                   border: "none",
                   color: colors.accent,
                   cursor: "pointer",
-                  fontSize: 11,
+                  fontSize: typography.size.xs,
                   fontFamily: fonts.sans,
                   textDecoration: "underline",
                 }}
@@ -470,9 +471,9 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
                         background: v.gender === "F" ? colors.female : colors.primaryLight,
                       }}
                     />
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>{v.name}</span>
+                    <span style={{ fontSize: typography.size.sm, fontWeight: 500 }}>{v.name}</span>
                   </div>
-                  <span style={{ fontSize: 10, color: colors.textDim, fontFamily: fonts.mono }}>
+                  <span style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono }}>
                     {v.accent}
                   </span>
                 </button>
@@ -507,7 +508,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
               background: colors.surfaceAlt,
               border: `1px solid ${colors.border}`,
               color: colors.textMuted,
-              fontSize: 13,
+              fontSize: typography.size.sm,
               fontWeight: 600,
               cursor: isUploading ? "default" : "pointer",
               fontFamily: fonts.sans,
@@ -532,40 +533,22 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
           previewName={exportCfg.renderFilename(settings.format)}
         />
 
-        <button
-          onClick={() => void handleGenerate()}
+        <Button
+          variant="primary"
+          size="lg"
+          icon={<Icons.Waveform />}
+          loading={synthesis.isGenerating}
           disabled={!canGenerate}
-          style={{
-            width: "100%",
-            padding: "14px 0",
-            borderRadius: radii.lg,
-            background: canGenerate
-              ? `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDim})`
-              : colors.textDark,
-            border: "none",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: canGenerate ? "pointer" : "default",
-            fontFamily: fonts.sans,
-            letterSpacing: "0.3px",
-            opacity: canGenerate ? 1 : 0.4,
-            boxShadow: canGenerate ? "0 4px 24px rgba(59,130,246,0.35)" : "none",
-            transition: "all 0.2s",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
+          fullWidth
+          onClick={() => void handleGenerate()}
         >
-          <Icons.Waveform />
           {synthesis.isGenerating ? t.generating : t.generate}
-        </button>
+        </Button>
 
         <p
           style={{
             margin: "4px 0 0",
-            fontSize: 10,
+            fontSize: typography.size.xs,
             color: colors.textFaint,
             fontFamily: fonts.mono,
             textAlign: "center",
@@ -607,7 +590,7 @@ function ExportPanel({ open, onToggle, settings, update, previewName }: ExportPa
           border: "none",
           color: colors.textDim,
           fontFamily: fonts.sans,
-          fontSize: 11,
+          fontSize: typography.size.xs,
           fontWeight: 600,
           textTransform: "uppercase",
           letterSpacing: "1.5px",
@@ -615,7 +598,7 @@ function ExportPanel({ open, onToggle, settings, update, previewName }: ExportPa
         }}
       >
         <span>Export</span>
-        <span style={{ fontSize: 14 }}>{open ? "−" : "+"}</span>
+        <span style={{ fontSize: typography.size.base }}>{open ? "−" : "+"}</span>
       </button>
 
       {open && (
@@ -659,7 +642,7 @@ function ExportPanel({ open, onToggle, settings, update, previewName }: ExportPa
           <p
             style={{
               margin: 0,
-              fontSize: 10,
+              fontSize: typography.size.xs,
               color: colors.textFaint,
               fontFamily: fonts.mono,
               wordBreak: "break-all",
@@ -709,7 +692,7 @@ function ExportField({ label, value, onChange, placeholder, type = "text" }: Exp
           border: `1px solid ${colors.borderFaint}`,
           borderRadius: radii.sm,
           color: colors.text,
-          fontSize: 12,
+          fontSize: typography.size.sm,
           fontFamily: fonts.sans,
           outline: "none",
           boxSizing: "border-box",
@@ -739,7 +722,7 @@ function IncompleteJobsBanner({ jobs, resumingId, onResume, onDiscard }: Incompl
     >
       <div
         style={{
-          fontSize: 11,
+          fontSize: typography.size.xs,
           fontWeight: 700,
           color: "#f59e0b",
           textTransform: "uppercase",
@@ -766,15 +749,15 @@ function IncompleteJobsBanner({ jobs, resumingId, onResume, onDiscard }: Incompl
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: colors.text }}>
+                <div style={{ fontSize: typography.size.sm, fontWeight: 600, color: colors.text }}>
                   {job.title || "Untitled"}
-                  <span style={{ marginLeft: 8, fontSize: 10, color: colors.textDim, fontFamily: fonts.mono }}>
+                  <span style={{ marginLeft: 8, fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono }}>
                     {job.chunks_available} chunks · {job.output_format} · {date}
                   </span>
                 </div>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: typography.size.xs,
                     color: colors.textDim,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -790,7 +773,7 @@ function IncompleteJobsBanner({ jobs, resumingId, onResume, onDiscard }: Incompl
                 disabled={isResuming}
                 style={{
                   padding: "6px 14px",
-                  fontSize: 12,
+                  fontSize: typography.size.sm,
                   fontWeight: 600,
                   background: "#f59e0b",
                   color: "#000",
@@ -811,7 +794,7 @@ function IncompleteJobsBanner({ jobs, resumingId, onResume, onDiscard }: Incompl
                   border: "none",
                   color: colors.textFaint,
                   cursor: "pointer",
-                  fontSize: 16,
+                  fontSize: typography.size.lg,
                   padding: "0 6px",
                 }}
               >
@@ -834,8 +817,8 @@ function ProgressBar({ step, progress }: ProgressBarProps) {
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-        <span style={{ fontSize: 12, color: colors.primaryLight }}>{step}</span>
-        <span style={{ fontSize: 11, color: colors.textDim, fontFamily: fonts.mono }}>
+        <span style={{ fontSize: typography.size.sm, color: colors.primaryLight }}>{step}</span>
+        <span style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono }}>
           {Math.round(progress)}%
         </span>
       </div>

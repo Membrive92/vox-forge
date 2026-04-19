@@ -158,6 +158,175 @@ export const es = {
   settingsSection: "Configuración",
   settingsPronunciation: "Diccionario de pronunciación",
   settingsExportDefaults: "Configuración de exportación",
+
+  // ── Common UI ────────────────────────────────────────────────────
+  unknownError: "desconocido",
+  zoom: "Zoom",
+  refresh: "Recargar",
+  remove: "Quitar",
+  hideDetails: "Ocultar detalles técnicos",
+  showDetails: "Ver detalles técnicos",
+
+  // ── Time helpers ─────────────────────────────────────────────────
+  timeJustNow: "hace un momento",
+  timeMinutesAgo: "hace {n}m",
+  timeHoursAgo: "hace {n}h",
+  timeDaysAgo: "hace {n}d",
+
+  // ── Workbench ────────────────────────────────────────────────────
+  workbenchWelcomeTitle: "Bienvenido al Workbench",
+  workbenchWelcomeDesc: "Los proyectos organizan tu historia en capítulos. Crea uno para empezar — puedes pegar un texto completo y dividirlo automáticamente, o añadir capítulos manualmente.",
+  workbenchCreateFirst: "+ Crea tu primer proyecto",
+  workbenchStep1Title: "Crea un proyecto",
+  workbenchStep1Desc: "Dale un nombre y elige una voz.",
+  workbenchStep2Title: "Pega o divide",
+  workbenchStep2Desc: "Introduce tu texto y divídelo por capítulos.",
+  workbenchStep3Title: "Sintetiza",
+  workbenchStep3Desc: "Previsualiza, reparte voces y añade ambiente.",
+  workbenchBreadcrumb: "Workbench",
+  workbenchUntitledProject: "Proyecto sin título",
+  workbenchAddChapter: "+ Capítulo",
+  workbenchSplitText: "Dividir texto",
+  workbenchExportAll: "Exportar todo",
+  workbenchNoProjects: "Aún no hay proyectos. Crea uno para empezar.",
+  workbenchNewProject: "+ Nuevo proyecto",
+  workbenchPasteYourStory: "Pega tu historia",
+  workbenchSplitDescription: "Pega tu texto completo abajo y pulsa Dividir para separarlo en capítulos automáticamente. Usa líneas '# Título' para marcar capítulos, o separadores '---'.",
+  workbenchSplitInto: "Dividir en capítulos",
+  workbenchOrAddManual: "O añade un capítulo manual",
+  workbenchPasteFirst: "Pega algo de texto primero",
+  workbenchSplitDone: "Dividido en {n} capítulos",
+  workbenchPastePrompt: "Pega el texto completo para dividir en capítulos:",
+  workbenchExportStarted: "Exportación iniciada — el archivo se descargará cuando todos los capítulos estén sintetizados",
+  workbenchDefaultProjectName: "Proyecto sin título",
+  workbenchDefaultChapterName: "Capítulo {n}",
+
+  // ── Chapter toolbar ──────────────────────────────────────────────
+  chapterPreview: "Previsualizar",
+  chapterChunks: "Chunks",
+  chapterCast: "Voces",
+  chapterAmbient: "Ambiente",
+
+  // ── ChunkMap ─────────────────────────────────────────────────────
+  chunkMapTitle: "Mapa de chunks",
+  chunkSynthesize: "Sintetizar capítulo",
+  chunkSynthesizing: "Sintetizando...",
+  chunkNoChunks: "No hay chunks grabados",
+  chunkClickToSynth: "Pulsa 'Sintetizar capítulo' para generar el audio",
+  chunkRegen: "Regen",
+  chunkRegenerating: "...",
+
+  // ── Character casting ────────────────────────────────────────────
+  castingNoTagsFound: "No se han encontrado etiquetas de personajes. Usa [Nombre] al inicio de las líneas.",
+  castingTitle: "Reparto de personajes",
+  castingRescan: "Rescanear",
+  castingRescanning: "...",
+  castingNoDetected: "No se han detectado personajes en este capítulo.",
+  castingAddTagsHint: "Añade etiquetas [Nombre] al inicio de las líneas del texto del capítulo y pulsa Rescanear.",
+  castingDefaultVoice: "— Voz por defecto —",
+  castingClonedProfiles: "Perfiles clonados",
+  castingSystemVoices: "Voces del sistema",
+  castingCastVoices: "Repartir {n} voces",
+  castingCastVoice: "Repartir 1 voz",
+  castingDownload: "Descargar audio con reparto",
+
+  // ── Quick preview ────────────────────────────────────────────────
+  previewNoText: "El capítulo no tiene texto para previsualizar",
+  previewReady: "Vista previa lista ({dur}s)",
+  previewTitle: "Vista previa rápida",
+  previewDescription: "Primeros {n} caracteres · sin chunking · audición rápida",
+  previewButton: "Previsualizar",
+  previewLoading: "...",
+
+  // ── Ambience mixer ───────────────────────────────────────────────
+  ambientMixerTitle: "Mezclador ambiental",
+  ambientUploading: "Subiendo...",
+  ambientUpload: "Subir pista ambiental",
+  ambientEmpty: "No hay pistas ambientales. Sube un sonido (bosque, lluvia, taberna, etc.)",
+  ambientLevelInfo: "Qué tan fuerte se oye la pista ambiental respecto a la narración. -15dB es sutil, -5dB es prominente.",
+  ambientFadeInInfo: "Segundos de fade in del ambiente al inicio del capítulo.",
+  ambientFadeOutInfo: "Segundos de fade out del ambiente al final del capítulo.",
+  ambientMixing: "Mezclando...",
+  ambientMix: "Mezclar con ambiente",
+  ambientPlayMix: "Reproducir mezcla",
+  ambientDownloadMix: "Descargar audio mezclado",
+
+  // ── Activity ─────────────────────────────────────────────────────
+  activityRecentGens: "Generaciones recientes",
+  activityStorage: "Almacenamiento",
+  activityCouldNotLoad: "No se pudo cargar la actividad",
+  activityRecentIssues: "Incidencias recientes",
+  activityNoGens: "Aún no hay generaciones. Sintetiza un capítulo desde el Workbench o usa la pestaña Síntesis rápida.",
+  activityGeneratedAudio: "Audio generado",
+  activityVoiceSamples: "Muestras de voz",
+  activityLogs: "Logs",
+  activityTotal: "Total",
+  activityHideLogs: "Ocultar logs de desarrollador",
+  activityShowLogs: "Logs de desarrollador",
+
+  // ── Voices tab upload ────────────────────────────────────────────
+  voicesFormatUnsupported: "Formato no soportado",
+  voicesDropHere: "Suelta el archivo aquí",
+  voicesLangSpanish: "Español",
+  voicesLangEnglish: "Inglés",
+
+  // ── Audio Tools mode descriptions ────────────────────────────────
+  audioToolsChangeVoiceDesc: "Clonar el timbre de otra voz sobre un audio",
+  audioToolsEffectsDesc: "Aplicar DSP: tono, formantes, ecualización, reverb",
+
+  // ── Quick Synth mode descriptions ────────────────────────────────
+  quickSynthStandardDesc: "Voces del sistema o perfiles guardados",
+  quickSynthCrossLingualDesc: "Clonar una muestra en otro idioma (experimental)",
+  quickSynthExpBadge: "EXP",
+
+  // ── Interactive player ───────────────────────────────────────────
+  playerSkipBack: "Retroceder 10 segundos",
+  playerSkipForward: "Avanzar 10 segundos",
+  playerPlaybackRate: "Velocidad de reproducción {r}x",
+
+  // ── Lab custom preset dialog ─────────────────────────────────────
+  labSavePresetTitle: "Guardar preset personalizado",
+  labPresetName: "Nombre",
+  labPresetDescription: "Descripción (opcional)",
+
+  // ── Error boundary ───────────────────────────────────────────────
+  errorBoundaryTitle: "Algo ha ido mal",
+  errorBoundaryDesc: "La interfaz encontró un error inesperado y no pudo terminar de renderizarse. Tu trabajo no se ha perdido — los borradores se guardan automáticamente. Prueba a volver a una pestaña que funcione, o recarga la página.",
+  errorBoundaryTryAgain: "Intentar de nuevo",
+  errorBoundaryReload: "Recargar página",
+
+  // Studio
+  tabStudio: "Estudio",
+  studioTagline: "Pulir audio: recortar, fades y normalizar",
+  studioSourcesTitle: "Fuentes",
+  studioSourcesEmpty: "No hay capítulos sintetizados todavía. Crea uno desde Workbench.",
+  studioSourcesLoading: "Cargando fuentes…",
+  studioRefresh: "Recargar",
+  studioOpsTitle: "Cola de operaciones",
+  studioOpsEmpty: "Añade operaciones desde la barra de herramientas para empezar.",
+  studioToolbarTitle: "Operaciones",
+  studioOpTrim: "Recortar a la selección",
+  studioOpDeleteRegion: "Borrar región",
+  studioOpFadeIn: "Fade in",
+  studioOpFadeOut: "Fade out",
+  studioOpNormalize: "Normalizar",
+  studioFadeDuration: "Duración (ms)",
+  studioNormalizeHeadroom: "Headroom (dB)",
+  studioApply: "Aplicar {n} operaciones",
+  studioApplyOne: "Aplicar 1 operación",
+  studioClearQueue: "Vaciar cola",
+  studioClearRegion: "Quitar selección",
+  studioOutputFormat: "Formato de salida",
+  studioResultTitle: "Resultado",
+  studioResultEmpty: "El resultado aparecerá aquí cuando apliques las operaciones.",
+  studioDownload: "Descargar",
+  studioProcessing: "Procesando…",
+  studioNeedRegion: "Selecciona una región del waveform primero.",
+  studioApplied: "Edición aplicada correctamente",
+  studioApplyFailed: "No se pudo aplicar la edición",
+  studioSelectChapterHint: "Selecciona un capítulo a la izquierda para cargar su waveform.",
+  studioDragHint: "Arrastra sobre el waveform para seleccionar una región. Redimensiona arrastrando sus bordes.",
+  studioRemoveOperation: "Quitar operación",
 } as const;
 
 export type TranslationKey = keyof typeof es;

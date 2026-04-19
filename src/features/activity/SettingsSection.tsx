@@ -10,7 +10,7 @@ import { useState } from "react";
 import { PronunciationTab } from "./PronunciationTab";
 import { useExportSettings } from "@/hooks/useExportSettings";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 interface Props {
   t: Translations;
@@ -32,7 +32,7 @@ export function SettingsSection({ t, onToast }: Props) {
           borderRadius: radii.xl,
           color: colors.text,
           fontFamily: fonts.sans,
-          fontSize: 14,
+          fontSize: typography.size.base,
           fontWeight: 700,
           cursor: "pointer",
           display: "flex",
@@ -73,7 +73,7 @@ function SubSection({ title, children }: { title: string; children: React.ReactN
       <h4
         style={{
           margin: "0 0 10px",
-          fontSize: 11,
+          fontSize: typography.size.xs,
           fontWeight: 700,
           color: colors.textDim,
           textTransform: "uppercase",
@@ -103,7 +103,7 @@ function ExportDefaultsForm() {
       <p
         style={{
           margin: "0 0 16px",
-          fontSize: 12,
+          fontSize: typography.size.sm,
           color: colors.textDim,
           lineHeight: 1.5,
         }}
@@ -150,7 +150,7 @@ function ExportDefaultsForm() {
         <p
           style={{
             margin: "6px 0 0",
-            fontSize: 10,
+            fontSize: typography.size.xs,
             color: colors.textFaint,
             fontFamily: fonts.mono,
           }}
@@ -160,7 +160,7 @@ function ExportDefaultsForm() {
         <p
           style={{
             margin: "8px 0 0",
-            fontSize: 11,
+            fontSize: typography.size.xs,
             color: colors.primaryLight,
             fontFamily: fonts.mono,
             wordBreak: "break-all",
@@ -187,7 +187,7 @@ function Field({ label, value, onChange, placeholder, type = "text" }: FieldProp
       <span
         style={{
           display: "block",
-          fontSize: 10,
+          fontSize: typography.size.xs,
           color: colors.textFaint,
           fontFamily: fonts.mono,
           textTransform: "uppercase",
@@ -209,7 +209,7 @@ function Field({ label, value, onChange, placeholder, type = "text" }: FieldProp
           border: `1px solid ${colors.borderFaint}`,
           borderRadius: radii.sm,
           color: colors.text,
-          fontSize: 13,
+          fontSize: typography.size.sm,
           fontFamily: fonts.sans,
           outline: "none",
           boxSizing: "border-box",

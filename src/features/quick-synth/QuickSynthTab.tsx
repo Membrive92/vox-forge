@@ -13,7 +13,7 @@
 import { useState } from "react";
 
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 import type { SynthSettings } from "../state";
 
@@ -49,15 +49,17 @@ export function QuickSynthTab({ t, text, setText, settings, onToast }: Props) {
         <ModeButton
           active={mode === "standard"}
           label={t.tabSynth}
-          description="Voces del sistema o perfiles guardados"
+          description={t.quickSynthStandardDesc}
           onClick={() => setMode("standard")}
+          expLabel={t.quickSynthExpBadge}
         />
         <ModeButton
           active={mode === "cross-lingual"}
           label={t.crossLingualMode}
-          description="Clonar una muestra en otro idioma (experimental)"
+          description={t.quickSynthCrossLingualDesc}
           onClick={() => setMode("cross-lingual")}
           warning
+          expLabel={t.quickSynthExpBadge}
         />
       </div>
 
@@ -82,10 +84,11 @@ interface ModeButtonProps {
   label: string;
   description: string;
   warning?: boolean;
+  expLabel: string;
   onClick: () => void;
 }
 
-function ModeButton({ active, label, description, warning, onClick }: ModeButtonProps) {
+function ModeButton({ active, label, description, warning, expLabel, onClick }: ModeButtonProps) {
   const activeGradient = warning
     ? "linear-gradient(135deg, #f59e0b, #d97706)"
     : `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDim})`;
@@ -109,7 +112,7 @@ function ModeButton({ active, label, description, warning, onClick }: ModeButton
     >
       <div
         style={{
-          fontSize: 14,
+          fontSize: typography.size.base,
           fontWeight: 700,
           marginBottom: 2,
           display: "flex",
@@ -132,11 +135,11 @@ function ModeButton({ active, label, description, warning, onClick }: ModeButton
               fontFamily: fonts.mono,
             }}
           >
-            EXP
+            {expLabel}
           </span>
         )}
       </div>
-      <div style={{ fontSize: 11, opacity: active ? 0.85 : 0.7, fontWeight: 500 }}>
+      <div style={{ fontSize: typography.size.xs, opacity: active ? 0.85 : 0.7, fontWeight: 500 }}>
         {description}
       </div>
     </button>

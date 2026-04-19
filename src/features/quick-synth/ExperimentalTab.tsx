@@ -2,10 +2,11 @@ import { useRef, useState } from "react";
 
 import { crossLingualSynthesize } from "@/api/experimental";
 import { AudioRecorder } from "@/components/AudioRecorder";
+import { Button } from "@/components/Button";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 interface ExperimentalTabProps {
   t: Translations;
@@ -47,16 +48,16 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24 }}>
+    <div className="vf-grid-editor-sidebar">
       {/* Left: text + result */}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Warning banner */}
         <div style={{
           background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)",
           borderRadius: radii.lg, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10,
-          fontSize: 12, color: "#f59e0b",
+          fontSize: typography.size.sm, color: "#f59e0b",
         }}>
-          <span style={{ fontSize: 16 }}>&#9888;</span>
+          <span style={{ fontSize: typography.size.lg }}>&#9888;</span>
           {t.expWarning}
         </div>
 
@@ -72,13 +73,13 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
             style={{
               width: "100%", minHeight: 300, padding: 20, resize: "vertical",
               background: "none", border: "none", color: colors.text,
-              fontSize: 15, lineHeight: 1.7, fontFamily: fonts.sans,
+              fontSize: typography.size.base, lineHeight: 1.7, fontFamily: fonts.sans,
               outline: "none", boxSizing: "border-box",
             }}
           />
           <div style={{
             padding: "10px 20px", borderTop: `1px solid ${colors.borderFaint}`,
-            fontSize: 11, color: colors.textFaint, fontFamily: fonts.mono,
+            fontSize: typography.size.xs, color: colors.textFaint, fontFamily: fonts.mono,
           }}>
             {text.length} {t.charCount}
           </div>
@@ -112,7 +113,7 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
                   opacity: player.isPlaying ? 1 : 0.3,
                 }}><Icons.Stop /></button>
                 {player.duration > 0 && (
-                  <span style={{ fontSize: 11, color: colors.textDim, fontFamily: fonts.mono }}>{player.duration.toFixed(1)}s</span>
+                  <span style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono }}>{player.duration.toFixed(1)}s</span>
                 )}
                 <span style={{ fontSize: 9, fontWeight: 700, fontFamily: fonts.mono, padding: "2px 6px", borderRadius: 4, background: "rgba(245,158,11,0.2)", color: "#f59e0b", textTransform: "uppercase" }}>EXPERIMENTAL</span>
               </div>
@@ -120,7 +121,7 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
                 display: "flex", alignItems: "center", gap: 6, padding: "10px 18px",
                 borderRadius: radii.md, background: "rgba(59,130,246,0.15)",
                 border: `1px solid ${colors.primaryBorder}`, color: colors.primaryLight,
-                cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: fonts.sans,
+                cursor: "pointer", fontSize: typography.size.sm, fontWeight: 600, fontFamily: fonts.sans,
               }}><Icons.Download /> {t.download}</button>
             </div>
           </div>
@@ -133,12 +134,12 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
         borderRadius: radii.xl, padding: 24, backdropFilter: "blur(12px)",
         display: "flex", flexDirection: "column", gap: 16,
       }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{t.expTitle}</h3>
-        <p style={{ margin: 0, fontSize: 12, color: colors.textDim }}>{t.expDesc}</p>
+        <h3 style={{ margin: 0, fontSize: typography.size.lg, fontWeight: 700 }}>{t.expTitle}</h3>
+        <p style={{ margin: 0, fontSize: typography.size.sm, color: colors.textDim }}>{t.expDesc}</p>
 
         {/* Voice sample upload */}
         <div>
-          <label style={{ fontSize: 11, color: colors.textDim, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 8, display: "block" }}>
+          <label style={{ fontSize: typography.size.xs, color: colors.textDim, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 8, display: "block" }}>
             {t.expVoiceSample}
           </label>
 
@@ -149,7 +150,7 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
             labelRecording={t.recording}
           />
 
-          <div style={{ textAlign: "center", fontSize: 11, color: colors.textDim, margin: "6px 0" }}>{t.or}</div>
+          <div style={{ textAlign: "center", fontSize: typography.size.xs, color: colors.textDim, margin: "6px 0" }}>{t.or}</div>
 
           <input ref={sampleInputRef} type="file" accept=".wav,.mp3,.ogg,.flac" style={{ display: "none" }}
             onChange={(e) => setSampleFile(e.target.files?.[0] ?? null)}
@@ -159,7 +160,7 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
             background: sampleFile ? colors.primarySoft : colors.surfaceAlt,
             border: sampleFile ? `1px solid ${colors.primaryBorder}` : `1px solid ${colors.border}`,
             color: sampleFile ? colors.primaryLight : colors.textMuted,
-            cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: fonts.sans,
+            cursor: "pointer", fontSize: typography.size.sm, fontWeight: 600, fontFamily: fonts.sans,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
           }}>
             <Icons.Upload />
@@ -169,7 +170,7 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
 
         {/* Target language */}
         <div>
-          <label style={{ fontSize: 11, color: colors.textDim, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 8, display: "block" }}>
+          <label style={{ fontSize: typography.size.xs, color: colors.textDim, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 8, display: "block" }}>
             {t.expTargetLang}
           </label>
           <div style={{ display: "flex", gap: 8 }}>
@@ -178,7 +179,7 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
               { id: "en", label: "English" },
             ].map((l) => (
               <button key={l.id} onClick={() => setLanguage(l.id)} style={{
-                flex: 1, padding: "8px 0", borderRadius: radii.sm, fontSize: 12, fontWeight: 600,
+                flex: 1, padding: "8px 0", borderRadius: radii.sm, fontSize: typography.size.sm, fontWeight: 600,
                 background: language === l.id ? "#f59e0b" : colors.surfaceAlt,
                 color: language === l.id ? "#fff" : colors.textDim,
                 border: "none", cursor: "pointer", fontFamily: fonts.sans,
@@ -188,22 +189,17 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
         </div>
 
         {/* Generate */}
-        <button
-          onClick={() => void handleGenerate()}
+        <Button
+          variant="warning"
+          size="lg"
+          icon={<Icons.Waveform />}
+          loading={isGenerating}
           disabled={!canGenerate}
-          style={{
-            width: "100%", padding: "14px 0", borderRadius: radii.lg,
-            background: canGenerate ? "linear-gradient(135deg, #f59e0b, #d97706)" : colors.textDark,
-            border: "none", color: "#fff", fontSize: 14, fontWeight: 700,
-            cursor: canGenerate ? "pointer" : "default",
-            fontFamily: fonts.sans, opacity: canGenerate ? 1 : 0.4,
-            boxShadow: canGenerate ? "0 4px 24px rgba(245,158,11,0.35)" : "none",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          }}
+          fullWidth
+          onClick={() => void handleGenerate()}
         >
-          <Icons.Waveform />
           {isGenerating ? t.expGenerating : t.expGenerate}
-        </button>
+        </Button>
       </div>
     </div>
   );

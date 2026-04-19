@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchServerLogs, fetchStats, type ServerLogEntry, type StatsResponse } from "@/api/logs";
 import { logger, type LogEntry } from "@/logging/logger";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 type ViewTab = "server" | "client" | "stats";
 type Source = "app" | "errors";
@@ -83,7 +83,7 @@ export function LogsTab() {
     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radii.xl, padding: 24, backdropFilter: "blur(12px)" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Logs</h3>
+        <h3 style={{ margin: 0, fontSize: typography.size.lg, fontWeight: 700 }}>Logs</h3>
         <div style={{ display: "flex", gap: 8 }}>
           <TabBtn active={tab === "server"} onClick={() => setTab("server")}>Server</TabBtn>
           <TabBtn active={tab === "client"} onClick={() => setTab("client")}>Client</TabBtn>
@@ -109,7 +109,7 @@ export function LogsTab() {
             onChange={(e) => setRidFilter(e.target.value)}
             placeholder="Request ID..."
             style={{
-              padding: "6px 10px", fontSize: 12, fontFamily: fonts.mono,
+              padding: "6px 10px", fontSize: typography.size.sm, fontFamily: fonts.mono,
               background: colors.surfaceAlt, color: colors.text,
               border: `1px solid ${colors.border}`, borderRadius: radii.sm,
               width: 130, outline: "none",
@@ -118,7 +118,7 @@ export function LogsTab() {
           <button onClick={() => void loadServer()} disabled={loading} style={btnStyle}>
             {loading ? "..." : "Refresh"}
           </button>
-          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: colors.textDim, cursor: "pointer", marginLeft: 4 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: typography.size.xs, color: colors.textDim, cursor: "pointer", marginLeft: 4 }}>
             <input
               type="checkbox"
               checked={autoRefresh}
@@ -136,13 +136,13 @@ export function LogsTab() {
           <button onClick={() => { logger.clear(); setClientEntries([]); }} style={btnStyle}>
             Clear
           </button>
-          <span style={{ fontSize: 11, color: colors.textDim }}>
+          <span style={{ fontSize: typography.size.xs, color: colors.textDim }}>
             {clientEntries.length} entries (persisted in session)
           </span>
         </div>
       )}
 
-      {error && <p style={{ color: "#f87171", fontSize: 12, margin: "8px 0" }}>Error: {error}</p>}
+      {error && <p style={{ color: "#f87171", fontSize: typography.size.sm, margin: "8px 0" }}>Error: {error}</p>}
 
       {/* Stats view */}
       {tab === "stats" && stats && (
@@ -152,7 +152,7 @@ export function LogsTab() {
       {/* Log entries */}
       {tab !== "stats" && (
         <pre style={{
-          fontFamily: fonts.mono, fontSize: 11, lineHeight: 1.5,
+          fontFamily: fonts.mono, fontSize: typography.size.xs, lineHeight: 1.5,
           background: colors.surfaceAlt, padding: 12, borderRadius: radii.md,
           maxHeight: 600, overflow: "auto", margin: 0,
           whiteSpace: "pre-wrap", wordBreak: "break-word",
@@ -215,7 +215,7 @@ function StatsView({ stats, onRefresh }: { stats: StatsResponse; onRefresh: () =
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <span style={{ fontSize: 12, color: colors.textDim }}>Last {stats.period_hours}h</span>
+        <span style={{ fontSize: typography.size.sm, color: colors.textDim }}>Last {stats.period_hours}h</span>
         <button onClick={onRefresh} style={btnStyle}>Refresh</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
@@ -225,19 +225,19 @@ function StatsView({ stats, onRefresh }: { stats: StatsResponse; onRefresh: () =
         <StatCard label="Avg latency" value={`${stats.avg_request_ms}ms`} />
       </div>
       {stats.slowest_request_path && (
-        <div style={{ fontSize: 11, color: colors.textDim, marginBottom: 12 }}>
+        <div style={{ fontSize: typography.size.xs, color: colors.textDim, marginBottom: 12 }}>
           Slowest: <span style={{ color: colors.text }}>{stats.slowest_request_path}</span>{" "}
           ({stats.slowest_request_ms}ms)
         </div>
       )}
       {Object.keys(stats.top_endpoints).length > 0 && (
         <div style={{ marginBottom: 12 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: colors.textDim, textTransform: "uppercase", letterSpacing: "1px" }}>
+          <span style={{ fontSize: typography.size.xs, fontWeight: 600, color: colors.textDim, textTransform: "uppercase", letterSpacing: "1px" }}>
             Top endpoints
           </span>
           <div style={{ marginTop: 6 }}>
             {Object.entries(stats.top_endpoints).map(([path, count]) => (
-              <div key={path} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: colors.textDim, padding: "2px 0" }}>
+              <div key={path} style={{ display: "flex", justifyContent: "space-between", fontSize: typography.size.xs, color: colors.textDim, padding: "2px 0" }}>
                 <span style={{ fontFamily: fonts.mono }}>{path}</span>
                 <span>{count}</span>
               </div>
@@ -247,12 +247,12 @@ function StatsView({ stats, onRefresh }: { stats: StatsResponse; onRefresh: () =
       )}
       {Object.keys(stats.engines_used).length > 0 && (
         <div>
-          <span style={{ fontSize: 11, fontWeight: 600, color: colors.textDim, textTransform: "uppercase", letterSpacing: "1px" }}>
+          <span style={{ fontSize: typography.size.xs, fontWeight: 600, color: colors.textDim, textTransform: "uppercase", letterSpacing: "1px" }}>
             Engines
           </span>
           <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
             {Object.entries(stats.engines_used).map(([engine, count]) => (
-              <span key={engine} style={{ fontSize: 11, color: colors.text, fontFamily: fonts.mono }}>
+              <span key={engine} style={{ fontSize: typography.size.xs, color: colors.text, fontFamily: fonts.mono }}>
                 {engine}: {count}
               </span>
             ))}
@@ -269,10 +269,10 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
       background: colors.surfaceAlt, borderRadius: radii.md, padding: 14,
       border: `1px solid ${colors.borderFaint}`,
     }}>
-      <div style={{ fontSize: 20, fontWeight: 700, fontFamily: fonts.mono, color: color ?? colors.text }}>
+      <div style={{ fontSize: typography.size.xl, fontWeight: 700, fontFamily: fonts.mono, color: color ?? colors.text }}>
         {value}
       </div>
-      <div style={{ fontSize: 10, color: colors.textDim, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginTop: 4 }}>
+      <div style={{ fontSize: typography.size.xs, color: colors.textDim, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginTop: 4 }}>
         {label}
       </div>
     </div>
@@ -280,7 +280,7 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
 }
 
 const btnStyle: React.CSSProperties = {
-  padding: "6px 14px", fontSize: 12, fontWeight: 600,
+  padding: "6px 14px", fontSize: typography.size.sm, fontWeight: 600,
   background: colors.primary, color: "#fff", border: "none",
   borderRadius: radii.sm, cursor: "pointer", fontFamily: fonts.sans,
 };
@@ -288,7 +288,7 @@ const btnStyle: React.CSSProperties = {
 function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button onClick={onClick} style={{
-      padding: "6px 14px", fontSize: 12, fontWeight: 600,
+      padding: "6px 14px", fontSize: typography.size.sm, fontWeight: 600,
       background: active ? colors.primary : colors.surfaceAlt,
       color: active ? "#fff" : colors.textDim, border: "none",
       borderRadius: radii.sm, cursor: "pointer", fontFamily: fonts.sans,
@@ -300,7 +300,7 @@ interface SelectProps { value: string; onChange: (v: string) => void; options: r
 function Select({ value, onChange, options }: SelectProps) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} style={{
-      padding: "6px 10px", fontSize: 12, fontFamily: fonts.sans,
+      padding: "6px 10px", fontSize: typography.size.sm, fontFamily: fonts.sans,
       background: colors.surfaceAlt, color: colors.text,
       border: `1px solid ${colors.border}`, borderRadius: radii.sm, cursor: "pointer",
     }}>

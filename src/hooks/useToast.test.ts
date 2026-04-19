@@ -4,44 +4,64 @@ import { describe, expect, it, vi } from "vitest";
 import { useToast } from "./useToast";
 
 describe("useToast", () => {
-  it("starts invisible", () => {
+  it("starts with an empty stack", () => {
     const { result } = renderHook(() => useToast());
-    expect(result.current.visible).toBe(false);
-    expect(result.current.message).toBe("");
+    expect(result.current.toasts).toEqual([]);
   });
 
-  it("shows message and hides after timeout", () => {
+  it("adds a toast and removes it after the auto-dismiss timeout", () => {
     vi.useFakeTimers();
-    const { result } = renderHook(() => useToast(1000));
+    const { result } = renderHook(() => useToast());
 
     act(() => result.current.show("Hello"));
-    expect(result.current.visible).toBe(true);
-    expect(result.current.message).toBe("Hello");
+    expect(result.current.toasts).toHaveLength(1);
+    expect(result.current.toasts[0]?.message).toBe("Hello");
 
-    act(() => vi.advanceTimersByTime(1000));
-    expect(result.current.visible).toBe(false);
+    // Default duration is 4000ms (info type)
+    act(() => vi.advanceTimersByTime(4000));
+    expect(result.current.toasts).toHaveLength(0);
 
     vi.useRealTimers();
   });
 
-  it("replaces message if shown again before timeout", () => {
-    vi.useFakeTimers();
-    const { result } = renderHook(() => useToast(2000));
+  it("stacks multiple toasts simultaneously", () => {
+    const { result } = renderHook(() => useToast());
 
     act(() => result.current.show("First"));
-    act(() => vi.advanceTimersByTime(500));
     act(() => result.current.show("Second"));
 
-    expect(result.current.message).toBe("Second");
-    expect(result.current.visible).toBe(true);
+    expect(result.current.toasts).toHaveLength(2);
+    expect(result.current.toasts[0]?.message).toBe("First");
+    expect(result.current.toasts[1]?.message).toBe("Second");
+  });
 
-    // First timer was cleared, only second counts
-    act(() => vi.advanceTimersByTime(1500));
-    expect(result.current.visible).toBe(true); // still within 2s of "Second"
+  it("dismiss removes the matching toast immediately", () => {
+    const { result } = renderHook(() => useToast());
 
-    act(() => vi.advanceTimersByTime(500));
-    expect(result.current.visible).toBe(false);
+    act(() => result.current.show("First"));
+    act(() => result.current.show("Second"));
+    const firstId = result.current.toasts[0]?.id ?? "";
 
-    vi.useRealTimers();
+    act(() => result.current.dismiss(firstId));
+    expect(result.current.toasts).toHaveLength(1);
+    expect(result.current.toasts[0]?.message).toBe("Second");
+  });
+
+  it("auto-detects error type from message prefix", () => {
+    const { result } = renderHook(() => useToast());
+    act(() => result.current.show("Error: something failed"));
+    expect(result.current.toasts[0]?.type).toBe("error");
+  });
+
+  it("auto-detects success type from message keywords", () => {
+    const { result } = renderHook(() => useToast());
+    act(() => result.current.show("Profile saved"));
+    expect(result.current.toasts[0]?.type).toBe("success");
+  });
+
+  it("respects an explicit type override", () => {
+    const { result } = renderHook(() => useToast());
+    act(() => result.current.show("Heads up", "warning"));
+    expect(result.current.toasts[0]?.type).toBe("warning");
   });
 });

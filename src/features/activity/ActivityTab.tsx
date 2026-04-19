@@ -6,9 +6,10 @@ import {
   type GenerationActivity,
   type RecentError,
 } from "@/api/activity";
+import { Skeleton } from "@/components/Skeleton";
 import { LogsTab } from "./LogsTab";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, space, typography } from "@/theme/tokens";
 
 import { SettingsSection } from "./SettingsSection";
 
@@ -33,10 +34,29 @@ export function ActivityTab({ t, onToast }: ActivityTabProps) {
   useEffect(() => { void load(); }, []);
 
   if (loading && !data) {
-    return <Section><p style={{ color: colors.textDim, fontSize: 13 }}>Loading...</p></Section>;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: space[5] }}>
+        <Section>
+          <SectionTitle>{t.activityRecentGens}</SectionTitle>
+          <div style={{ display: "flex", flexDirection: "column", gap: space[2], marginTop: space[3] }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} height={48} radius={6} />
+            ))}
+          </div>
+        </Section>
+        <Section>
+          <SectionTitle>{t.activityStorage}</SectionTitle>
+          <div className="vf-grid-4" style={{ marginTop: space[3] }}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} height={64} radius={8} />
+            ))}
+          </div>
+        </Section>
+      </div>
+    );
   }
   if (!data) {
-    return <Section><p style={{ color: colors.textDim, fontSize: 13 }}>Could not load activity</p></Section>;
+    return <Section><p style={{ color: colors.textDim, fontSize: typography.size.sm }}>{t.activityCouldNotLoad}</p></Section>;
   }
 
   return (
@@ -44,7 +64,7 @@ export function ActivityTab({ t, onToast }: ActivityTabProps) {
       {/* Errors (only if any) */}
       {data.errors.length > 0 && (
         <Section>
-          <SectionTitle>Recent issues</SectionTitle>
+          <SectionTitle>{t.activityRecentIssues}</SectionTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {data.errors.map((err, i) => (
               <ErrorRow key={i} error={err} />
@@ -56,12 +76,12 @@ export function ActivityTab({ t, onToast }: ActivityTabProps) {
       {/* Recent generations */}
       <Section>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <SectionTitle>Recent generations</SectionTitle>
-          <button onClick={() => void load()} style={refreshBtn}>Refresh</button>
+          <SectionTitle>{t.activityRecentGens}</SectionTitle>
+          <button onClick={() => void load()} style={refreshBtn}>{t.refresh}</button>
         </div>
         {data.generations.length === 0 ? (
-          <p style={{ color: colors.textDim, fontSize: 13, textAlign: "center", padding: 20 }}>
-            No generations yet. Synthesize a chapter from the Workbench or use the Synthesize tab.
+          <p style={{ color: colors.textDim, fontSize: typography.size.sm, textAlign: "center", padding: 20 }}>
+            {t.activityNoGens}
           </p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -74,12 +94,12 @@ export function ActivityTab({ t, onToast }: ActivityTabProps) {
 
       {/* Disk usage */}
       <Section>
-        <SectionTitle>Storage</SectionTitle>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 8 }}>
-          <DiskCard label="Generated audio" value={data.disk.output} />
-          <DiskCard label="Voice samples" value={data.disk.voices} />
-          <DiskCard label="Logs" value={data.disk.logs} />
-          <DiskCard label="Total" value={data.disk.total} highlight />
+        <SectionTitle>{t.activityStorage}</SectionTitle>
+        <div className="vf-grid-4" style={{ marginTop: 8 }}>
+          <DiskCard label={t.activityGeneratedAudio} value={data.disk.output} />
+          <DiskCard label={t.activityVoiceSamples} value={data.disk.voices} />
+          <DiskCard label={t.activityLogs} value={data.disk.logs} />
+          <DiskCard label={t.activityTotal} value={data.disk.total} highlight />
         </div>
       </Section>
 
@@ -91,12 +111,12 @@ export function ActivityTab({ t, onToast }: ActivityTabProps) {
         <button
           onClick={() => setDevMode((v) => !v)}
           style={{
-            background: "none", border: "none", fontSize: 10,
+            background: "none", border: "none", fontSize: typography.size.xs,
             color: colors.textFaint, cursor: "pointer", fontFamily: fonts.mono,
             padding: "4px 8px",
           }}
         >
-          {devMode ? "Hide developer logs" : "Developer logs"}
+          {devMode ? t.activityHideLogs : t.activityShowLogs}
         </button>
       </div>
       {devMode && <LogsTab />}
@@ -131,11 +151,11 @@ function GenerationRow({ gen }: { gen: GenerationActivity }) {
 
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: colors.text }}>
+        <div style={{ fontSize: typography.size.sm, fontWeight: 500, color: colors.text }}>
           {gen.project_name}
           <span style={{ color: colors.textDim, fontWeight: 400 }}> / {gen.chapter_title}</span>
         </div>
-        <div style={{ fontSize: 11, color: colors.textDim, marginTop: 2 }}>
+        <div style={{ fontSize: typography.size.xs, color: colors.textDim, marginTop: 2 }}>
           {date}
           {gen.duration > 0 && <span> · {gen.duration.toFixed(1)}s audio</span>}
           {gen.chunks_total > 0 && <span> · {gen.chunks_done}/{gen.chunks_total} chunks</span>}
@@ -154,7 +174,7 @@ function GenerationRow({ gen }: { gen: GenerationActivity }) {
 
       {/* Status label */}
       <span style={{
-        fontSize: 10, fontWeight: 600, color: statusColor,
+        fontSize: typography.size.xs, fontWeight: 600, color: statusColor,
         textTransform: "uppercase", fontFamily: fonts.mono,
         minWidth: 50, textAlign: "right",
       }}>
@@ -178,8 +198,8 @@ function ErrorRow({ error }: { error: RecentError }) {
         background: "#f87171", flexShrink: 0, marginTop: 5,
       }} />
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, color: colors.text }}>{error.message}</div>
-        <div style={{ fontSize: 10, color: colors.textDim, marginTop: 2 }}>
+        <div style={{ fontSize: typography.size.sm, color: colors.text }}>{error.message}</div>
+        <div style={{ fontSize: typography.size.xs, color: colors.textDim, marginTop: 2 }}>
           {error.timestamp}
         </div>
       </div>
@@ -200,7 +220,7 @@ function DiskCard({ label, value, highlight }: { label: string; value: string; h
         {value}
       </div>
       <div style={{
-        fontSize: 10, color: colors.textDim, fontWeight: 600,
+        fontSize: typography.size.xs, color: colors.textDim, fontWeight: 600,
         textTransform: "uppercase", letterSpacing: "1px", marginTop: 4,
       }}>
         {label}
@@ -223,7 +243,7 @@ function Section({ children }: { children: React.ReactNode }) {
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <h3 style={{
-      margin: 0, fontSize: 14, fontWeight: 700,
+      margin: 0, fontSize: typography.size.base, fontWeight: 700,
       color: colors.text, fontFamily: fonts.sans,
     }}>
       {children}
@@ -232,7 +252,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 const refreshBtn: React.CSSProperties = {
-  padding: "5px 12px", fontSize: 11, fontWeight: 600,
+  padding: "5px 12px", fontSize: typography.size.xs, fontWeight: 600,
   background: colors.surfaceAlt, color: colors.textDim,
   border: `1px solid ${colors.border}`, borderRadius: radii.sm,
   cursor: "pointer", fontFamily: fonts.sans,

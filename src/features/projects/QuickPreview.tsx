@@ -6,12 +6,15 @@
 import { useState } from "react";
 
 import { synthesize } from "@/api/synthesis";
+import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
-import { colors, fonts, radii } from "@/theme/tokens";
+import type { Translations } from "@/i18n";
+import { colors, radii, typography } from "@/theme/tokens";
 
 interface Props {
+  t: Translations;
   chapterText: string;
   voiceId: string;
   profileId: string | null;
@@ -25,7 +28,7 @@ interface Props {
 const PREVIEW_CHARS = 300;
 
 export function QuickPreview({
-  chapterText, voiceId, profileId, speed, pitch, volume, outputFormat, onToast,
+  t, chapterText, voiceId, profileId, speed, pitch, volume, outputFormat, onToast,
 }: Props) {
   const [generating, setGenerating] = useState(false);
   const player = useAudioPlayer();
@@ -36,7 +39,7 @@ export function QuickPreview({
 
   const handlePreview = async (): Promise<void> => {
     if (!snippet) {
-      onToast("Chapter has no text to preview");
+      onToast(t.previewNoText);
       return;
     }
     setGenerating(true);
@@ -51,9 +54,9 @@ export function QuickPreview({
         profileId: profileId ?? undefined,
       });
       player.load(result.blob, result.duration);
-      onToast(`Preview ready (${result.duration.toFixed(1)}s)`);
+      onToast(t.previewReady.replace("{dur}", result.duration.toFixed(1)));
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setGenerating(false);
     }
@@ -78,36 +81,21 @@ export function QuickPreview({
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
-          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>Quick Preview</h4>
-          <p style={{ margin: "2px 0 0", fontSize: 11, color: colors.textDim }}>
-            First {Math.min(PREVIEW_CHARS, chapterText.length)} chars · no chunking · fast audition
+          <h4 style={{ margin: 0, fontSize: typography.size.sm, fontWeight: 700 }}>{t.previewTitle}</h4>
+          <p style={{ margin: "2px 0 0", fontSize: typography.size.xs, color: colors.textDim }}>
+            {t.previewDescription.replace("{n}", String(Math.min(PREVIEW_CHARS, chapterText.length)))}
           </p>
         </div>
-        <button
+        <Button
+          variant="primary"
+          size="sm"
+          icon={<Icons.Waveform />}
+          loading={generating}
+          disabled={snippet.length === 0}
           onClick={() => void handlePreview()}
-          disabled={generating || snippet.length === 0}
-          style={{
-            padding: "8px 16px",
-            background: generating || !snippet
-              ? colors.textDark
-              : `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDim})`,
-            border: "none",
-            color: "#fff",
-            borderRadius: radii.md,
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: generating || !snippet ? "default" : "pointer",
-            fontFamily: fonts.sans,
-            opacity: generating || !snippet ? 0.5 : 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            flexShrink: 0,
-          }}
         >
-          <Icons.Waveform />
-          {generating ? "..." : "Preview"}
-        </button>
+          {generating ? t.previewLoading : t.previewButton}
+        </Button>
       </div>
 
       {player.url && (
@@ -122,9 +110,9 @@ export function QuickPreview({
           />
           <InteractivePlayer
             player={player}
-            playLabel="Play"
-            pauseLabel="Pause"
-            stopLabel="Stop"
+            playLabel={t.play}
+            pauseLabel={t.pause}
+            stopLabel={t.stop}
           />
         </div>
       )}

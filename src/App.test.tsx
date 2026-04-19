@@ -31,8 +31,8 @@ describe("App — navigation", () => {
   it("renders header and Workbench tab by default", () => {
     renderApp();
     expect(screen.getByText("VoxForge")).toBeInTheDocument();
-    // Workbench is now the default — sidebar "+ New Project" button is visible
-    expect(screen.getByText("+ New Project")).toBeInTheDocument();
+    // Workbench is the default — sidebar "+ Nuevo proyecto" button is visible (Spanish)
+    expect(screen.getByText("+ Nuevo proyecto")).toBeInTheDocument();
   });
 
   it("navigates to Quick Synth and shows the textarea", async () => {

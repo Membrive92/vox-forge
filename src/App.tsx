@@ -7,6 +7,7 @@ import { ActivityTab } from "@/features/activity/ActivityTab";
 import { AudioToolsTab } from "@/features/audio-tools/AudioToolsTab";
 import { WorkbenchTab } from "@/features/projects/WorkbenchTab";
 import { QuickSynthTab } from "@/features/quick-synth/QuickSynthTab";
+import { StudioTab } from "@/features/studio/StudioTab";
 import { VoicesUnifiedTab } from "@/features/voices-unified/VoicesUnifiedTab";
 import { useErrorBadge } from "@/hooks/useErrorBadge";
 import type { ProfileDraft, SynthSettings } from "@/features/state";
@@ -16,10 +17,10 @@ import { useToast } from "@/hooks/useToast";
 import { useSamplePlayer } from "@/hooks/useSamplePlayer";
 import { useVoicePreview } from "@/hooks/useVoicePreview";
 import { getTranslations } from "@/i18n";
-import { colors, fonts, fontsHref } from "@/theme/tokens";
+import { colors, fonts, fontsHref, typography } from "@/theme/tokens";
 import type { AudioFormat, Language, Profile, UploadedSample } from "@/types/domain";
 
-type Tab = "quick-synth" | "workbench" | "voices" | "audio-tools" | "activity";
+type Tab = "quick-synth" | "workbench" | "voices" | "audio-tools" | "studio" | "activity";
 
 export default function App() {
   const [lang, setLang] = useState<Language>("es");
@@ -95,7 +96,7 @@ export default function App() {
       setUploadedFile(null);
       toast.show(t.profileSaved);
     } catch (e) {
-      toast.show(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.show(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     }
   };
 
@@ -123,7 +124,7 @@ export default function App() {
     try {
       await remove(id);
     } catch (e) {
-      toast.show(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.show(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     }
   };
 
@@ -141,16 +142,16 @@ export default function App() {
       <link href={fontsHref} rel="stylesheet" />
 
       <BackgroundTexture />
-      <Toast message={toast.message} visible={toast.visible} />
+      <Toast toasts={toast.toasts} onDismiss={toast.dismiss} />
 
       <Header t={t} lang={lang} onToggleLang={handleToggleLang} />
       <TabsNav t={t} tab={tab} setTab={setTab} errorCount={errorBadge} />
 
-      <main style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
+      <main className="vf-main-narrow" style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
         {tab === "quick-synth" && (
           <QuickSynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} />
         )}
-        {tab === "workbench" && <WorkbenchTab onToast={toast.show} />}
+        {tab === "workbench" && <WorkbenchTab t={t} onToast={toast.show} />}
         {tab === "voices" && (
           <VoicesUnifiedTab
             t={t}
@@ -171,6 +172,7 @@ export default function App() {
         {tab === "audio-tools" && (
           <AudioToolsTab t={t} profiles={profiles} onToast={toast.show} />
         )}
+        {tab === "studio" && <StudioTab t={t} onToast={toast.show} />}
         {tab === "activity" && <ActivityTab t={t} onToast={toast.show} />}
       </main>
     </div>
@@ -245,7 +247,7 @@ function Header({ t, lang, onToggleLang }: HeaderProps) {
           <h1
             style={{
               margin: 0,
-              fontSize: 20,
+              fontSize: typography.size.xl,
               fontWeight: 800,
               letterSpacing: "-0.5px",
               fontFamily: fonts.serif,
@@ -259,7 +261,7 @@ function Header({ t, lang, onToggleLang }: HeaderProps) {
           <p
             style={{
               margin: 0,
-              fontSize: 10,
+              fontSize: typography.size.xs,
               color: colors.textDim,
               letterSpacing: "2px",
               textTransform: "uppercase",
@@ -284,7 +286,7 @@ function Header({ t, lang, onToggleLang }: HeaderProps) {
           padding: "8px 14px",
           color: colors.text,
           cursor: "pointer",
-          fontSize: 13,
+          fontSize: typography.size.sm,
           fontWeight: 500,
           fontFamily: fonts.sans,
           transition: "all 0.2s",
@@ -307,14 +309,16 @@ interface TabsNavProps {
 
 function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
   const tabs: readonly { id: Tab; icon: JSX.Element; label: string }[] = [
-    { id: "workbench", icon: <Icons.Settings />, label: t.tabWorkbench },
-    { id: "quick-synth", icon: <Icons.Waveform />, label: t.tabQuickSynth },
-    { id: "voices", icon: <Icons.User />, label: t.tabVoices },
-    { id: "audio-tools", icon: <Icons.Mic />, label: t.tabAudioTools },
-    { id: "activity", icon: <Icons.Settings />, label: errorCount > 0 ? `${t.tabActivity} (${errorCount})` : t.tabActivity },
+    { id: "workbench", icon: <Icons.Book />, label: t.tabWorkbench },
+    { id: "quick-synth", icon: <Icons.Zap />, label: t.tabQuickSynth },
+    { id: "voices", icon: <Icons.Mic2 />, label: t.tabVoices },
+    { id: "audio-tools", icon: <Icons.SlidersIcon />, label: t.tabAudioTools },
+    { id: "studio", icon: <Icons.Scissors />, label: t.tabStudio },
+    { id: "activity", icon: <Icons.Clock />, label: errorCount > 0 ? `${t.tabActivity} (${errorCount})` : t.tabActivity },
   ];
   return (
     <nav
+      className="vf-tabs-nav"
       style={{
         position: "relative",
         zIndex: 10,
@@ -330,12 +334,13 @@ function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
           <button
             key={tb.id}
             onClick={() => setTab(tb.id)}
+            aria-current={active ? "page" : undefined}
             style={{
               display: "flex",
               alignItems: "center",
               gap: 6,
               padding: "14px 20px",
-              fontSize: 13,
+              fontSize: typography.size.sm,
               fontWeight: 600,
               background: "none",
               border: "none",
@@ -346,7 +351,8 @@ function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
               transition: "all 0.2s",
             }}
           >
-            {tb.icon} {tb.label}
+            {tb.icon}
+            <span className="vf-tab-label">{tb.label}</span>
           </button>
         );
       })}

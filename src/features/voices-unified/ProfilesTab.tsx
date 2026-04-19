@@ -1,9 +1,11 @@
+import { Button } from "@/components/Button";
+import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
 import { ALL_VOICES } from "@/constants/voices";
 import type { SamplePlayerState } from "@/hooks/useSamplePlayer";
 import type { VoicePreviewState } from "@/hooks/useVoicePreview";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
 
 interface ProfilesTabProps {
@@ -29,31 +31,15 @@ export function ProfilesTab({ t, profiles, onUse, onEdit, onDelete, onNew, sampl
         }}
       >
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{t.savedProfiles}</h3>
-        <button
-          onClick={onNew}
-          style={{
-            padding: "8px 16px",
-            borderRadius: radii.md,
-            fontSize: 12,
-            fontWeight: 600,
-            background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDim})`,
-            border: "none",
-            color: "#fff",
-            cursor: "pointer",
-            fontFamily: fonts.sans,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
+        <Button variant="primary" size="sm" onClick={onNew}>
           + {t.newProfile}
-        </button>
+        </Button>
       </div>
 
       {profiles.length === 0 ? (
         <EmptyState t={t} />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div className="vf-grid-2col">
           {profiles.map((p) => (
             <ProfileCard
               key={p.id}
@@ -86,10 +72,10 @@ function EmptyState({ t }: { t: Translations }) {
       <div style={{ color: colors.textGhost, marginBottom: 12 }}>
         <Icons.Mic />
       </div>
-      <p style={{ margin: 0, fontSize: 15, color: colors.textDim, fontWeight: 500 }}>
+      <p style={{ margin: 0, fontSize: typography.size.base, color: colors.textDim, fontWeight: 500 }}>
         {t.noProfiles}
       </p>
-      <p style={{ margin: "8px 0 0", fontSize: 12, color: colors.textFaint }}>
+      <p style={{ margin: "8px 0 0", fontSize: typography.size.sm, color: colors.textFaint }}>
         {t.noProfilesHint}
       </p>
     </div>
@@ -133,8 +119,8 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, samplePlayer, voiceP
         }}
       >
         <div>
-          <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{profile.name}</h4>
-          <p style={{ margin: "4px 0 0", fontSize: 11, color: colors.textDim }}>
+          <h4 style={{ margin: 0, fontSize: typography.size.base, fontWeight: 700 }}>{profile.name}</h4>
+          <p style={{ margin: "4px 0 0", fontSize: typography.size.xs, color: colors.textDim }}>
             {voice?.name ?? "—"} · {voice?.accent ?? "—"} · {profile.lang.toUpperCase()}
           </p>
         </div>
@@ -187,7 +173,7 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, samplePlayer, voiceP
             <p
               style={{
                 margin: "2px 0 0",
-                fontSize: 14,
+                fontSize: typography.size.base,
                 fontWeight: 700,
                 fontFamily: fonts.mono,
                 color: colors.text,
@@ -237,10 +223,10 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, samplePlayer, voiceP
               : <Icons.Play />}
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <p style={{ margin: 0, fontSize: typography.size.xs, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {profile.sampleName}
             </p>
-            <p style={{ margin: 0, fontSize: 10, color: colors.textDim }}>
+            <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim }}>
               {profile.sampleDuration}s
             </p>
           </div>
@@ -261,7 +247,7 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, samplePlayer, voiceP
           border: `1px solid ${colors.borderFaint}`,
           color: colors.textMuted,
           cursor: "pointer",
-          fontSize: 11,
+          fontSize: typography.size.xs,
           fontWeight: 500,
           fontFamily: fonts.sans,
           display: "flex",
@@ -275,60 +261,18 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, samplePlayer, voiceP
         {voicePreview.previewingId === profile.voiceId ? t.stop : t.previewVoice} {voice?.name ?? ""}
       </button>
 
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={onUse}
-          style={{
-            flex: 1,
-            padding: "10px 0",
-            borderRadius: radii.md,
-            fontSize: 12,
-            fontWeight: 600,
-            background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDim})`,
-            border: "none",
-            color: "#fff",
-            cursor: "pointer",
-            fontFamily: fonts.sans,
-          }}
-        >
-          {t.useProfile}
-        </button>
-        <button
-          onClick={onEdit}
-          aria-label={t.editProfile}
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: radii.md,
-            background: colors.surfaceAlt,
-            border: `1px solid ${colors.border}`,
-            color: colors.textMuted,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ flex: 1 }}>
+          <Button variant="primary" size="sm" fullWidth onClick={onUse}>
+            {t.useProfile}
+          </Button>
+        </div>
+        <IconButton aria-label={t.editProfile} variant="secondary" size="md" onClick={onEdit}>
           <Icons.Edit />
-        </button>
-        <button
-          onClick={onDelete}
-          aria-label={t.deleteProfile}
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: radii.md,
-            background: colors.dangerSoft,
-            border: `1px solid ${colors.dangerBorder}`,
-            color: colors.danger,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+        </IconButton>
+        <IconButton aria-label={t.deleteProfile} variant="danger" size="md" onClick={onDelete}>
           <Icons.Trash />
-        </button>
+        </IconButton>
       </div>
     </div>
   );

@@ -101,3 +101,64 @@ export const Volume = () => (
     <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" />
   </svg>
 );
+
+// ─── Tab icons (Phase 4 — one unique per nav tab) ────────────────────
+
+/** Book — Workbench (default tab, project authoring). */
+export const Book = () => (
+  <svg viewBox="0 0 24 24" {...base} strokeWidth="1.5" style={SIZE_MD}>
+    <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+  </svg>
+);
+
+/** Zap — Quick Synth (fast one-shot synthesis). */
+export const Zap = () => (
+  <svg viewBox="0 0 24 24" {...base} strokeWidth="1.5" style={SIZE_MD}>
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
+/** Mic2 — Voices (more mic-like than the generic Mic used for recording). */
+export const Mic2 = () => (
+  <svg viewBox="0 0 24 24" {...base} strokeWidth="1.5" style={SIZE_MD}>
+    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+    <path d="M19 10v2a7 7 0 01-14 0v-2" />
+    <line x1="12" y1="19" x2="12" y2="23" />
+    <line x1="8" y1="23" x2="16" y2="23" />
+  </svg>
+);
+
+/** Sliders — Audio Tools (DSP + voice conversion). */
+export const SlidersIcon = () => (
+  <svg viewBox="0 0 24 24" {...base} strokeWidth="1.5" style={SIZE_MD}>
+    <line x1="4" y1="21" x2="4" y2="14" />
+    <line x1="4" y1="10" x2="4" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12" y2="3" />
+    <line x1="20" y1="21" x2="20" y2="16" />
+    <line x1="20" y1="12" x2="20" y2="3" />
+    <line x1="1" y1="14" x2="7" y2="14" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="17" y1="16" x2="23" y2="16" />
+  </svg>
+);
+
+/** Clock — Activity (history + monitoring). */
+export const Clock = () => (
+  <svg viewBox="0 0 24 24" {...base} strokeWidth="1.5" style={SIZE_MD}>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
+/** Scissors — Studio editor (cut/trim). */
+export const Scissors = () => (
+  <svg viewBox="0 0 24 24" {...base} strokeWidth="1.5" style={SIZE_MD}>
+    <circle cx="6" cy="6" r="3" />
+    <circle cx="6" cy="18" r="3" />
+    <line x1="20" y1="4" x2="8.12" y2="15.88" />
+    <line x1="14.47" y1="14.48" x2="20" y2="20" />
+    <line x1="8.12" y1="8.12" x2="12" y2="12" />
+  </svg>
+);

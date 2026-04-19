@@ -1,6 +1,8 @@
+import { Button } from "@/components/Button";
+import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
 import type { AudioPlayerState } from "@/hooks/useAudioPlayer";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, typography } from "@/theme/tokens";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -37,62 +39,51 @@ export function InteractivePlayer({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <button
-          onClick={player.toggle}
-          disabled={!ready}
+        <IconButton
           aria-label={player.isPlaying ? pauseLabel : playLabel}
+          variant={player.isPlaying ? "primary" : "primary"}
+          size="lg"
+          disabled={!ready}
+          onClick={player.toggle}
           style={{
-            width: 42, height: 42, borderRadius: "50%",
-            background: ready ? (player.isPlaying ? colors.accent : colors.primary) : colors.textDark,
-            border: "none", color: "#fff",
-            cursor: ready ? "pointer" : "default",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            opacity: ready ? 1 : 0.3,
-            transition: "all 0.2s",
-            flexShrink: 0,
+            background: player.isPlaying ? colors.accent : colors.primary,
           }}
         >
           {player.isPlaying ? <Icons.Pause /> : <Icons.Play />}
-        </button>
+        </IconButton>
 
-        <button
-          onClick={() => player.skip(-10)}
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!ready}
+          onClick={() => player.skip(-10)}
           aria-label="Skip back 10 seconds"
-          style={skipBtn(ready)}
         >
           −10s
-        </button>
-        <button
-          onClick={() => player.skip(10)}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!ready}
+          onClick={() => player.skip(10)}
           aria-label="Skip forward 10 seconds"
-          style={skipBtn(ready)}
         >
           +10s
-        </button>
+        </Button>
 
-        <button
-          onClick={player.stop}
-          disabled={!player.isPlaying}
+        <IconButton
           aria-label={stopLabel}
-          style={{
-            width: 32, height: 32, borderRadius: "50%",
-            background: colors.textDark,
-            border: `1px solid ${colors.border}`,
-            color: colors.textMuted,
-            cursor: player.isPlaying ? "pointer" : "default",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            opacity: player.isPlaying ? 1 : 0.3,
-            flexShrink: 0,
-          }}
+          variant="secondary"
+          size="sm"
+          disabled={!player.isPlaying}
+          onClick={player.stop}
         >
           <Icons.Stop />
-        </button>
+        </IconButton>
 
         <span
           style={{
-            fontSize: 11,
+            fontSize: typography.size.xs,
             color: colors.textDim,
             fontFamily: fonts.mono,
             minWidth: 80,
@@ -106,25 +97,21 @@ export function InteractivePlayer({
           {PLAYBACK_RATES.map((r) => {
             const active = Math.abs(player.playbackRate - r) < 0.01;
             return (
-              <button
+              <Button
                 key={r}
-                onClick={() => player.setRate(r)}
+                variant={active ? "primary" : "ghost"}
+                size="sm"
                 disabled={!ready}
+                onClick={() => player.setRate(r)}
+                aria-label={`Playback rate ${r}x`}
                 style={{
-                  padding: "4px 8px",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  background: active ? colors.primary : colors.surfaceAlt,
-                  color: active ? "#fff" : colors.textDim,
-                  border: `1px solid ${active ? colors.primary : colors.border}`,
-                  borderRadius: radii.sm,
-                  cursor: ready ? "pointer" : "default",
                   fontFamily: fonts.mono,
-                  opacity: ready ? 1 : 0.4,
+                  minHeight: 26,
+                  padding: "4px 10px",
                 }}
               >
                 {r === 1 ? "1×" : `${r}×`}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -147,20 +134,4 @@ export function InteractivePlayer({
       />
     </div>
   );
-}
-
-function skipBtn(enabled: boolean): React.CSSProperties {
-  return {
-    padding: "6px 10px",
-    fontSize: 10,
-    fontWeight: 700,
-    background: colors.surfaceAlt,
-    color: enabled ? colors.textDim : colors.textFaint,
-    border: `1px solid ${colors.border}`,
-    borderRadius: radii.sm,
-    cursor: enabled ? "pointer" : "default",
-    fontFamily: fonts.mono,
-    opacity: enabled ? 1 : 0.4,
-    flexShrink: 0,
-  };
 }

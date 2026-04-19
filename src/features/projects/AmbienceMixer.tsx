@@ -14,18 +14,21 @@ import {
   uploadAmbience,
   type AmbienceTrack,
 } from "@/api/ambience";
+import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Slider } from "@/components/Slider";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
-import { colors, fonts, radii } from "@/theme/tokens";
+import type { Translations } from "@/i18n";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 interface Props {
+  t: Translations;
   chapterId: string;
   onToast: (msg: string) => void;
 }
 
-export function AmbienceMixer({ chapterId, onToast }: Props) {
+export function AmbienceMixer({ t, chapterId, onToast }: Props) {
   const [tracks, setTracks] = useState<AmbienceTrack[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [volumeDb, setVolumeDb] = useState(-15);
@@ -55,7 +58,7 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
       await loadTracks();
       onToast("Ambient track uploaded");
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setUploading(false);
     }
@@ -68,7 +71,7 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
       if (selectedId === id) setSelectedId(null);
       await loadTracks();
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     }
   };
 
@@ -97,7 +100,7 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
       mixPlayer.load(result.blob, result.duration);
       onToast(`Mixed audio ready (${result.duration.toFixed(1)}s)`);
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setMixing(false);
     }
@@ -118,8 +121,8 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
       background: colors.surface, border: `1px solid ${colors.border}`,
       borderRadius: radii.xl, padding: 20,
     }}>
-      <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700 }}>
-        Ambient Mixer
+      <h4 style={{ margin: "0 0 12px", fontSize: typography.size.base, fontWeight: 700 }}>
+        {t.ambientMixerTitle}
       </h4>
 
       {/* Hidden audio element for preview */}
@@ -144,7 +147,7 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           style={{
-            padding: "8px 14px", fontSize: 12, fontWeight: 600,
+            padding: "8px 14px", fontSize: typography.size.sm, fontWeight: 600,
             background: colors.surfaceAlt, color: colors.textDim,
             border: `1px dashed ${colors.border}`, borderRadius: radii.md,
             cursor: uploading ? "default" : "pointer", fontFamily: fonts.sans,
@@ -153,23 +156,23 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
           }}
         >
           <Icons.Upload />
-          {uploading ? "Uploading..." : "Upload ambient track"}
+          {uploading ? t.ambientUploading : t.ambientUpload}
         </button>
       </div>
 
       {/* Track list */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto", marginBottom: 14 }}>
         {tracks.length === 0 ? (
-          <p style={{ fontSize: 12, color: colors.textDim, textAlign: "center", padding: 12 }}>
-            No ambient tracks. Upload a sound (forest, rain, tavern, etc.)
+          <p style={{ fontSize: typography.size.sm, color: colors.textDim, textAlign: "center", padding: 12 }}>
+            {t.ambientEmpty}
           </p>
         ) : (
-          tracks.map((t) => {
-            const active = selectedId === t.id;
+          tracks.map((track) => {
+            const active = selectedId === track.id;
             return (
               <div
-                key={t.id}
-                onClick={() => setSelectedId(t.id)}
+                key={track.id}
+                onClick={() => setSelectedId(track.id)}
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "8px 12px", borderRadius: radii.sm, cursor: "pointer",
@@ -178,32 +181,32 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
                 }}
               >
                 <button
-                  onClick={(e) => { e.stopPropagation(); handlePreview(t); }}
-                  aria-label={`Preview ${t.name}`}
+                  onClick={(e) => { e.stopPropagation(); handlePreview(track); }}
+                  aria-label={`${t.play} ${track.name}`}
                   style={{
                     width: 26, height: 26, borderRadius: "50%",
                     background: colors.surfaceAlt, border: `1px solid ${colors.border}`,
                     color: colors.textDim, cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 10, flexShrink: 0,
+                    fontSize: typography.size.xs, flexShrink: 0,
                   }}
                 >
                   <Icons.Play />
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: colors.text }}>{t.name}</div>
-                  <div style={{ fontSize: 10, color: colors.textDim, fontFamily: fonts.mono }}>
-                    {t.duration_s.toFixed(1)}s
-                    {t.tags.length > 0 && ` · ${t.tags.join(", ")}`}
+                  <div style={{ fontSize: typography.size.sm, fontWeight: 500, color: colors.text }}>{track.name}</div>
+                  <div style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono }}>
+                    {track.duration_s.toFixed(1)}s
+                    {track.tags.length > 0 && ` · ${track.tags.join(", ")}`}
                   </div>
                 </div>
                 {active && <Icons.Check />}
                 <button
-                  onClick={(e) => { e.stopPropagation(); void handleDelete(t.id); }}
-                  aria-label={`Delete ${t.name}`}
+                  onClick={(e) => { e.stopPropagation(); void handleDelete(track.id); }}
+                  aria-label={`${t.deleteProfile} ${track.name}`}
                   style={{
                     background: "none", border: "none", color: colors.textFaint,
-                    cursor: "pointer", fontSize: 14, padding: "0 4px",
+                    cursor: "pointer", fontSize: typography.size.base, padding: "0 4px",
                   }}
                 >
                   x
@@ -218,51 +221,47 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
       {selectedId && (
         <div style={{ borderTop: `1px solid ${colors.borderFaint}`, paddingTop: 12, marginBottom: 12 }}>
           <Slider
-            label="Ambient volume"
+            label={t.volume}
             value={volumeDb}
             onChange={setVolumeDb}
             min={-40}
             max={0}
             step={1}
             unit="dB"
-            info="How loud the ambient track is relative to the narration. -15dB is subtle, -5dB is prominent."
+            info={t.ambientLevelInfo}
           />
           <Slider
-            label="Fade in"
+            label={t.studioOpFadeIn}
             value={fadeIn}
             onChange={setFadeIn}
             min={0}
             max={15}
             step={0.5}
             unit="s"
-            info="Seconds for the ambient to fade in at the start of the chapter."
+            info={t.ambientFadeInInfo}
           />
           <Slider
-            label="Fade out"
+            label={t.studioOpFadeOut}
             value={fadeOut}
             onChange={setFadeOut}
             min={0}
             max={15}
             step={0.5}
             unit="s"
-            info="Seconds for the ambient to fade out at the end of the chapter."
+            info={t.ambientFadeOutInfo}
           />
 
-          <button
-            onClick={() => void handleMix()}
-            disabled={mixing}
-            style={{
-              width: "100%", padding: "12px 0", borderRadius: radii.lg, marginTop: 8,
-              background: mixing ? colors.textDark : "linear-gradient(135deg, #10b981, #059669)",
-              border: "none", color: "#fff", fontSize: 13, fontWeight: 700,
-              cursor: mixing ? "default" : "pointer", fontFamily: fonts.sans,
-              opacity: mixing ? 0.5 : 1,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            }}
-          >
-            <Icons.Waveform />
-            {mixing ? "Mixing..." : "Mix with ambient"}
-          </button>
+          <div style={{ marginTop: 8 }}>
+            <Button
+              variant="success"
+              icon={<Icons.Waveform />}
+              loading={mixing}
+              fullWidth
+              onClick={() => void handleMix()}
+            >
+              {mixing ? t.ambientMixing : t.ambientMix}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -277,18 +276,18 @@ export function AmbienceMixer({ chapterId, onToast }: Props) {
             onEnded={() => mixPlayer.setIsPlaying(false)}
             style={{ display: "none" }}
           />
-          <InteractivePlayer player={mixPlayer} playLabel="Play mix" pauseLabel="Pause" stopLabel="Stop" />
+          <InteractivePlayer player={mixPlayer} playLabel={t.ambientPlayMix} pauseLabel={t.pause} stopLabel={t.stop} />
           <button
             onClick={handleDownloadMix}
             style={{
-              marginTop: 8, padding: "8px 14px", fontSize: 12, fontWeight: 600,
+              marginTop: 8, padding: "8px 14px", fontSize: typography.size.sm, fontWeight: 600,
               background: "rgba(59,130,246,0.15)", border: `1px solid ${colors.primaryBorder}`,
               borderRadius: radii.md, color: colors.primaryLight,
               cursor: "pointer", fontFamily: fonts.sans,
               display: "flex", alignItems: "center", gap: 6,
             }}
           >
-            <Icons.Download /> Download mixed audio
+            <Icons.Download /> {t.ambientDownloadMix}
           </button>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { colors, fonts } from "@/theme/tokens";
+import { colors, fonts, typography } from "@/theme/tokens";
 
 interface SliderProps {
   label: string;
@@ -29,7 +29,7 @@ export function Slider({
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: colors.textMuted, fontFamily: fonts.sans, display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: typography.size.sm, color: colors.textMuted, fontFamily: fonts.sans, display: "flex", alignItems: "center", gap: 6 }}>
           {label}
           {info && (
             <span
@@ -42,7 +42,7 @@ export function Slider({
                 borderRadius: "50%",
                 background: showInfo ? colors.primary : "rgba(148,163,184,0.15)",
                 color: showInfo ? "#fff" : colors.textDim,
-                fontSize: 10,
+                fontSize: typography.size.xs,
                 fontWeight: 700,
                 display: "inline-flex",
                 alignItems: "center",
@@ -58,7 +58,7 @@ export function Slider({
         </span>
         <span
           style={{
-            fontSize: 12,
+            fontSize: typography.size.sm,
             color: colors.text,
             fontFamily: fonts.mono,
             fontWeight: 600,
@@ -71,7 +71,7 @@ export function Slider({
       {showInfo && info && (
         <div
           style={{
-            fontSize: 11,
+            fontSize: typography.size.xs,
             color: colors.textMuted,
             background: "rgba(30,41,59,0.8)",
             border: `1px solid ${colors.border}`,

@@ -7,30 +7,38 @@ import {
   type ChapterSynthResult,
   type ChunkInfo,
 } from "@/api/chapterSynth";
+import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
+import { Skeleton } from "@/components/Skeleton";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
-import { colors, fonts, radii } from "@/theme/tokens";
+import type { Translations } from "@/i18n";
+import { colors, fonts, radii, space, typography } from "@/theme/tokens";
 
 interface Props {
+  t: Translations;
   chapterId: string;
   chapterTitle: string;
   onToast: (msg: string) => void;
 }
 
-export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
+export function ChunkMap({ t, chapterId, chapterTitle, onToast }: Props) {
   const [chunks, setChunks] = useState<ChunkInfo[]>([]);
   const [genId, setGenId] = useState<string | null>(null);
   const [synthesizing, setSynthesizing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
   const player = useAudioPlayer();
 
   const loadMap = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await getChunkMap(chapterId);
       setChunks(data.chunks);
       setGenId(data.generation_id);
-    } catch { /* first time — no generation yet */ }
+    } catch { /* first time — no generation yet */ } finally {
+      setLoading(false);
+    }
   }, [chapterId]);
 
   useEffect(() => { void loadMap(); }, [loadMap]);
@@ -44,7 +52,7 @@ export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
       onToast(`${chapterTitle} synthesized (${result.chunks} chunks, ${result.engine})`);
       await loadMap();
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setSynthesizing(false);
     }
@@ -57,7 +65,7 @@ export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
       onToast(`Chunk ${index + 1} regenerated`);
       await loadMap();
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setRegenIndex(null);
     }
@@ -81,31 +89,17 @@ export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
           marginBottom: 16,
         }}
       >
-        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
-          Chunk Map — {chapterTitle}
+        <h4 style={{ margin: 0, fontSize: typography.size.base, fontWeight: 700 }}>
+          {t.chunkMapTitle} — {chapterTitle}
         </h4>
-        <button
+        <Button
+          variant="primary"
+          icon={<Icons.Waveform />}
+          loading={synthesizing}
           onClick={() => void handleSynthesize()}
-          disabled={synthesizing}
-          style={{
-            padding: "8px 18px",
-            background: synthesizing ? colors.textDark : "linear-gradient(135deg, #3b82f6, #2563eb)",
-            color: "#fff",
-            border: "none",
-            borderRadius: radii.md,
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: synthesizing ? "default" : "pointer",
-            fontFamily: fonts.sans,
-            opacity: synthesizing ? 0.5 : 1,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
         >
-          <Icons.Waveform />
-          {synthesizing ? "Synthesizing..." : "Synthesize Chapter"}
-        </button>
+          {synthesizing ? t.chunkSynthesizing : t.chunkSynthesize}
+        </Button>
       </div>
 
       {/* Player for the full chapter audio */}
@@ -119,14 +113,20 @@ export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
             onEnded={() => player.setIsPlaying(false)}
             style={{ display: "none" }}
           />
-          <InteractivePlayer player={player} playLabel="Play" pauseLabel="Pause" stopLabel="Stop" />
+          <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} />
         </div>
       )}
 
       {/* Chunk list */}
-      {chunks.length === 0 ? (
-        <p style={{ fontSize: 12, color: colors.textDim, textAlign: "center", padding: 20 }}>
-          {genId ? "No chunks recorded" : "Click 'Synthesize Chapter' to generate audio"}
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: space[1] }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} height={48} radius={6} />
+          ))}
+        </div>
+      ) : chunks.length === 0 ? (
+        <p style={{ fontSize: typography.size.sm, color: colors.textDim, textAlign: "center", padding: 20 }}>
+          {genId ? t.chunkNoChunks : t.chunkClickToSynth}
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 500, overflowY: "auto" }}>
@@ -159,7 +159,7 @@ export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 10,
+                    fontSize: typography.size.xs,
                     fontWeight: 700,
                     fontFamily: fonts.mono,
                     flexShrink: 0,
@@ -171,7 +171,7 @@ export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
                   <p
                     style={{
                       margin: 0,
-                      fontSize: 11,
+                      fontSize: typography.size.xs,
                       color: colors.textDim,
                       lineHeight: 1.5,
                       display: "-webkit-box",
@@ -189,7 +189,7 @@ export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
                   title={`Regenerate chunk ${chunk.index + 1}`}
                   style={{
                     padding: "6px 12px",
-                    fontSize: 10,
+                    fontSize: typography.size.xs,
                     fontWeight: 600,
                     background: isRegen ? colors.textDark : "rgba(245,158,11,0.1)",
                     color: isRegen ? colors.textFaint : "#f59e0b",
@@ -201,7 +201,7 @@ export function ChunkMap({ chapterId, chapterTitle, onToast }: Props) {
                     flexShrink: 0,
                   }}
                 >
-                  {isRegen ? "..." : "Regen"}
+                  {isRegen ? t.chunkRegenerating : t.chunkRegen}
                 </button>
               </div>
             );

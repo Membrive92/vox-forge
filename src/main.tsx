@@ -5,6 +5,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { installGlobalErrorHandlers, logger } from "@/logging/logger";
 
 import App from "./App";
+import "./global.css";
 
 installGlobalErrorHandlers();
 logger.info("VoxForge UI starting", { userAgent: navigator.userAgent });

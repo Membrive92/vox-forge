@@ -16,7 +16,7 @@ import * as Icons from "@/components/icons";
 import type { SamplePlayerState } from "@/hooks/useSamplePlayer";
 import type { VoicePreviewState } from "@/hooks/useVoicePreview";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Profile, UploadedSample } from "@/types/domain";
 
 import type { ProfileDraft, SynthSettings } from "../state";
@@ -123,7 +123,7 @@ export function VoicesUnifiedTab({
             borderRadius: radii.xl,
             color: colors.text,
             fontFamily: fonts.sans,
-            fontSize: 14,
+            fontSize: typography.size.base,
             fontWeight: 700,
             cursor: "pointer",
             display: "flex",
@@ -157,7 +157,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div>
       <h2 style={{
         margin: "0 0 14px",
-        fontSize: 12,
+        fontSize: typography.size.sm,
         fontWeight: 700,
         color: colors.textDim,
         textTransform: "uppercase",
@@ -181,7 +181,7 @@ function QualityFeedback({ t, analysis, analyzing }: QualityProps) {
   if (analyzing) {
     return (
       <div style={feedbackBoxStyle(colors.surfaceAlt, colors.border)}>
-        <span style={{ color: colors.textDim, fontSize: 12 }}>
+        <span style={{ color: colors.textDim, fontSize: typography.size.sm }}>
           {t.sampleQuality}: ...
         </span>
       </div>
@@ -210,16 +210,16 @@ function QualityFeedback({ t, analysis, analyzing }: QualityProps) {
         <div style={{
           width: 8, height: 8, borderRadius: "50%", background: color,
         }} />
-        <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
+        <span style={{ fontSize: typography.size.sm, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
           {t.sampleQuality}: {ratingLabel[analysis.rating]}
         </span>
-        <span style={{ fontSize: 10, color: colors.textDim, fontFamily: fonts.mono, marginLeft: "auto" }}>
+        <span style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono, marginLeft: "auto" }}>
           {analysis.duration_s.toFixed(1)}s · SNR {analysis.snr_db.toFixed(1)}dB · peak {analysis.peak_dbfs.toFixed(1)}dBFS
         </span>
       </div>
       {analysis.issues.length > 0 && (
         <ul style={{
-          margin: "6px 0 0", paddingLeft: 18, fontSize: 11,
+          margin: "6px 0 0", paddingLeft: 18, fontSize: typography.size.xs,
           color: colors.textDim, lineHeight: 1.6,
         }}>
           {analysis.issues.map((issue, i) => (

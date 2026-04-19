@@ -1,0 +1,214 @@
+/* ─────────────────────────────────────────────────────────────────
+   Global styles. Kept minimal — the app uses inline styles with tokens
+   for everything component-level. This file only holds:
+   - CSS resets for things JS can't do inline
+   - :focus-visible rings for keyboard users (accessibility)
+   - :hover states for Button / IconButton primitives
+   - Spinner keyframe
+   - prefers-reduced-motion override
+   ───────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Focus ring for keyboard users ─────────────────────────────── */
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Remove the default mouse-click focus ring. :focus-visible keeps it
+   for keyboard users only. */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ─── Button primitive hover states ─────────────────────────────── */
+
+.vf-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+.vf-btn:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.95);
+}
+
+/* Ghost / secondary variants: subtle background tint on hover */
+.vf-btn-ghost:hover:not(:disabled),
+.vf-btn-secondary:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+/* ─── IconButton hover ──────────────────────────────────────────── */
+
+.vf-icon-btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.vf-icon-btn:active:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+/* ─── Spinner keyframe (used by Button in loading state) ────────── */
+
+@keyframes vf-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ─── Shimmer keyframe (used by Skeleton) ───────────────────────── */
+
+@keyframes vf-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ─── Slide-in keyframe (used by Toast) ─────────────────────────── */
+
+@keyframes vf-slide-in {
+  from { transform: translateX(120%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes vf-toast-progress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* ─── Respect user motion preferences ───────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Responsive layout utilities ───────────────────────────────────
+   Inline styles can't hold @media queries — these utility classes
+   give us a small set of responsive layouts that components opt into
+   via className. Phase 7 of the FE polish plan.
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Two-column layout (Convert, Compare). Stacks under 768px. */
+.vf-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 768px) {
+  .vf-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Editor + sidebar layout used by SynthTab and ExperimentalTab.
+   Right sidebar is 340px on desktop, stacks under 1024px. */
+.vf-grid-editor-sidebar {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+}
+@media (max-width: 1024px) {
+  .vf-grid-editor-sidebar {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Wider variant for Lab (380px sidebar with more presets). */
+.vf-grid-editor-sidebar-wide {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+}
+@media (max-width: 1024px) {
+  .vf-grid-editor-sidebar-wide {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 4-column card grid (Activity storage cards). */
+.vf-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+@media (max-width: 1024px) {
+  .vf-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Workbench main: sidebar shrinks at narrower widths. */
+.vf-workbench-sidebar {
+  width: 260px;
+  min-width: 260px;
+  flex-shrink: 0;
+}
+@media (max-width: 1024px) {
+  .vf-workbench-sidebar {
+    width: 200px;
+    min-width: 200px;
+  }
+}
+
+/* Tab nav: horizontal scroll on small screens to avoid overflow. */
+.vf-tabs-nav {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.vf-tabs-nav::-webkit-scrollbar {
+  display: none;
+}
+.vf-tabs-nav > button {
+  flex-shrink: 0;
+}
+
+/* Hide tab labels at very narrow widths, keep only icons. */
+@media (max-width: 640px) {
+  .vf-tab-label {
+    display: none;
+  }
+}
+
+/* Main content padding shrinks on narrow screens. */
+@media (max-width: 768px) {
+  .vf-main-narrow {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
+/* Studio layout: 240px source picker + main waveform/queue column.
+   Stacks under 1024px. */
+.vf-studio-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .vf-studio-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -160,4 +160,173 @@ export const en: Record<TranslationKey, string> = {
   settingsSection: "Settings",
   settingsPronunciation: "Pronunciation dictionary",
   settingsExportDefaults: "Export defaults",
+
+  // ── Common UI ────────────────────────────────────────────────────
+  unknownError: "unknown",
+  zoom: "Zoom",
+  refresh: "Refresh",
+  remove: "Remove",
+  hideDetails: "Hide technical details",
+  showDetails: "Show technical details",
+
+  // ── Time helpers ─────────────────────────────────────────────────
+  timeJustNow: "just now",
+  timeMinutesAgo: "{n}m ago",
+  timeHoursAgo: "{n}h ago",
+  timeDaysAgo: "{n}d ago",
+
+  // ── Workbench ────────────────────────────────────────────────────
+  workbenchWelcomeTitle: "Welcome to the Workbench",
+  workbenchWelcomeDesc: "Projects hold your story organized into chapters. Create one to start — you can paste a full text and split it automatically, or add chapters manually.",
+  workbenchCreateFirst: "+ Create your first project",
+  workbenchStep1Title: "Create a project",
+  workbenchStep1Desc: "Give it a name and pick a voice.",
+  workbenchStep2Title: "Paste or split",
+  workbenchStep2Desc: "Drop in your text and split it by chapter.",
+  workbenchStep3Title: "Synthesize",
+  workbenchStep3Desc: "Preview, cast characters, add ambient.",
+  workbenchBreadcrumb: "Workbench",
+  workbenchUntitledProject: "Untitled project",
+  workbenchAddChapter: "+ Chapter",
+  workbenchSplitText: "Split text",
+  workbenchExportAll: "Export all",
+  workbenchNoProjects: "No projects yet. Create one to get started.",
+  workbenchNewProject: "+ New project",
+  workbenchPasteYourStory: "Paste your story",
+  workbenchSplitDescription: "Paste your full text below and click Split to divide it into chapters automatically. Use '# Title' lines to mark chapter breaks, or '---' separators.",
+  workbenchSplitInto: "Split into chapters",
+  workbenchOrAddManual: "Or add a manual chapter",
+  workbenchPasteFirst: "Paste some text first",
+  workbenchSplitDone: "Split into {n} chapters",
+  workbenchPastePrompt: "Paste the full text to split into chapters:",
+  workbenchExportStarted: "Export started — the file will download when all chapters are synthesized",
+  workbenchDefaultProjectName: "Untitled Project",
+  workbenchDefaultChapterName: "Chapter {n}",
+
+  // ── Chapter toolbar ──────────────────────────────────────────────
+  chapterPreview: "Preview",
+  chapterChunks: "Chunks",
+  chapterCast: "Cast",
+  chapterAmbient: "Ambient",
+
+  // ── ChunkMap ─────────────────────────────────────────────────────
+  chunkMapTitle: "Chunk map",
+  chunkSynthesize: "Synthesize chapter",
+  chunkSynthesizing: "Synthesizing...",
+  chunkNoChunks: "No chunks recorded",
+  chunkClickToSynth: "Click 'Synthesize chapter' to generate audio",
+  chunkRegen: "Regen",
+  chunkRegenerating: "...",
+
+  // ── Character casting ────────────────────────────────────────────
+  castingNoTagsFound: "No character tags found. Use [Name] markup at the start of lines.",
+  castingTitle: "Character casting",
+  castingRescan: "Rescan",
+  castingRescanning: "...",
+  castingNoDetected: "No characters detected in this chapter.",
+  castingAddTagsHint: "Add [Name] tags at the start of lines in the chapter text, then rescan.",
+  castingDefaultVoice: "— Default voice —",
+  castingClonedProfiles: "Cloned profiles",
+  castingSystemVoices: "System voices",
+  castingCastVoices: "Cast {n} voices",
+  castingCastVoice: "Cast 1 voice",
+  castingDownload: "Download cast audio",
+
+  // ── Quick preview ────────────────────────────────────────────────
+  previewNoText: "Chapter has no text to preview",
+  previewReady: "Preview ready ({dur}s)",
+  previewTitle: "Quick preview",
+  previewDescription: "First {n} chars · no chunking · fast audition",
+  previewButton: "Preview",
+  previewLoading: "...",
+
+  // ── Ambience mixer ───────────────────────────────────────────────
+  ambientMixerTitle: "Ambient mixer",
+  ambientUploading: "Uploading...",
+  ambientUpload: "Upload ambient track",
+  ambientEmpty: "No ambient tracks. Upload a sound (forest, rain, tavern, etc.)",
+  ambientLevelInfo: "How loud the ambient track is relative to the narration. -15dB is subtle, -5dB is prominent.",
+  ambientFadeInInfo: "Seconds for the ambient to fade in at the start of the chapter.",
+  ambientFadeOutInfo: "Seconds for the ambient to fade out at the end of the chapter.",
+  ambientMixing: "Mixing...",
+  ambientMix: "Mix with ambient",
+  ambientPlayMix: "Play mix",
+  ambientDownloadMix: "Download mixed audio",
+
+  // ── Activity ─────────────────────────────────────────────────────
+  activityRecentGens: "Recent generations",
+  activityStorage: "Storage",
+  activityCouldNotLoad: "Could not load activity",
+  activityRecentIssues: "Recent issues",
+  activityNoGens: "No generations yet. Synthesize a chapter from the Workbench or use the Quick Synth tab.",
+  activityGeneratedAudio: "Generated audio",
+  activityVoiceSamples: "Voice samples",
+  activityLogs: "Logs",
+  activityTotal: "Total",
+  activityHideLogs: "Hide developer logs",
+  activityShowLogs: "Developer logs",
+
+  // ── Voices tab upload ────────────────────────────────────────────
+  voicesFormatUnsupported: "Unsupported format",
+  voicesDropHere: "Drop the file here",
+  voicesLangSpanish: "Spanish",
+  voicesLangEnglish: "English",
+
+  // ── Audio Tools mode descriptions ────────────────────────────────
+  audioToolsChangeVoiceDesc: "Clone another voice's timbre over an audio",
+  audioToolsEffectsDesc: "Apply DSP: pitch, formants, EQ, reverb",
+
+  // ── Quick Synth mode descriptions ────────────────────────────────
+  quickSynthStandardDesc: "System voices or saved profiles",
+  quickSynthCrossLingualDesc: "Clone a sample in another language (experimental)",
+  quickSynthExpBadge: "EXP",
+
+  // ── Interactive player ───────────────────────────────────────────
+  playerSkipBack: "Skip back 10 seconds",
+  playerSkipForward: "Skip forward 10 seconds",
+  playerPlaybackRate: "Playback rate {r}x",
+
+  // ── Lab custom preset dialog ─────────────────────────────────────
+  labSavePresetTitle: "Save custom preset",
+  labPresetName: "Name",
+  labPresetDescription: "Description (optional)",
+
+  // ── Error boundary ───────────────────────────────────────────────
+  errorBoundaryTitle: "Something went wrong",
+  errorBoundaryDesc: "The interface encountered an unexpected error and could not finish rendering. Your work is not lost — drafts are autosaved. Try returning to a working tab, or reload the page.",
+  errorBoundaryTryAgain: "Try again",
+  errorBoundaryReload: "Reload page",
+
+  // Studio
+  tabStudio: "Studio",
+  studioTagline: "Polish audio: trim, fades, and normalize",
+  studioSourcesTitle: "Sources",
+  studioSourcesEmpty: "No synthesized chapters yet. Create one from Workbench.",
+  studioSourcesLoading: "Loading sources…",
+  studioRefresh: "Refresh",
+  studioOpsTitle: "Edit queue",
+  studioOpsEmpty: "Add operations from the toolbar to get started.",
+  studioToolbarTitle: "Operations",
+  studioOpTrim: "Trim to selection",
+  studioOpDeleteRegion: "Delete region",
+  studioOpFadeIn: "Fade in",
+  studioOpFadeOut: "Fade out",
+  studioOpNormalize: "Normalize",
+  studioFadeDuration: "Duration (ms)",
+  studioNormalizeHeadroom: "Headroom (dB)",
+  studioApply: "Apply {n} operations",
+  studioApplyOne: "Apply 1 operation",
+  studioClearQueue: "Clear queue",
+  studioClearRegion: "Clear selection",
+  studioOutputFormat: "Output format",
+  studioResultTitle: "Result",
+  studioResultEmpty: "The result will appear here once you apply the operations.",
+  studioDownload: "Download",
+  studioProcessing: "Processing…",
+  studioNeedRegion: "Select a region on the waveform first.",
+  studioApplied: "Edit applied successfully",
+  studioApplyFailed: "Could not apply the edit",
+  studioSelectChapterHint: "Select a chapter on the left to load its waveform.",
+  studioDragHint: "Drag on the waveform to select a region. Resize by dragging its edges.",
+  studioRemoveOperation: "Remove operation",
 };

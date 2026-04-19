@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { listPresets, processAudio, randomPreset, type Preset, type VoiceLabParams } from "@/api/voiceLab";
 import { AudioRecorder } from "@/components/AudioRecorder";
+import { Button } from "@/components/Button";
+import { PromptDialog } from "@/components/PromptDialog";
 import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useCustomLabPresets } from "@/hooks/useCustomLabPresets";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 interface LabTabProps {
   t: Translations;
@@ -35,6 +37,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
   const [presetFilter, setPresetFilter] = useState<string>("all");
   const [isProcessing, setIsProcessing] = useState(false);
   const [format, setFormat] = useState("mp3");
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const player = useAudioPlayer();
 
@@ -45,12 +48,14 @@ export function LabTab({ t, onToast }: LabTabProps) {
   const presets: Preset[] = [...serverPresets, ...custom.presets];
 
   const handleSaveCustom = (): void => {
-    const name = window.prompt("Preset name?");
-    if (!name || !name.trim()) return;
-    const description = window.prompt("Short description (optional)") ?? "";
+    setSavePresetOpen(true);
+  };
+
+  const handleSavePresetConfirm = (name: string, description: string): void => {
     custom.save(name, description, params);
-    setActivePreset(name.trim());
-    onToast(`Preset saved: ${name.trim()}`);
+    setActivePreset(name);
+    setSavePresetOpen(false);
+    onToast(`Preset saved: ${name}`);
   };
 
   const handleDeleteCustom = (e: React.MouseEvent, name: string): void => {
@@ -113,13 +118,13 @@ export function LabTab({ t, onToast }: LabTabProps) {
     : presets.filter((p) => p.category === presetFilter);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 24 }}>
+    <div className="vf-grid-editor-sidebar-wide">
       {/* Left: source + sliders + result */}
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Source upload */}
         <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radii.xl, padding: 24, backdropFilter: "blur(12px)" }}>
-          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700 }}>{t.labTitle}</h3>
-          <p style={{ margin: "0 0 16px", fontSize: 12, color: colors.textDim }}>{t.labDesc}</p>
+          <h3 style={{ margin: "0 0 4px", fontSize: typography.size.lg, fontWeight: 700 }}>{t.labTitle}</h3>
+          <p style={{ margin: "0 0 16px", fontSize: typography.size.sm, color: colors.textDim }}>{t.labDesc}</p>
 
           <AudioRecorder
             onRecorded={setSourceFile}
@@ -128,7 +133,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
             labelRecording={t.recording}
           />
 
-          <div style={{ textAlign: "center", fontSize: 11, color: colors.textDim, margin: "8px 0" }}>
+          <div style={{ textAlign: "center", fontSize: typography.size.xs, color: colors.textDim, margin: "8px 0" }}>
             {t.or}
           </div>
 
@@ -140,7 +145,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
               background: sourceFile ? colors.primarySoft : colors.surfaceAlt,
               border: sourceFile ? `1px solid ${colors.primaryBorder}` : `2px dashed ${colors.border}`,
               color: sourceFile ? colors.primaryLight : colors.textMuted,
-              cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: fonts.sans,
+              cursor: "pointer", fontSize: typography.size.sm, fontWeight: 600, fontFamily: fonts.sans,
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
@@ -164,7 +169,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
             {/* Format selector */}
             {["mp3", "wav"].map((f) => (
               <button key={f} onClick={() => setFormat(f)} style={{
-                padding: "4px 12px", fontSize: 10, fontWeight: 600, borderRadius: radii.sm,
+                padding: "4px 12px", fontSize: typography.size.xs, fontWeight: 600, borderRadius: radii.sm,
                 background: format === f ? colors.primary : colors.surfaceAlt,
                 color: format === f ? "#fff" : colors.textDim,
                 border: format === f ? `1px solid ${colors.primary}` : `1px solid ${colors.border}`,
@@ -173,28 +178,25 @@ export function LabTab({ t, onToast }: LabTabProps) {
             ))}
             <div style={{ flex: 1 }} />
             <button onClick={handleReset} style={{
-              padding: "4px 12px", fontSize: 11, fontWeight: 600, borderRadius: radii.sm,
+              padding: "4px 12px", fontSize: typography.size.xs, fontWeight: 600, borderRadius: radii.sm,
               background: colors.surfaceAlt, border: `1px solid ${colors.border}`,
               color: colors.textMuted, cursor: "pointer", fontFamily: fonts.sans,
             }}>{t.labReset}</button>
           </div>
 
-          <button
-            onClick={() => void handleProcess()}
-            disabled={!sourceFile || isProcessing}
-            style={{
-              width: "100%", padding: "14px 0", borderRadius: radii.lg, marginTop: 16,
-              background: sourceFile && !isProcessing ? "linear-gradient(135deg, #10b981, #059669)" : colors.textDark,
-              border: "none", color: "#fff", fontSize: 14, fontWeight: 700,
-              cursor: sourceFile && !isProcessing ? "pointer" : "default",
-              fontFamily: fonts.sans, opacity: sourceFile && !isProcessing ? 1 : 0.4,
-              boxShadow: sourceFile && !isProcessing ? "0 4px 24px rgba(16,185,129,0.35)" : "none",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            }}
-          >
-            <Icons.Waveform />
-            {isProcessing ? t.labProcessing : t.labProcess}
-          </button>
+          <div style={{ marginTop: 16 }}>
+            <Button
+              variant="success"
+              size="lg"
+              icon={<Icons.Waveform />}
+              loading={isProcessing}
+              disabled={!sourceFile}
+              fullWidth
+              onClick={() => void handleProcess()}
+            >
+              {isProcessing ? t.labProcessing : t.labProcess}
+            </Button>
+          </div>
         </div>
 
         {/* Player */}
@@ -217,7 +219,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
                   opacity: player.isPlaying ? 1 : 0.3,
                 }}><Icons.Stop /></button>
                 {player.duration > 0 && (
-                  <span style={{ fontSize: 11, color: colors.textDim, fontFamily: fonts.mono }}>{player.duration.toFixed(1)}s</span>
+                  <span style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono }}>{player.duration.toFixed(1)}s</span>
                 )}
                 <span style={{ fontSize: 9, fontWeight: 700, fontFamily: fonts.mono, padding: "2px 6px", borderRadius: 4, background: "rgba(16,185,129,0.2)", color: "#34d399", textTransform: "uppercase" }}>LAB</span>
               </div>
@@ -225,7 +227,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
                 display: "flex", alignItems: "center", gap: 6, padding: "10px 18px",
                 borderRadius: radii.md, background: "rgba(59,130,246,0.15)",
                 border: `1px solid ${colors.primaryBorder}`, color: colors.primaryLight,
-                cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: fonts.sans,
+                cursor: "pointer", fontSize: typography.size.sm, fontWeight: 600, fontFamily: fonts.sans,
               }}><Icons.Download /> {t.download} .{format}</button>
             </div>
           </div>
@@ -235,31 +237,23 @@ export function LabTab({ t, onToast }: LabTabProps) {
       {/* Right: presets */}
       <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radii.xl, padding: 24, backdropFilter: "blur(12px)", display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{t.labPresets}</h3>
+          <h3 style={{ margin: 0, fontSize: typography.size.lg, fontWeight: 700 }}>{t.labPresets}</h3>
           <div style={{ display: "flex", gap: 6 }}>
-            <button
+            <Button
+              variant="success"
+              size="sm"
               onClick={handleSaveCustom}
               title="Save current settings as preset"
-              style={{
-                padding: "6px 12px", borderRadius: radii.sm, fontSize: 12, fontWeight: 600,
-                background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)",
-                color: "#34d399", cursor: "pointer", fontFamily: fonts.sans,
-              }}
             >
               + Save
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="warning"
+              size="sm"
               onClick={() => void handleRandom()}
-              style={{
-                padding: "6px 14px", borderRadius: radii.sm, fontSize: 12, fontWeight: 600,
-                background: "linear-gradient(135deg, #f59e0b, #d97706)", border: "none",
-                color: "#fff", cursor: "pointer", fontFamily: fonts.sans,
-                display: "flex", alignItems: "center", gap: 4,
-                boxShadow: "0 2px 12px rgba(245,158,11,0.3)",
-              }}
             >
               {t.labRandom}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -276,7 +270,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
               key={cat.id}
               onClick={() => setPresetFilter(cat.id)}
               style={{
-                flex: 1, padding: "5px 0", fontSize: 10, fontWeight: 600,
+                flex: 1, padding: "5px 0", fontSize: typography.size.xs, fontWeight: 600,
                 borderRadius: radii.sm,
                 background: presetFilter === cat.id ? colors.primary : colors.surfaceAlt,
                 color: presetFilter === cat.id ? "#fff" : colors.textDim,
@@ -311,7 +305,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{preset.name}</span>
+                  <span style={{ fontSize: typography.size.sm, fontWeight: 600 }}>{preset.name}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{
                       fontSize: 8, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
@@ -329,7 +323,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
                           border: "none",
                           color: colors.textFaint,
                           cursor: "pointer",
-                          fontSize: 14,
+                          fontSize: typography.size.base,
                           lineHeight: 1,
                           padding: 2,
                         }}
@@ -339,7 +333,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
                     )}
                   </div>
                 </div>
-                <p style={{ margin: 0, fontSize: 11, color: colors.textDim, lineHeight: 1.4 }}>
+                <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim, lineHeight: 1.4 }}>
                   {preset.description}
                 </p>
               </div>
@@ -347,6 +341,17 @@ export function LabTab({ t, onToast }: LabTabProps) {
           })}
         </div>
       </div>
+
+      <PromptDialog
+        open={savePresetOpen}
+        title={t.labSavePresetTitle}
+        label={t.labPresetName}
+        secondaryLabel={t.labPresetDescription}
+        confirmText={t.saveProfile}
+        cancelText={t.cancel}
+        onConfirm={handleSavePresetConfirm}
+        onCancel={() => setSavePresetOpen(false)}
+      />
     </div>
   );
 }

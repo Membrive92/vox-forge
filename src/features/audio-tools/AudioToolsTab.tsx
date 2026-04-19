@@ -18,7 +18,7 @@
 import { useState } from "react";
 
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
 
 import { ConvertTab } from "./ConvertTab";
@@ -51,13 +51,13 @@ export function AudioToolsTab({ t, profiles, onToast }: Props) {
         <ModeButton
           active={mode === "change-voice"}
           label={t.audioToolsChangeVoice}
-          description="Clonar el timbre de otra voz sobre un audio"
+          description={t.audioToolsChangeVoiceDesc}
           onClick={() => setMode("change-voice")}
         />
         <ModeButton
           active={mode === "effects"}
           label={t.audioToolsEffects}
-          description="Aplicar DSP: tono, formantes, ecualización, reverb"
+          description={t.audioToolsEffectsDesc}
           onClick={() => setMode("effects")}
         />
       </div>
@@ -101,7 +101,7 @@ function ModeButton({ active, label, description, onClick }: ModeButtonProps) {
     >
       <div
         style={{
-          fontSize: 14,
+          fontSize: typography.size.base,
           fontWeight: 700,
           marginBottom: 2,
         }}
@@ -110,7 +110,7 @@ function ModeButton({ active, label, description, onClick }: ModeButtonProps) {
       </div>
       <div
         style={{
-          fontSize: 11,
+          fontSize: typography.size.xs,
           opacity: active ? 0.85 : 0.7,
           fontWeight: 500,
         }}

@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from "react";
 
 import WaveSurfer from "wavesurfer.js";
 
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 export interface ChunkRegion {
   index: number;
@@ -122,10 +122,10 @@ export function WaveformEditor({
           {isPlaying ? "Pause" : "Play"}
         </button>
         <button onClick={handleStop} style={ctrlBtn}>Stop</button>
-        <span style={{ fontSize: 11, fontFamily: fonts.mono, color: colors.textDim, minWidth: 80 }}>
+        <span style={{ fontSize: typography.size.xs, fontFamily: fonts.mono, color: colors.textDim, minWidth: 80 }}>
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", fontSize: 11, color: colors.textDim }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", fontSize: typography.size.xs, color: colors.textDim }}>
           Zoom
           <input
             type="range"
@@ -151,7 +151,7 @@ export function WaveformEditor({
                 title={r.text.slice(0, 80)}
                 style={{
                   padding: "4px 10px",
-                  fontSize: 10,
+                  fontSize: typography.size.xs,
                   fontWeight: 700,
                   fontFamily: fonts.mono,
                   background: active ? colors.primarySoft : colors.surfaceAlt,
@@ -173,7 +173,7 @@ export function WaveformEditor({
 
 const ctrlBtn: React.CSSProperties = {
   padding: "6px 14px",
-  fontSize: 11,
+  fontSize: typography.size.xs,
   fontWeight: 600,
   background: colors.surfaceAlt,
   color: colors.textDim,

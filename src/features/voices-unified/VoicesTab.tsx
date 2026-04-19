@@ -1,13 +1,14 @@
 import { useRef } from "react";
 
 import { AudioRecorder } from "@/components/AudioRecorder";
+import { Button } from "@/components/Button";
 import { Slider } from "@/components/Slider";
 import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
 import { readAudioDuration } from "@/hooks/readAudioDuration";
 import type { VoicePreviewState } from "@/hooks/useVoicePreview";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Language } from "@/types/domain";
 
 import type { ProfileDraft, SynthSettings } from "../state";
@@ -41,7 +42,7 @@ export function VoicesTab({
   const handleFile = async (file: File | undefined): Promise<void> => {
     if (!file) return;
     if (!(file.type.includes("audio") || AUDIO_EXT_RE.test(file.name))) {
-      onToast("Formato no soportado");
+      onToast(t.voicesFormatUnsupported);
       return;
     }
     const duration = await readAudioDuration(file);
@@ -54,7 +55,7 @@ export function VoicesTab({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+    <div className="vf-grid-2col">
       <UploadCard
         t={t}
         dragOver={dragOver}
@@ -75,7 +76,7 @@ export function VoicesTab({
           backdropFilter: "blur(12px)",
         }}
       >
-        <h3 style={{ margin: "0 0 20px", fontSize: 16, fontWeight: 700 }}>{t.builtinVoices}</h3>
+        <h3 style={{ margin: "0 0 20px", fontSize: typography.size.lg, fontWeight: 700 }}>{t.builtinVoices}</h3>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           {(["es", "en"] as const).map((l) => (
             <LangPill
@@ -120,17 +121,17 @@ export function VoicesTab({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 14,
+                      fontSize: typography.size.base,
                     }}
                   >
                     {v.gender === "F" ? "♀" : "♂"}
                   </div>
                   <div>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{v.name}</p>
+                    <p style={{ margin: 0, fontSize: typography.size.sm, fontWeight: 600 }}>{v.name}</p>
                     <p
                       style={{
                         margin: 0,
-                        fontSize: 10,
+                        fontSize: typography.size.xs,
                         color: colors.textDim,
                         fontFamily: fonts.mono,
                       }}
@@ -146,7 +147,7 @@ export function VoicesTab({
                     style={{
                       padding: "6px 10px",
                       borderRadius: radii.sm,
-                      fontSize: 11,
+                      fontSize: typography.size.xs,
                       fontWeight: 600,
                       background: voicePreview.previewingId === v.id
                         ? colors.primary
@@ -165,7 +166,7 @@ export function VoicesTab({
                     style={{
                       padding: "6px 12px",
                       borderRadius: radii.sm,
-                      fontSize: 11,
+                      fontSize: typography.size.xs,
                       fontWeight: 600,
                       background: active ? colors.primary : colors.surfaceAlt,
                       border: active ? "none" : `1px solid ${colors.border}`,
@@ -199,7 +200,7 @@ function LangPill({ lang, active, onClick }: LangPillProps) {
       style={{
         padding: "6px 16px",
         borderRadius: radii.sm,
-        fontSize: 12,
+        fontSize: typography.size.sm,
         fontWeight: 600,
         background: active ? colors.primary : colors.surfaceAlt,
         color: active ? "#fff" : colors.textDim,
@@ -209,7 +210,7 @@ function LangPill({ lang, active, onClick }: LangPillProps) {
         transition: "all 0.2s",
       }}
     >
-      {lang === "es" ? "Español" : "English"}
+      {lang === "es" ? "Español" : "English"/* language names are intentionally not translated */}
     </button>
   );
 }
@@ -246,8 +247,8 @@ function UploadCard({
         backdropFilter: "blur(12px)",
       }}
     >
-      <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700 }}>{t.uploadVoice}</h3>
-      <p style={{ margin: "0 0 16px", fontSize: 12, color: colors.textDim }}>{t.uploadHint}</p>
+      <h3 style={{ margin: "0 0 4px", fontSize: typography.size.lg, fontWeight: 700 }}>{t.uploadVoice}</h3>
+      <p style={{ margin: "0 0 16px", fontSize: typography.size.sm, color: colors.textDim }}>{t.uploadHint}</p>
 
       <AudioRecorder
         onRecorded={(file) => void onFile(file)}
@@ -256,7 +257,7 @@ function UploadCard({
         labelRecording={t.recording}
       />
 
-      <div style={{ textAlign: "center", fontSize: 11, color: colors.textDim, margin: "8px 0" }}>
+      <div style={{ textAlign: "center", fontSize: typography.size.xs, color: colors.textDim, margin: "8px 0" }}>
         {t.or}
       </div>
 
@@ -272,16 +273,24 @@ function UploadCard({
           void onFile(e.dataTransfer.files[0]);
         }}
         onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
         role="button"
         tabIndex={0}
+        aria-label={t.uploadDesc}
         style={{
-          border: `2px dashed ${dragOver ? colors.primary : "rgba(148,163,184,0.15)"}`,
+          border: `2px dashed ${dragOver ? colors.primary : colors.border}`,
           borderRadius: 12,
           padding: "40px 20px",
           textAlign: "center",
-          background: dragOver ? "rgba(59,130,246,0.06)" : colors.surfaceSubtle,
+          background: dragOver ? colors.primarySoft : colors.surfaceSubtle,
           cursor: "pointer",
           transition: "all 0.2s",
+          transform: dragOver ? "scale(1.01)" : "scale(1)",
         }}
       >
         <input
@@ -291,11 +300,26 @@ function UploadCard({
           style={{ display: "none" }}
           onChange={(e) => void onFile(e.target.files?.[0])}
         />
-        <div style={{ color: dragOver ? colors.primary : colors.textFaint, marginBottom: 12 }}>
+        <div
+          style={{
+            color: dragOver ? colors.primary : colors.textMuted,
+            marginBottom: 12,
+            transition: "color 0.2s",
+          }}
+        >
           <Icons.Upload />
         </div>
-        <p style={{ margin: 0, fontSize: 13, color: colors.textMuted }}>{t.uploadDesc}</p>
-        <p style={{ margin: "8px 0 0", fontSize: 11, color: colors.textFaint }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: typography.size.sm,
+            fontWeight: dragOver ? typography.weight.semibold : typography.weight.regular,
+            color: dragOver ? colors.primaryLight : colors.textMuted,
+          }}
+        >
+          {dragOver ? t.voicesDropHere : t.uploadDesc}
+        </p>
+        <p style={{ margin: "8px 0 0", fontSize: typography.size.xs, color: colors.textFaint }}>
           .wav, .mp3, .ogg, .flac
         </p>
       </div>
@@ -328,8 +352,8 @@ function UploadCard({
             <Icons.Mic />
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>{draft.uploadedFile.name}</p>
-            <p style={{ margin: 0, fontSize: 11, color: colors.textDim }}>
+            <p style={{ margin: 0, fontSize: typography.size.sm, fontWeight: 600 }}>{draft.uploadedFile.name}</p>
+            <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim }}>
               {draft.uploadedFile.sizeKb}KB · {draft.uploadedFile.duration}s
             </p>
           </div>
@@ -340,7 +364,7 @@ function UploadCard({
       <div style={{ marginTop: 20 }}>
         <label
           style={{
-            fontSize: 11,
+            fontSize: typography.size.xs,
             color: colors.textDim,
             fontWeight: 600,
             textTransform: "uppercase",
@@ -362,7 +386,7 @@ function UploadCard({
             background: colors.surfaceAlt,
             border: `1px solid ${colors.border}`,
             color: colors.text,
-            fontSize: 13,
+            fontSize: typography.size.sm,
             fontFamily: fonts.sans,
             outline: "none",
             boxSizing: "border-box",
@@ -376,30 +400,16 @@ function UploadCard({
         <Slider label={t.volume} value={settings.volume} onChange={settings.setVolume} min={0} max={100} unit="%" />
       </div>
 
-      <button
-        onClick={() => void onSaveProfile()}
-        disabled={!canSave}
-        style={{
-          width: "100%",
-          padding: "12px 0",
-          borderRadius: radii.lg,
-          marginTop: 8,
-          background: canSave
-            ? `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDim})`
-            : colors.textDark,
-          border: "none",
-          color: "#fff",
-          fontSize: 13,
-          fontWeight: 700,
-          cursor: canSave ? "pointer" : "default",
-          fontFamily: fonts.sans,
-          opacity: canSave ? 1 : 0.4,
-          boxShadow: canSave ? "0 4px 24px rgba(59,130,246,0.3)" : "none",
-          transition: "all 0.2s",
-        }}
-      >
-        {draft.editingId ? t.confirm : t.saveProfile}
-      </button>
+      <div style={{ marginTop: 8 }}>
+        <Button
+          variant="primary"
+          disabled={!canSave}
+          fullWidth
+          onClick={() => void onSaveProfile()}
+        >
+          {draft.editingId ? t.confirm : t.saveProfile}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
 
 import { synthesize } from "@/api/synthesis";
+import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii } from "@/theme/tokens";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
 
 interface Props {
@@ -63,10 +64,10 @@ export function CompareTab({ t, profiles, onToast }: Props) {
           marginBottom: 20,
         }}
       >
-        <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 700 }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: typography.size.lg, fontWeight: 700 }}>
           A/B Voice Comparison
         </h3>
-        <p style={{ margin: "0 0 12px", fontSize: 12, color: colors.textDim }}>
+        <p style={{ margin: "0 0 12px", fontSize: typography.size.sm, color: colors.textDim }}>
           Write a test paragraph, pick two profiles, and compare how they sound side by side.
         </p>
         <textarea
@@ -81,7 +82,7 @@ export function CompareTab({ t, profiles, onToast }: Props) {
             borderRadius: radii.md,
             color: colors.text,
             fontFamily: fonts.sans,
-            fontSize: 14,
+            fontSize: typography.size.base,
             lineHeight: 1.6,
             padding: 12,
             resize: "vertical",
@@ -91,7 +92,7 @@ export function CompareTab({ t, profiles, onToast }: Props) {
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+      <div className="vf-grid-2col">
         {(["A", "B"] as const).map((side) => {
           const profileId = side === "A" ? profileA : profileB;
           const setProfile = side === "A" ? setProfileA : setProfileB;
@@ -109,7 +110,7 @@ export function CompareTab({ t, profiles, onToast }: Props) {
                 padding: 20,
               }}
             >
-              <h4 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 700 }}>
+              <h4 style={{ margin: "0 0 12px", fontSize: typography.size.base, fontWeight: 700 }}>
                 Voice {side}
               </h4>
 
@@ -124,7 +125,7 @@ export function CompareTab({ t, profiles, onToast }: Props) {
                 }}
               >
                 {profilesWithSample.length === 0 ? (
-                  <p style={{ fontSize: 12, color: colors.textDim, textAlign: "center", padding: 16 }}>
+                  <p style={{ fontSize: typography.size.sm, color: colors.textDim, textAlign: "center", padding: 16 }}>
                     {t.noProfiles}
                   </p>
                 ) : (
@@ -147,7 +148,7 @@ export function CompareTab({ t, profiles, onToast }: Props) {
                           cursor: "pointer",
                           color: colors.text,
                           fontFamily: fonts.sans,
-                          fontSize: 13,
+                          fontSize: typography.size.sm,
                         }}
                       >
                         {p.name}
@@ -158,34 +159,16 @@ export function CompareTab({ t, profiles, onToast }: Props) {
                 )}
               </div>
 
-              <button
+              <Button
+                variant="primary"
+                icon={<Icons.Waveform />}
+                loading={generating}
+                disabled={!canGen && !generating}
+                fullWidth
                 onClick={() => void handleGenerate(side)}
-                disabled={!canGen}
-                style={{
-                  width: "100%",
-                  padding: "12px 0",
-                  borderRadius: radii.lg,
-                  background: canGen
-                    ? side === "A"
-                      ? "linear-gradient(135deg, #3b82f6, #2563eb)"
-                      : "linear-gradient(135deg, #8b5cf6, #7c3aed)"
-                    : colors.textDark,
-                  border: "none",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: canGen ? "pointer" : "default",
-                  fontFamily: fonts.sans,
-                  opacity: canGen ? 1 : 0.4,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                }}
               >
-                <Icons.Waveform />
                 {generating ? "Generating..." : `Generate ${side}`}
-              </button>
+              </Button>
 
               {player.url && (
                 <div style={{ marginTop: 12 }}>
@@ -287,27 +270,18 @@ function QuickPreview({ t, text, profiles, onToast }: QuickPreviewProps) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
+        <h4 style={{ margin: 0, fontSize: typography.size.base, fontWeight: 700 }}>
           Quick Preview — first 300 chars vs all profiles
         </h4>
-        <button
+        <Button
+          variant="success"
+          size="sm"
+          loading={running}
+          disabled={!text.trim()}
           onClick={() => void handlePreviewAll()}
-          disabled={running || !text.trim()}
-          style={{
-            padding: "8px 16px",
-            background: running ? colors.textDark : "linear-gradient(135deg, #10b981, #059669)",
-            color: "#fff",
-            border: "none",
-            borderRadius: radii.md,
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: running ? "default" : "pointer",
-            fontFamily: fonts.sans,
-            opacity: running ? 0.5 : 1,
-          }}
         >
           {running ? "Generating..." : "Preview All"}
-        </button>
+        </Button>
       </div>
 
       {results.size > 0 && (
@@ -347,8 +321,8 @@ function QuickPreview({ t, text, profiles, onToast }: QuickPreviewProps) {
                 >
                   <Icons.Play />
                 </button>
-                <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{p.name}</div>
-                <span style={{ fontSize: 11, color: colors.textDim, fontFamily: fonts.mono }}>
+                <div style={{ flex: 1, fontSize: typography.size.sm, fontWeight: 600 }}>{p.name}</div>
+                <span style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono }}>
                   {r.duration.toFixed(1)}s
                 </span>
                 <audio

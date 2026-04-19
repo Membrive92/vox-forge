@@ -12,20 +12,23 @@ import {
   extractCharacters,
   type CharacterMapping,
 } from "@/api/characterSynth";
+import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useProfiles } from "@/hooks/useProfiles";
-import { colors, fonts, radii } from "@/theme/tokens";
+import type { Translations } from "@/i18n";
+import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 interface Props {
+  t: Translations;
   chapterText: string;
   chapterTitle: string;
   onToast: (msg: string) => void;
 }
 
-export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) {
+export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Props) {
   const [characters, setCharacters] = useState<string[]>([]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [scanning, setScanning] = useState(false);
@@ -43,14 +46,14 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
       const data = await extractCharacters(chapterText);
       setCharacters(data.characters);
       if (data.characters.length === 0) {
-        onToast("No character tags found. Use [Name] markup at the start of lines.");
+        onToast(t.castingNoTagsFound);
       }
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setScanning(false);
     }
-  }, [chapterText, onToast]);
+  }, [chapterText, onToast, t.castingNoTagsFound, t.unknownError]);
 
   useEffect(() => { void scan(); }, [scan]);
 
@@ -82,7 +85,7 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
         onToast(`Cast synthesis ready (${result.segments} segments)`);
       }
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setGenerating(false);
     }
@@ -118,13 +121,13 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
           marginBottom: 14,
         }}
       >
-        <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>Character Casting</h4>
+        <h4 style={{ margin: 0, fontSize: typography.size.base, fontWeight: 700 }}>{t.castingTitle}</h4>
         <button
           onClick={() => void scan()}
           disabled={scanning}
           style={rescanBtn}
         >
-          {scanning ? "..." : "Rescan"}
+          {scanning ? t.castingRescanning : t.castingRescan}
         </button>
       </div>
 
@@ -135,17 +138,16 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
             borderRadius: radii.md,
             background: colors.surfaceSubtle,
             border: `1px dashed ${colors.borderFaint}`,
-            fontSize: 12,
+            fontSize: typography.size.sm,
             color: colors.textDim,
             lineHeight: 1.6,
           }}
         >
           <p style={{ margin: "0 0 8px", fontWeight: 600, color: colors.textMuted }}>
-            No characters detected in this chapter.
+            {t.castingNoDetected}
           </p>
           <p style={{ margin: 0 }}>
-            Add <code style={{ fontFamily: fonts.mono, color: colors.primaryLight }}>[Character]</code>{" "}
-            tags at the start of lines in the chapter text, then rescan.
+            {t.castingAddTagsHint}
           </p>
           <pre
             style={{
@@ -154,7 +156,7 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
               background: colors.surfaceAlt,
               borderRadius: radii.sm,
               fontFamily: fonts.mono,
-              fontSize: 11,
+              fontSize: typography.size.xs,
               color: colors.textDim,
               whiteSpace: "pre-wrap",
             }}
@@ -184,7 +186,7 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
                 <div
                   style={{
                     minWidth: 140,
-                    fontSize: 13,
+                    fontSize: typography.size.sm,
                     fontWeight: 600,
                     color: colors.text,
                   }}
@@ -201,15 +203,15 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
                     color: colors.text,
                     border: `1px solid ${colors.border}`,
                     borderRadius: radii.sm,
-                    fontSize: 12,
+                    fontSize: typography.size.sm,
                     fontFamily: fonts.sans,
                     outline: "none",
                     cursor: "pointer",
                   }}
                 >
-                  <option value="">— Default voice —</option>
+                  <option value="">{t.castingDefaultVoice}</option>
                   {profilesWithSample.length > 0 && (
-                    <optgroup label="Cloned profiles">
+                    <optgroup label={t.castingClonedProfiles}>
                       {profilesWithSample.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.name}
@@ -217,7 +219,7 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
                       ))}
                     </optgroup>
                   )}
-                  <optgroup label="System voices">
+                  <optgroup label={t.castingSystemVoices}>
                     {allVoices.map((v) => (
                       <option key={v.id} value={v.id}>
                         {v.name} ({v.accent})
@@ -232,33 +234,21 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
       )}
 
       {characters.length > 0 && (
-        <button
-          onClick={() => void handleGenerate()}
-          disabled={generating}
-          style={{
-            width: "100%",
-            marginTop: 12,
-            padding: "12px 0",
-            borderRadius: radii.lg,
-            background: generating
-              ? colors.textDark
-              : "linear-gradient(135deg, #8b5cf6, #7c3aed)",
-            border: "none",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: generating ? "default" : "pointer",
-            fontFamily: fonts.sans,
-            opacity: generating ? 0.5 : 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
-        >
-          <Icons.Waveform />
-          {generating ? "Generating..." : `Cast ${characters.length} voice${characters.length === 1 ? "" : "s"}`}
-        </button>
+        <div style={{ marginTop: 12 }}>
+          <Button
+            variant="primary"
+            icon={<Icons.Waveform />}
+            loading={generating}
+            fullWidth
+            onClick={() => void handleGenerate()}
+          >
+            {generating
+              ? t.generating
+              : characters.length === 1
+                ? t.castingCastVoice
+                : t.castingCastVoices.replace("{n}", String(characters.length))}
+          </Button>
+        </div>
       )}
 
       {player.url && (
@@ -271,13 +261,13 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
             onEnded={() => player.setIsPlaying(false)}
             style={{ display: "none" }}
           />
-          <InteractivePlayer player={player} playLabel="Play" pauseLabel="Pause" stopLabel="Stop" />
+          <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} />
           <button
             onClick={handleDownload}
             style={{
               marginTop: 8,
               padding: "8px 14px",
-              fontSize: 12,
+              fontSize: typography.size.sm,
               fontWeight: 600,
               background: "rgba(139,92,246,0.15)",
               border: "1px solid rgba(139,92,246,0.3)",
@@ -290,7 +280,7 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
               gap: 6,
             }}
           >
-            <Icons.Download /> Download cast audio
+            <Icons.Download /> {t.castingDownload}
           </button>
         </div>
       )}
@@ -300,7 +290,7 @@ export function CharacterCasting({ chapterText, chapterTitle, onToast }: Props) 
 
 const rescanBtn: React.CSSProperties = {
   padding: "5px 12px",
-  fontSize: 11,
+  fontSize: typography.size.xs,
   fontWeight: 600,
   background: colors.surfaceAlt,
   color: colors.textDim,
