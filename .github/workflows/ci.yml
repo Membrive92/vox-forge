@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend — pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - name: System libs for audio wheels
+        run: sudo apt-get update && sudo apt-get install -y libsndfile1 ffmpeg
+
+      - name: Install backend dependencies (lean)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-ci.txt
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Verify OpenAPI schema is up to date
+        # Regenerate the committed schema and fail if it drifted. Keeps
+        # ``src/api/generated.ts`` trustworthy without requiring
+        # contributors to remember ``npm run openapi``.
+        run: |
+          python scripts/export_openapi.py
+          git diff --exit-code schema/openapi.json || (
+            echo "::error::schema/openapi.json is out of date — run 'npm run openapi' and commit."
+            exit 1
+          )
+
+  frontend:
+    name: Frontend — typecheck + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test -- --run
+
+      - name: Verify generated types are up to date
+        # ``src/api/generated.ts`` must match the committed schema. The
+        # backend job already guards the schema itself; this guards the
+        # generated TS so they stay in lockstep.
+        run: |
+          npm run openapi:gen
+          git diff --exit-code src/api/generated.ts || (
+            echo "::error::src/api/generated.ts is stale — run 'npm run openapi:gen' and commit."
+            exit 1
+          )

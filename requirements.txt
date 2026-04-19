@@ -1,0 +1,47 @@
+# VoxForge backend dependencies (full production set).
+#
+# Installs everything needed to run synthesis end-to-end including GPU
+# engines. For CI (test-only), use ``requirements-ci.txt`` which skips
+# the heavy ML packages — tests stub ``torch``, ``pydub``, ``edge_tts``
+# and ``openvoice`` via ``tests/conftest.py``.
+
+# ── Core web layer ──────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+aiofiles
+aiosqlite
+httpx
+
+# ── Audio I/O + DSP ─────────────────────────────────────────────────
+pydub
+mutagen
+librosa
+numpy
+soundfile
+pedalboard
+praat-parselmouth
+noisereduce
+
+# Pydub's audioop dep is not bundled with Python 3.13+
+audioop-lts; python_version >= "3.13"
+
+# ── TTS engines ─────────────────────────────────────────────────────
+edge-tts
+
+# ── GPU: voice cloning + conversion ─────────────────────────────────
+# XTTS v2 via Coqui TTS. Needs torch + transformers.
+torch
+torchaudio
+coqui-tts
+transformers
+
+# OpenVoice V2 — install from source; not on PyPI
+# git+https://github.com/myshell-ai/OpenVoice.git
+
+# ── Test-only (dev) ─────────────────────────────────────────────────
+pytest
+pytest-asyncio
+pytest-cov

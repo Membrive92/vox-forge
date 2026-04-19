@@ -1,0 +1,30 @@
+# Lean dependency set for CI — just enough to run ``pytest`` and the
+# OpenAPI schema export. The heavy ML packages (``torch``, ``coqui-tts``,
+# ``openvoice``, ``edge-tts``, ``pydub``) are stubbed in
+# ``tests/conftest.py`` via ``sys.modules``, so CI doesn't need them.
+
+# Core web layer
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+aiofiles
+aiosqlite
+httpx
+
+# Audio DSP (voice_lab_engine imports these at module load)
+librosa
+numpy
+soundfile
+pedalboard
+praat-parselmouth
+noisereduce
+mutagen
+
+audioop-lts; python_version >= "3.13"
+
+# Test runner
+pytest
+pytest-asyncio
+pytest-cov

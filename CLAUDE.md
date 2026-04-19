@@ -25,7 +25,29 @@ python -m pytest -xvs
 npm run dev
 npm run typecheck
 npm test
+
+# Regenerate TS types from backend's OpenAPI schema
+npm run openapi
 ```
+
+## Dependencies files
+
+- `requirements.txt` — full production install (torch, coqui-tts, etc.)
+- `requirements-ci.txt` — lean set for CI / tests. Heavy ML packages
+  (`torch`, `coqui-tts`, `openvoice`, `edge-tts`, `pydub`) are stubbed in
+  `tests/conftest.py` so CI doesn't need them.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every PR:
+
+- **Backend job**: installs `requirements-ci.txt`, runs `pytest`, then
+  regenerates `schema/openapi.json` and fails if it drifted.
+- **Frontend job**: `npm ci`, `npm run typecheck`, `npm test`, then
+  regenerates `src/api/generated.ts` and fails if it drifted.
+
+If CI fails on the schema/types check, run `npm run openapi` locally
+and commit the result.
 
 ---
 
@@ -313,8 +335,8 @@ Dev: `typescript`, `vite`, `@vitejs/plugin-react`, `vitest`, `@testing-library/r
 5. ~~Frontend: strict TS + migrate to TSX.~~ Done.
 6. ~~Frontend: split into components/, features/, hooks/, api/.~~ Done.
 7. **Frontend**: extract inline styles to unified system (CSS Modules or Tailwind).
-8. **Frontend**: generate types from backend's OpenAPI schema.
-9. **Both**: CI with lint + typecheck + tests before merge.
+8. ~~Frontend: generate types from backend's OpenAPI schema.~~ Done (`schema/openapi.json` + `src/api/generated.ts` via `npm run openapi`).
+9. ~~Both: CI with typecheck + tests before merge.~~ Done (`.github/workflows/ci.yml`).
 
 ---
 
