@@ -5,16 +5,21 @@ import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 import { EditOperationsPanel } from "./EditOperationsPanel";
+import { RecentRenders } from "./RecentRenders";
 import { SourcePicker } from "./SourcePicker";
 import { StudioWaveform, type StudioRegion, type StudioWaveformHandle } from "./StudioWaveform";
+import { TranscribePanel } from "./TranscribePanel";
 import { useStudioSession } from "./useStudioSession";
+import { VideoRenderPanel } from "./VideoRenderPanel";
 
 interface Props {
   t: Translations;
   onToast: (msg: string) => void;
+  pendingSourceId: string | null;
+  onPendingSourceConsumed: () => void;
 }
 
-export function StudioTab({ t, onToast }: Props) {
+export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed }: Props) {
   const studio = useStudioSession();
   const { session } = studio;
   const waveformRef = useRef<StudioWaveformHandle>(null);
@@ -24,7 +29,30 @@ export function StudioTab({ t, onToast }: Props) {
 
   useEffect(() => {
     void studio.refreshSources();
-  }, [studio.refreshSources]);
+    void studio.refreshRenders();
+  }, [studio.refreshSources, studio.refreshRenders]);
+
+  // Cross-tab navigation: when the Workbench fires "Edit in Studio" we
+  // receive a generation id via props. Find the matching source, select
+  // it, then tell the parent we're done so the intent doesn't re-fire.
+  useEffect(() => {
+    if (!pendingSourceId) return;
+    const match = session.sources.find((s) => s.id === pendingSourceId);
+    if (match) {
+      studio.selectSource(match);
+      onPendingSourceConsumed();
+    } else if (!session.loadingSources && session.sources.length > 0) {
+      // Sources loaded but the id isn't there — stale link. Clear so
+      // the user isn't stuck.
+      onPendingSourceConsumed();
+    }
+  }, [
+    pendingSourceId,
+    session.sources,
+    session.loadingSources,
+    studio.selectSource,
+    onPendingSourceConsumed,
+  ]);
 
   useEffect(() => {
     if (session.error) onToast(`${t.studioApplyFailed}: ${session.error}`);
@@ -97,6 +125,7 @@ export function StudioTab({ t, onToast }: Props) {
             onRemove={studio.removeOperation}
             onClear={studio.clearOperations}
             onApply={handleApply}
+            onCancelApply={studio.cancelApply}
             onClearRegion={handleClearRegion}
             onOutputFormatChange={setOutputFormat}
             onNeedRegion={() => onToast(t.studioNeedRegion)}
@@ -144,6 +173,44 @@ export function StudioTab({ t, onToast }: Props) {
               </p>
             )}
           </div>
+
+          <TranscribePanel
+            t={t}
+            enabled={session.selected !== null}
+            isTranscribing={session.isTranscribing}
+            transcript={session.transcript}
+            onTranscribe={(lang) => void studio.transcribe(lang)}
+            onCancel={studio.cancelTranscribe}
+          />
+
+          <VideoRenderPanel
+            t={t}
+            enabled={session.selected !== null}
+            cover={session.cover}
+            isUploadingCover={session.isUploadingCover}
+            hasTranscript={session.transcript !== null}
+            isRendering={session.isRendering}
+            videoUrl={session.videoUrl}
+            videoMeta={session.videoMeta}
+            onPickCover={(file) => void studio.setCover(file)}
+            onClearCover={studio.clearCover}
+            onRender={(options) => {
+              void studio.renderCurrent(options).then(() => {
+                void studio.refreshRenders();
+              });
+            }}
+            onCancelRender={studio.cancelRender}
+            onDownloadVideo={() => studio.downloadVideo()}
+            onClearVideo={studio.clearVideo}
+          />
+
+          <RecentRenders
+            t={t}
+            renders={session.renders}
+            loading={session.loadingRenders}
+            onRefresh={(kind) => void studio.refreshRenders(kind)}
+            onDelete={(id) => void studio.removeRender(id)}
+          />
         </div>
       </div>
     </div>

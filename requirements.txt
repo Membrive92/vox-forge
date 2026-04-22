@@ -31,6 +31,9 @@ audioop-lts; python_version >= "3.13"
 # ── TTS engines ─────────────────────────────────────────────────────
 edge-tts
 
+# ── Speech-to-text (Studio video subtitles) ─────────────────────────
+faster-whisper
+
 # ── GPU: voice cloning + conversion ─────────────────────────────────
 # XTTS v2 via Coqui TTS. Needs torch + transformers.
 torch

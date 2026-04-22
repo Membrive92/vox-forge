@@ -34,6 +34,14 @@ ALLOWED_DOCUMENT_TYPES: set[str] = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 
+# Allowed image content types for Studio cover upload.
+ALLOWED_IMAGE_TYPES: set[str] = {
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+}
+
 
 def validate_audio_upload(upload: UploadFile) -> None:
     """Reject if content_type is not a recognized audio format."""
@@ -45,6 +53,18 @@ def validate_audio_upload(upload: UploadFile) -> None:
             raise InvalidSampleError(
                 f"Unsupported audio type: {upload.content_type}. "
                 "Valid: wav, mp3, ogg, flac, webm, m4a"
+            )
+
+
+def validate_image_upload(upload: UploadFile) -> None:
+    """Reject if content_type is not a recognized image format."""
+    ctype = (upload.content_type or "").lower()
+    if ctype not in ALLOWED_IMAGE_TYPES:
+        fname = (upload.filename or "").lower()
+        if not fname.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            raise InvalidSampleError(
+                f"Unsupported image type: {upload.content_type}. "
+                "Valid: png, jpg, jpeg, webp"
             )
 
 

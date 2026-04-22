@@ -1,30 +1,49 @@
-"""Studio module — audio editor.
+"""Studio module — audio editor + video renderer.
 
 Endpoints:
-- ``GET  /api/studio/sources``   list editable chapter generations
-- ``POST /api/studio/edit``      apply a queue of edit operations
-- ``GET  /api/studio/audio``     serve an audio file for wavesurfer.js
+- ``GET  /api/studio/sources``        list editable chapter generations
+- ``POST /api/studio/edit``           apply a queue of edit operations
+- ``GET  /api/studio/audio``          serve an audio file for wavesurfer.js
+- ``POST /api/studio/transcribe``     speech-to-text → SRT (Phase B.1)
+- ``POST /api/studio/upload-cover``   upload cover image for video render (Phase B.2)
+- ``POST /api/studio/render-video``   compose MP4 via ffmpeg (Phase B.2)
+- ``GET  /api/studio/renders``        list persisted renders (Phase B.2)
+- ``DELETE /api/studio/renders/{id}`` remove a render record (Phase B.2)
 """
 from __future__ import annotations
 
+import json
 import logging
+import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import FileResponse
 
 import aiosqlite
 
 from ..catalogs import AUDIO_FORMATS
 from ..database import get_db
+from ..dependencies import get_transcriber, get_video_renderer
 from ..exceptions import InvalidSampleError, SampleNotFound, UnsupportedFormatError
-from ..paths import JOBS_DIR, OUTPUT_DIR, STUDIO_DIR
+from ..paths import JOBS_DIR, OUTPUT_DIR, STUDIO_COVERS_DIR, STUDIO_DIR
 from ..schemas import (
+    CoverUploadResponse,
+    RenderVideoRequest,
+    SrtEntry,
     StudioEditRequest,
+    StudioRender,
+    StudioRendersResponse,
     StudioSource,
     StudioSourcesResponse,
+    TranscribeRequest,
+    TranscribeResponse,
 )
+from ..services import studio_store
 from ..services.audio_editor import EditOperation, apply_operations
+from ..services.transcriber import Transcriber
+from ..services.video_renderer import VideoRenderer
+from ..upload_utils import read_upload_safely, validate_image_upload
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +87,10 @@ async def list_sources() -> StudioSourcesResponse:
     async with get_db() as db:
         cursor = await db.execute(
             """SELECT g.id, g.file_path, g.duration, g.created_at,
-                      c.title AS chapter_title,
-                      p.name  AS project_name
+                      g.chapter_id,
+                      c.title     AS chapter_title,
+                      c.project_id,
+                      p.name      AS project_name
                FROM generations g
                JOIN chapters c ON c.id = g.chapter_id
                JOIN projects p ON p.id = c.project_id
@@ -88,6 +109,8 @@ async def list_sources() -> StudioSourcesResponse:
             StudioSource(
                 id=row["id"],
                 kind="chapter",
+                project_id=row["project_id"],
+                chapter_id=row["chapter_id"],
                 project_name=row["project_name"],
                 chapter_title=row["chapter_title"],
                 source_path=str(path.resolve()),
@@ -101,7 +124,13 @@ async def list_sources() -> StudioSourcesResponse:
 
 @router.post("/edit", summary="Apply a batch of edit operations")
 async def edit_audio(request: StudioEditRequest) -> FileResponse:
-    """Apply ``operations`` to ``source_path`` and return the new file."""
+    """Apply ``operations`` to ``source_path`` and return the new file.
+
+    When ``chapter_id`` is provided the output is also persisted to
+    ``studio_renders`` (kind="audio") so the Workbench can discover
+    "N edited versions" of a chapter and the Recent Renders panel
+    surfaces it automatically.
+    """
     if request.output_format not in AUDIO_FORMATS:
         raise UnsupportedFormatError(
             f"Unsupported format: {request.output_format}"
@@ -116,9 +145,31 @@ async def edit_audio(request: StudioEditRequest) -> FileResponse:
     ops = [EditOperation(type=op.type, params=dict(op.params)) for op in request.operations]
     output = apply_operations(source, ops, output_format=request.output_format)
 
+    # Duration of the resulting audio so the Workbench can show "2.3s"
+    # next to each edited version without a second HEAD request.
+    try:
+        from pydub import AudioSegment
+        duration_s = float(len(AudioSegment.from_file(str(output)))) / 1000.0
+    except Exception:  # noqa: BLE001
+        duration_s = 0.0
+
+    # Only persist when the caller linked the edit to a chapter — free
+    # ad-hoc edits (someone trimming an ambient sample) stay throwaway.
+    if request.chapter_id:
+        await studio_store.create_render(
+            kind="audio",
+            source_path=str(source.resolve()),
+            output_path=str(output.resolve()),
+            operations=json.dumps([op.model_dump() for op in request.operations]),
+            project_id=request.project_id,
+            chapter_id=request.chapter_id,
+            duration_s=duration_s,
+            size_bytes=output.stat().st_size,
+        )
+
     logger.info(
-        "Studio edit: %s -> %s (%d ops)",
-        source.name, output.name, len(ops),
+        "Studio edit: %s -> %s (%d ops, chapter=%s)",
+        source.name, output.name, len(ops), request.chapter_id or "-",
     )
     return FileResponse(
         str(output),
@@ -129,6 +180,151 @@ async def edit_audio(request: StudioEditRequest) -> FileResponse:
             "X-Operations-Count": str(len(ops)),
         },
     )
+
+
+@router.post(
+    "/transcribe",
+    summary="Transcribe a Studio source audio file to SRT",
+    response_model=TranscribeResponse,
+)
+async def transcribe(
+    request: TranscribeRequest,
+    transcriber: Transcriber = Depends(get_transcriber),
+) -> TranscribeResponse:
+    """Run faster-whisper on ``source_path`` and return the SRT + parsed entries."""
+    source = Path(request.source_path)
+    if not _is_within_allowed_roots(source):
+        raise InvalidSampleError("Source path is outside allowed directories")
+    if not source.exists() or not source.is_file():
+        raise SampleNotFound("Source audio not found")
+
+    result = await transcriber.transcribe_async(source, language=request.language)
+    entries = [
+        SrtEntry(index=s.index, start_s=s.start, end_s=s.end, text=s.text)
+        for s in result.segments
+    ]
+    logger.info(
+        "Studio transcribe: %s -> %s (%d segments, %s)",
+        source.name, result.srt_path.name, len(entries), result.engine,
+    )
+    return TranscribeResponse(
+        srt_path=str(result.srt_path.resolve()),
+        duration_s=result.duration_s,
+        word_count=result.word_count,
+        language=result.language,
+        engine=result.engine,
+        entries=entries,
+    )
+
+
+@router.post(
+    "/upload-cover",
+    summary="Upload a cover image for video rendering",
+    response_model=CoverUploadResponse,
+)
+async def upload_cover(cover: UploadFile = File(...)) -> CoverUploadResponse:
+    validate_image_upload(cover)
+    ext = Path(cover.filename or "").suffix.lower() or ".png"
+    if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+        ext = ".png"
+    filename = f"cover_{str(uuid.uuid4())[:12]}{ext}"
+    filepath = STUDIO_COVERS_DIR / filename
+
+    STUDIO_COVERS_DIR.mkdir(parents=True, exist_ok=True)
+    content = await read_upload_safely(cover)
+    filepath.write_bytes(content)
+
+    logger.info("Cover uploaded: %s (%d bytes)", filename, len(content))
+    return CoverUploadResponse(
+        filename=filename,
+        path=str(filepath.resolve()),
+        size_kb=round(len(content) / 1024, 1),
+        content_type=cover.content_type or "application/octet-stream",
+    )
+
+
+@router.post("/render-video", summary="Render an MP4 from audio + cover")
+async def render_video(
+    request: RenderVideoRequest,
+    renderer: VideoRenderer = Depends(get_video_renderer),
+) -> FileResponse:
+    audio_path = Path(request.audio_path)
+    cover_path = Path(request.cover_path)
+    subs_path = Path(request.subtitles_path) if request.subtitles_path else None
+
+    # All input paths must live inside one of the allowed Studio roots —
+    # same guard as /edit and /audio so a request cannot pull arbitrary
+    # files off disk and ship them through ffmpeg.
+    for p in (audio_path, cover_path, *( [subs_path] if subs_path else [] )):
+        if not _is_within_allowed_roots(p):
+            raise InvalidSampleError("Input path is outside allowed directories")
+
+    result = await renderer.render(
+        audio_path=audio_path,
+        cover_path=cover_path,
+        subtitles_path=subs_path,
+        options=request.options,
+    )
+
+    # Persist a history row so the FE can show recent renders.
+    await studio_store.create_render(
+        kind="video",
+        source_path=str(audio_path.resolve()),
+        output_path=str(result.output_path.resolve()),
+        operations=json.dumps(request.options.model_dump()),
+        project_id=request.project_id,
+        chapter_id=request.chapter_id,
+        duration_s=result.duration_s,
+        size_bytes=result.size_bytes,
+    )
+
+    logger.info(
+        "Studio video rendered: %s (%.1fs, %d KB)",
+        result.output_path.name, result.duration_s, result.size_bytes // 1024,
+    )
+    return FileResponse(
+        str(result.output_path),
+        media_type="video/mp4",
+        filename=result.output_path.name,
+        headers={
+            "X-Video-Duration": f"{result.duration_s:.2f}",
+            "X-Video-Size": str(result.size_bytes),
+            "X-Video-Resolution": request.options.resolution,
+        },
+    )
+
+
+@router.get(
+    "/renders",
+    summary="List persisted renders (audio edits + videos)",
+    response_model=StudioRendersResponse,
+)
+async def list_renders(
+    kind: str | None = Query(default=None, description="audio | video"),
+    chapter_id: str | None = Query(default=None, description="Filter by chapter"),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> StudioRendersResponse:
+    if kind is not None and kind not in ("audio", "video"):
+        raise InvalidSampleError(f"Invalid kind: {kind}. Valid: audio, video")
+    rows = await studio_store.list_renders(kind=kind, chapter_id=chapter_id, limit=limit)
+    renders = [StudioRender(**row) for row in rows]
+    return StudioRendersResponse(renders=renders, count=len(renders))
+
+
+@router.delete("/renders/{render_id}", summary="Delete a render record")
+async def delete_render(render_id: str) -> dict[str, str]:
+    row = await studio_store.get_render(render_id)
+    if not row:
+        raise SampleNotFound(f"Render not found: {render_id}")
+    # Best-effort delete of the actual file; the row is authoritative.
+    output = Path(row["output_path"])
+    if output.exists() and _is_within_allowed_roots(output):
+        try:
+            output.unlink()
+        except OSError as exc:  # noqa: PERF203
+            logger.warning("Could not delete render file %s: %s", output, exc)
+    await studio_store.delete_render(render_id)
+    return {"status": "deleted", "id": render_id}
 
 
 @router.get("/audio", summary="Serve an audio file by absolute path")

@@ -200,6 +200,22 @@ export const es = {
   workbenchExportStarted: "Exportación iniciada — el archivo se descargará cuando todos los capítulos estén sintetizados",
   workbenchDefaultProjectName: "Proyecto sin título",
   workbenchDefaultChapterName: "Capítulo {n}",
+  workbenchCover: "Portada",
+  workbenchUploadCover: "Subir portada",
+  workbenchChangeCover: "Cambiar",
+  workbenchCoverSet: "Portada guardada",
+  workbenchRenderVideo: "Renderizar vídeo",
+  workbenchRendering: "Renderizando…",
+  workbenchVideoReady: "Vídeo renderizado",
+  workbenchNeedCoverFirst: "Añade una portada al proyecto antes de renderizar vídeo",
+  workbenchVideoCount: "{n} vídeos",
+  chapterStatusSynth: "Sintetizado",
+  chapterStatusEdits: "{n} ediciones",
+  chapterStatusVideos: "{n} vídeos",
+  chapterCharactersDetected: "{n} personajes",
+  chapterCharactersHint: "Etiquetas [Nombre] detectadas — asignar voces en Casting",
+  workbenchIncompleteJobs: "{n} trabajos de síntesis interrumpidos esperan reanudarse.",
+  workbenchResumeJobs: "Ir a Síntesis rápida",
 
   // ── Chapter toolbar ──────────────────────────────────────────────
   chapterPreview: "Previsualizar",
@@ -215,6 +231,8 @@ export const es = {
   chunkClickToSynth: "Pulsa 'Sintetizar capítulo' para generar el audio",
   chunkRegen: "Regen",
   chunkRegenerating: "...",
+  chunkOpenInStudio: "Editar en Studio",
+  chunkEditedCount: "{n} ediciones",
 
   // ── Character casting ────────────────────────────────────────────
   castingNoTagsFound: "No se han encontrado etiquetas de personajes. Usa [Nombre] al inicio de las líneas.",
@@ -237,6 +255,12 @@ export const es = {
   previewDescription: "Primeros {n} caracteres · sin chunking · audición rápida",
   previewButton: "Previsualizar",
   previewLoading: "...",
+  previewCancelled: "Previsualización cancelada",
+
+  // Cancellation toasts (shared across tabs)
+  synthesisCancelled: "Síntesis cancelada",
+  renderCancelled: "Renderizado cancelado",
+  processingCancelled: "Proceso cancelado",
 
   // ── Ambience mixer ───────────────────────────────────────────────
   ambientMixerTitle: "Mezclador ambiental",
@@ -327,6 +351,49 @@ export const es = {
   studioSelectChapterHint: "Selecciona un capítulo a la izquierda para cargar su waveform.",
   studioDragHint: "Arrastra sobre el waveform para seleccionar una región. Redimensiona arrastrando sus bordes.",
   studioRemoveOperation: "Quitar operación",
+
+  // Studio — transcribe panel (B.1)
+  studioTranscribeTitle: "Transcripción",
+  studioTranscribeHint: "Genera subtítulos automáticos con Whisper. Úsalos después para quemar los subtítulos en el vídeo.",
+  studioTranscribeStart: "Transcribir",
+  studioTranscribing: "Transcribiendo…",
+  studioTranscribeRegen: "Re-transcribir",
+  studioTranscribeEmpty: "Sin transcripción todavía.",
+  studioTranscribeDone: "{n} segmentos · {w} palabras · {engine}",
+  studioTranscribeLangHint: "Idioma (vacío = auto)",
+
+  // Studio — video render panel (B.2)
+  studioVideoTitle: "Render de vídeo",
+  studioVideoHint: "Combina el audio con una imagen de portada y los subtítulos para generar un MP4.",
+  studioVideoCover: "Imagen de portada",
+  studioVideoUploadCover: "Subir portada",
+  studioVideoUploadingCover: "Subiendo…",
+  studioVideoChangeCover: "Cambiar portada",
+  studioVideoCoverLoaded: "Portada cargada",
+  studioVideoNoCover: "Añade una imagen (PNG, JPG o WEBP)",
+  studioVideoResolution: "Resolución",
+  studioVideoKenBurns: "Zoom suave (Ken Burns)",
+  studioVideoWaveform: "Overlay de onda",
+  studioVideoTitleText: "Título (opcional)",
+  studioVideoTitlePlaceholder: "Ej: Capítulo 1 — La Torre",
+  studioVideoSubsMode: "Subtítulos",
+  studioVideoSubsNone: "Sin subtítulos",
+  studioVideoSubsBurn: "Quemados en el vídeo",
+  studioVideoSubsSoft: "Pista separada",
+  studioVideoSubsNeedTranscript: "Transcribe primero para usar subtítulos",
+  studioVideoRender: "Renderizar vídeo",
+  studioVideoRendering: "Renderizando…",
+  studioVideoResult: "Vídeo listo",
+  studioVideoDownload: "Descargar MP4",
+  studioVideoClear: "Descartar",
+
+  // Studio — recent renders (B.2)
+  studioRecentTitle: "Renders recientes",
+  studioRecentEmpty: "Aún no has renderizado nada.",
+  studioRecentFilterAll: "Todos",
+  studioRecentFilterAudio: "Audio",
+  studioRecentFilterVideo: "Vídeo",
+  studioRecentDelete: "Eliminar",
 } as const;
 
 export type TranslationKey = keyof typeof es;

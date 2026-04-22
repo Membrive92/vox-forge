@@ -2369,7 +2369,7 @@
           "studio"
         ],
         "summary": "Apply a batch of edit operations",
-        "description": "Apply ``operations`` to ``source_path`` and return the new file.",
+        "description": "Apply ``operations`` to ``source_path`` and return the new file.\n\nWhen ``chapter_id`` is provided the output is also persisted to\n``studio_renders`` (kind=\"audio\") so the Workbench can discover\n\"N edited versions\" of a chapter and the Recent Renders panel\nsurfaces it automatically.",
         "operationId": "edit_audio_api_studio_edit_post",
         "requestBody": {
           "content": {
@@ -2387,6 +2387,255 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/transcribe": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Transcribe a Studio source audio file to SRT",
+        "description": "Run faster-whisper on ``source_path`` and return the SRT + parsed entries.",
+        "operationId": "transcribe_api_studio_transcribe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranscribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscribeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/upload-cover": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Upload a cover image for video rendering",
+        "operationId": "upload_cover_api_studio_upload_cover_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_cover_api_studio_upload_cover_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/render-video": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Render an MP4 from audio + cover",
+        "operationId": "render_video_api_studio_render_video_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderVideoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/renders": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "List persisted renders (audio edits + videos)",
+        "operationId": "list_renders_api_studio_renders_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "audio | video",
+              "title": "Kind"
+            },
+            "description": "audio | video"
+          },
+          {
+            "name": "chapter_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by chapter",
+              "title": "Chapter Id"
+            },
+            "description": "Filter by chapter"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudioRendersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/renders/{render_id}": {
+      "delete": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Delete a render record",
+        "operationId": "delete_render_api_studio_renders__render_id__delete",
+        "parameters": [
+          {
+            "name": "render_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Render Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Render Api Studio Renders  Render Id  Delete"
+                }
               }
             }
           },
@@ -2744,6 +2993,20 @@
         ],
         "title": "Body_upload_ambience_api_ambience_post"
       },
+      "Body_upload_cover_api_studio_upload_cover_post": {
+        "properties": {
+          "cover": {
+            "type": "string",
+            "format": "binary",
+            "title": "Cover"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cover"
+        ],
+        "title": "Body_upload_cover_api_studio_upload_cover_post"
+      },
       "Body_upload_voice_sample_api_voices_upload_sample_post": {
         "properties": {
           "sample": {
@@ -2931,6 +3194,34 @@
           "character"
         ],
         "title": "CharacterMapping"
+      },
+      "CoverUploadResponse": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "size_kb": {
+            "type": "number",
+            "title": "Size Kb"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "path",
+          "size_kb",
+          "content_type"
+        ],
+        "title": "CoverUploadResponse"
       },
       "DeletedResponse": {
         "properties": {
@@ -3467,6 +3758,17 @@
             "minimum": 0.0,
             "title": "Volume",
             "default": 80
+          },
+          "cover_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Path"
           }
         },
         "type": "object",
@@ -3583,6 +3885,17 @@
               }
             ],
             "title": "Volume"
+          },
+          "cover_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Path"
           }
         },
         "type": "object",
@@ -3630,6 +3943,63 @@
           "count"
         ],
         "title": "PronunciationListResponse"
+      },
+      "RenderVideoRequest": {
+        "properties": {
+          "audio_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Audio Path"
+          },
+          "cover_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cover Path"
+          },
+          "subtitles_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitles Path"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
+          },
+          "options": {
+            "$ref": "#/components/schemas/VideoOptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio_path",
+          "cover_path"
+        ],
+        "title": "RenderVideoRequest",
+        "description": "Render a Studio source + cover into an MP4."
       },
       "SampleUploadResponse": {
         "properties": {
@@ -3709,6 +4079,38 @@
         ],
         "title": "SplitRequest"
       },
+      "SrtEntry": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Index"
+          },
+          "start_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Start S"
+          },
+          "end_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "End S"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "start_s",
+          "end_s",
+          "text"
+        ],
+        "title": "SrtEntry",
+        "description": "A single line in an SRT subtitle file."
+      },
       "StudioEditRequest": {
         "properties": {
           "source_path": {
@@ -3728,6 +4130,28 @@
             "type": "string",
             "title": "Output Format",
             "default": "mp3"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
           }
         },
         "type": "object",
@@ -3736,7 +4160,7 @@
           "operations"
         ],
         "title": "StudioEditRequest",
-        "description": "Apply a sequence of edit operations to a source audio file."
+        "description": "Apply a sequence of edit operations to a source audio file.\n\n``project_id`` / ``chapter_id`` are optional but strongly encouraged\nwhen the source came from a chapter's generation — they let the\npersisted ``studio_renders`` row link back so the Workbench can\nsurface \"N edited versions\" indicators."
       },
       "StudioOperation": {
         "properties": {
@@ -3760,6 +4184,104 @@
         "title": "StudioOperation",
         "description": "A single edit step in a Studio batch."
       },
+      "StudioRender": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source_path": {
+            "type": "string",
+            "title": "Source Path"
+          },
+          "output_path": {
+            "type": "string",
+            "title": "Output Path"
+          },
+          "operations": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operations"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "source_path",
+          "output_path",
+          "duration_s",
+          "size_bytes",
+          "created_at"
+        ],
+        "title": "StudioRender",
+        "description": "Persisted render row (audio edit or video)."
+      },
+      "StudioRendersResponse": {
+        "properties": {
+          "renders": {
+            "items": {
+              "$ref": "#/components/schemas/StudioRender"
+            },
+            "type": "array",
+            "title": "Renders"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "renders",
+          "count"
+        ],
+        "title": "StudioRendersResponse"
+      },
       "StudioSource": {
         "properties": {
           "id": {
@@ -3769,6 +4291,28 @@
           "kind": {
             "type": "string",
             "title": "Kind"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id"
           },
           "project_name": {
             "type": "string",
@@ -3938,6 +4482,81 @@
         "title": "SynthesisRequest",
         "description": "Text-to-speech synthesis request."
       },
+      "TranscribeRequest": {
+        "properties": {
+          "source_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Path"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "tiny|base|small|medium|large-v3",
+            "default": "small"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "description": "ISO code (es, en, ...). None -> auto-detect."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_path"
+        ],
+        "title": "TranscribeRequest",
+        "description": "Transcribe a Studio-visible audio file."
+      },
+      "TranscribeResponse": {
+        "properties": {
+          "srt_path": {
+            "type": "string",
+            "title": "Srt Path"
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          },
+          "word_count": {
+            "type": "integer",
+            "title": "Word Count"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/SrtEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "srt_path",
+          "duration_s",
+          "word_count",
+          "language",
+          "engine",
+          "entries"
+        ],
+        "title": "TranscribeResponse",
+        "description": "Transcription result for a Studio source."
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -3970,6 +4589,47 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VideoOptions": {
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "title": "Resolution",
+            "description": "1920x1080 or 1280x720",
+            "default": "1920x1080"
+          },
+          "ken_burns": {
+            "type": "boolean",
+            "title": "Ken Burns",
+            "default": true
+          },
+          "waveform_overlay": {
+            "type": "boolean",
+            "title": "Waveform Overlay",
+            "default": true
+          },
+          "title_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Text"
+          },
+          "subtitles_mode": {
+            "type": "string",
+            "title": "Subtitles Mode",
+            "description": "none | burn | soft",
+            "default": "burn"
+          }
+        },
+        "type": "object",
+        "title": "VideoOptions",
+        "description": "Visual options passed to the Studio video renderer."
       },
       "VoiceMeta": {
         "properties": {

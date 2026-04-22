@@ -153,6 +153,8 @@ class StudioSource(BaseModel):
 
     id: str
     kind: str  # "chapter" | "mix"
+    project_id: Optional[str] = None
+    chapter_id: Optional[str] = None
     project_name: str
     chapter_title: str
     source_path: str
@@ -173,8 +175,95 @@ class StudioOperation(BaseModel):
 
 
 class StudioEditRequest(BaseModel):
-    """Apply a sequence of edit operations to a source audio file."""
+    """Apply a sequence of edit operations to a source audio file.
+
+    ``project_id`` / ``chapter_id`` are optional but strongly encouraged
+    when the source came from a chapter's generation — they let the
+    persisted ``studio_renders`` row link back so the Workbench can
+    surface "N edited versions" indicators.
+    """
 
     source_path: str = Field(..., min_length=1)
     operations: list[StudioOperation] = Field(..., min_length=1)
     output_format: str = Field(default="mp3")
+    project_id: Optional[str] = None
+    chapter_id: Optional[str] = None
+
+
+class SrtEntry(BaseModel):
+    """A single line in an SRT subtitle file."""
+
+    index: int = Field(..., ge=1)
+    start_s: float = Field(..., ge=0)
+    end_s: float = Field(..., ge=0)
+    text: str
+
+
+class TranscribeRequest(BaseModel):
+    """Transcribe a Studio-visible audio file."""
+
+    source_path: str = Field(..., min_length=1)
+    model: str = Field(default="small", description="tiny|base|small|medium|large-v3")
+    language: Optional[str] = Field(
+        default=None,
+        description="ISO code (es, en, ...). None -> auto-detect.",
+    )
+
+
+class TranscribeResponse(BaseModel):
+    """Transcription result for a Studio source."""
+
+    srt_path: str
+    duration_s: float
+    word_count: int
+    language: str
+    engine: str
+    entries: list[SrtEntry]
+
+
+class VideoOptions(BaseModel):
+    """Visual options passed to the Studio video renderer."""
+
+    resolution: str = Field(default="1920x1080", description="1920x1080 or 1280x720")
+    ken_burns: bool = True
+    waveform_overlay: bool = True
+    title_text: Optional[str] = Field(default=None, max_length=200)
+    subtitles_mode: str = Field(default="burn", description="none | burn | soft")
+
+
+class RenderVideoRequest(BaseModel):
+    """Render a Studio source + cover into an MP4."""
+
+    audio_path: str = Field(..., min_length=1)
+    cover_path: str = Field(..., min_length=1)
+    subtitles_path: Optional[str] = None
+    project_id: Optional[str] = None
+    chapter_id: Optional[str] = None
+    options: VideoOptions = Field(default_factory=VideoOptions)
+
+
+class StudioRender(BaseModel):
+    """Persisted render row (audio edit or video)."""
+
+    id: str
+    kind: str
+    source_path: str
+    output_path: str
+    operations: Optional[str] = None
+    project_id: Optional[str] = None
+    chapter_id: Optional[str] = None
+    duration_s: float
+    size_bytes: int
+    created_at: str
+
+
+class StudioRendersResponse(BaseModel):
+    renders: list[StudioRender]
+    count: int
+
+
+class CoverUploadResponse(BaseModel):
+    filename: str
+    path: str
+    size_kb: float
+    content_type: str

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS projects (
     pitch       INTEGER NOT NULL DEFAULT 0,
     volume      INTEGER NOT NULL DEFAULT 80,
     output_format TEXT NOT NULL DEFAULT 'mp3',
+    cover_path  TEXT DEFAULT NULL,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
@@ -81,9 +82,29 @@ CREATE TABLE IF NOT EXISTS takes (
     created_at      TEXT NOT NULL
 );
 
+-- Studio module: audio edits + video renders (Phase B)
+-- ``project_id`` / ``chapter_id`` are nullable because a user may
+-- edit a standalone audio file (e.g. an ambient mix) that isn't tied
+-- to a chapter. Intentionally no FK constraint — renders are
+-- historical artefacts and should survive chapter/project deletions.
+CREATE TABLE IF NOT EXISTS studio_renders (
+    id            TEXT PRIMARY KEY,
+    kind          TEXT NOT NULL,         -- "audio" | "video"
+    source_path   TEXT NOT NULL,
+    output_path   TEXT NOT NULL,
+    operations    TEXT,                  -- JSON (audio edits) or video options
+    project_id    TEXT,
+    chapter_id    TEXT,
+    duration_s    REAL NOT NULL DEFAULT 0,
+    size_bytes    INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_chapters_project ON chapters(project_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_generations_chapter ON generations(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_takes_generation ON takes(generation_id, chunk_index);
+CREATE INDEX IF NOT EXISTS idx_studio_renders_chapter ON studio_renders(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_studio_renders_created ON studio_renders(created_at DESC);
 """
 
 
@@ -92,6 +113,17 @@ async def init_db() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await db.executescript(_SCHEMA_SQL)
+        # In-place migration: add columns introduced after a DB was
+        # first created. SQLite has no ``ADD COLUMN IF NOT EXISTS``, so
+        # we try/except on the duplicate-column error.
+        for column_def in (
+            "ALTER TABLE projects ADD COLUMN cover_path TEXT DEFAULT NULL",
+        ):
+            try:
+                await db.execute(column_def)
+            except aiosqlite.OperationalError as exc:  # noqa: PERF203
+                if "duplicate column" not in str(exc).lower():
+                    raise
         await db.commit()
     logger.info("Database initialized at %s", DB_PATH)
 

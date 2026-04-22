@@ -202,6 +202,22 @@ export const en: Record<TranslationKey, string> = {
   workbenchExportStarted: "Export started — the file will download when all chapters are synthesized",
   workbenchDefaultProjectName: "Untitled Project",
   workbenchDefaultChapterName: "Chapter {n}",
+  workbenchCover: "Cover",
+  workbenchUploadCover: "Upload cover",
+  workbenchChangeCover: "Change",
+  workbenchCoverSet: "Cover saved",
+  workbenchRenderVideo: "Render video",
+  workbenchRendering: "Rendering…",
+  workbenchVideoReady: "Video rendered",
+  workbenchNeedCoverFirst: "Add a project cover before rendering video",
+  workbenchVideoCount: "{n} videos",
+  chapterStatusSynth: "Synthesized",
+  chapterStatusEdits: "{n} edits",
+  chapterStatusVideos: "{n} videos",
+  chapterCharactersDetected: "{n} characters",
+  chapterCharactersHint: "[Name] tags detected — assign voices in Cast",
+  workbenchIncompleteJobs: "{n} interrupted synthesis jobs waiting to resume.",
+  workbenchResumeJobs: "Go to Quick Synth",
 
   // ── Chapter toolbar ──────────────────────────────────────────────
   chapterPreview: "Preview",
@@ -217,6 +233,8 @@ export const en: Record<TranslationKey, string> = {
   chunkClickToSynth: "Click 'Synthesize chapter' to generate audio",
   chunkRegen: "Regen",
   chunkRegenerating: "...",
+  chunkOpenInStudio: "Edit in Studio",
+  chunkEditedCount: "{n} edits",
 
   // ── Character casting ────────────────────────────────────────────
   castingNoTagsFound: "No character tags found. Use [Name] markup at the start of lines.",
@@ -239,6 +257,12 @@ export const en: Record<TranslationKey, string> = {
   previewDescription: "First {n} chars · no chunking · fast audition",
   previewButton: "Preview",
   previewLoading: "...",
+  previewCancelled: "Preview cancelled",
+
+  // Cancellation toasts (shared across tabs)
+  synthesisCancelled: "Synthesis cancelled",
+  renderCancelled: "Render cancelled",
+  processingCancelled: "Processing cancelled",
 
   // ── Ambience mixer ───────────────────────────────────────────────
   ambientMixerTitle: "Ambient mixer",
@@ -329,4 +353,47 @@ export const en: Record<TranslationKey, string> = {
   studioSelectChapterHint: "Select a chapter on the left to load its waveform.",
   studioDragHint: "Drag on the waveform to select a region. Resize by dragging its edges.",
   studioRemoveOperation: "Remove operation",
+
+  // Studio — transcribe panel (B.1)
+  studioTranscribeTitle: "Transcription",
+  studioTranscribeHint: "Auto-generate subtitles with Whisper. Use them later to burn subs into your video.",
+  studioTranscribeStart: "Transcribe",
+  studioTranscribing: "Transcribing…",
+  studioTranscribeRegen: "Re-transcribe",
+  studioTranscribeEmpty: "No transcription yet.",
+  studioTranscribeDone: "{n} segments · {w} words · {engine}",
+  studioTranscribeLangHint: "Language (leave blank for auto)",
+
+  // Studio — video render panel (B.2)
+  studioVideoTitle: "Video render",
+  studioVideoHint: "Combine the audio with a cover image and subtitles to produce an MP4.",
+  studioVideoCover: "Cover image",
+  studioVideoUploadCover: "Upload cover",
+  studioVideoUploadingCover: "Uploading…",
+  studioVideoChangeCover: "Change cover",
+  studioVideoCoverLoaded: "Cover loaded",
+  studioVideoNoCover: "Add an image (PNG, JPG or WEBP)",
+  studioVideoResolution: "Resolution",
+  studioVideoKenBurns: "Slow zoom (Ken Burns)",
+  studioVideoWaveform: "Waveform overlay",
+  studioVideoTitleText: "Title (optional)",
+  studioVideoTitlePlaceholder: "e.g. Chapter 1 — The Tower",
+  studioVideoSubsMode: "Subtitles",
+  studioVideoSubsNone: "No subtitles",
+  studioVideoSubsBurn: "Burn into the video",
+  studioVideoSubsSoft: "Soft track",
+  studioVideoSubsNeedTranscript: "Transcribe first to use subtitles",
+  studioVideoRender: "Render video",
+  studioVideoRendering: "Rendering…",
+  studioVideoResult: "Video ready",
+  studioVideoDownload: "Download MP4",
+  studioVideoClear: "Discard",
+
+  // Studio — recent renders (B.2)
+  studioRecentTitle: "Recent renders",
+  studioRecentEmpty: "No renders yet.",
+  studioRecentFilterAll: "All",
+  studioRecentFilterAudio: "Audio",
+  studioRecentFilterVideo: "Video",
+  studioRecentDelete: "Delete",
 };

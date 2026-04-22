@@ -894,9 +894,102 @@ export interface paths {
         /**
          * Apply a batch of edit operations
          * @description Apply ``operations`` to ``source_path`` and return the new file.
+         *
+         *     When ``chapter_id`` is provided the output is also persisted to
+         *     ``studio_renders`` (kind="audio") so the Workbench can discover
+         *     "N edited versions" of a chapter and the Recent Renders panel
+         *     surfaces it automatically.
          */
         post: operations["edit_audio_api_studio_edit_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/transcribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transcribe a Studio source audio file to SRT
+         * @description Run faster-whisper on ``source_path`` and return the SRT + parsed entries.
+         */
+        post: operations["transcribe_api_studio_transcribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/upload-cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload a cover image for video rendering */
+        post: operations["upload_cover_api_studio_upload_cover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/render-video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Render an MP4 from audio + cover */
+        post: operations["render_video_api_studio_render_video_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/renders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List persisted renders (audio edits + videos) */
+        get: operations["list_renders_api_studio_renders_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/renders/{render_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a render record */
+        delete: operations["delete_render_api_studio_renders__render_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1132,6 +1225,14 @@ export interface components {
              */
             tags: string;
         };
+        /** Body_upload_cover_api_studio_upload_cover_post */
+        Body_upload_cover_api_studio_upload_cover_post: {
+            /**
+             * Cover
+             * Format: binary
+             */
+            cover: string;
+        };
         /** Body_upload_voice_sample_api_voices_upload_sample_post */
         Body_upload_voice_sample_api_voices_upload_sample_post: {
             /**
@@ -1211,6 +1312,17 @@ export interface components {
              * @default
              */
             voice_id: string;
+        };
+        /** CoverUploadResponse */
+        CoverUploadResponse: {
+            /** Filename */
+            filename: string;
+            /** Path */
+            path: string;
+            /** Size Kb */
+            size_kb: number;
+            /** Content Type */
+            content_type: string;
         };
         /** DeletedResponse */
         DeletedResponse: {
@@ -1436,6 +1548,8 @@ export interface components {
              * @default 80
              */
             volume: number;
+            /** Cover Path */
+            cover_path?: string | null;
         };
         /** ProjectUpdate */
         ProjectUpdate: {
@@ -1457,6 +1571,8 @@ export interface components {
             pitch?: number | null;
             /** Volume */
             volume?: number | null;
+            /** Cover Path */
+            cover_path?: string | null;
         };
         /** PronunciationEntry */
         PronunciationEntry: {
@@ -1473,6 +1589,23 @@ export interface components {
             };
             /** Count */
             count: number;
+        };
+        /**
+         * RenderVideoRequest
+         * @description Render a Studio source + cover into an MP4.
+         */
+        RenderVideoRequest: {
+            /** Audio Path */
+            audio_path: string;
+            /** Cover Path */
+            cover_path: string;
+            /** Subtitles Path */
+            subtitles_path?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Chapter Id */
+            chapter_id?: string | null;
+            options?: components["schemas"]["VideoOptions"];
         };
         /**
          * SampleUploadResponse
@@ -1505,8 +1638,27 @@ export interface components {
             delimiter: string;
         };
         /**
+         * SrtEntry
+         * @description A single line in an SRT subtitle file.
+         */
+        SrtEntry: {
+            /** Index */
+            index: number;
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Text */
+            text: string;
+        };
+        /**
          * StudioEditRequest
          * @description Apply a sequence of edit operations to a source audio file.
+         *
+         *     ``project_id`` / ``chapter_id`` are optional but strongly encouraged
+         *     when the source came from a chapter's generation � they let the
+         *     persisted ``studio_renders`` row link back so the Workbench can
+         *     surface "N edited versions" indicators.
          */
         StudioEditRequest: {
             /** Source Path */
@@ -1518,6 +1670,10 @@ export interface components {
              * @default mp3
              */
             output_format: string;
+            /** Project Id */
+            project_id?: string | null;
+            /** Chapter Id */
+            chapter_id?: string | null;
         };
         /**
          * StudioOperation
@@ -1535,6 +1691,39 @@ export interface components {
             };
         };
         /**
+         * StudioRender
+         * @description Persisted render row (audio edit or video).
+         */
+        StudioRender: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Source Path */
+            source_path: string;
+            /** Output Path */
+            output_path: string;
+            /** Operations */
+            operations?: string | null;
+            /** Project Id */
+            project_id?: string | null;
+            /** Chapter Id */
+            chapter_id?: string | null;
+            /** Duration S */
+            duration_s: number;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Created At */
+            created_at: string;
+        };
+        /** StudioRendersResponse */
+        StudioRendersResponse: {
+            /** Renders */
+            renders: components["schemas"]["StudioRender"][];
+            /** Count */
+            count: number;
+        };
+        /**
          * StudioSource
          * @description An audio file the Studio editor can load.
          */
@@ -1543,6 +1732,10 @@ export interface components {
             id: string;
             /** Kind */
             kind: string;
+            /** Project Id */
+            project_id?: string | null;
+            /** Chapter Id */
+            chapter_id?: string | null;
             /** Project Name */
             project_name: string;
             /** Chapter Title */
@@ -1611,6 +1804,43 @@ export interface components {
             /** Track Number */
             track_number?: number | null;
         };
+        /**
+         * TranscribeRequest
+         * @description Transcribe a Studio-visible audio file.
+         */
+        TranscribeRequest: {
+            /** Source Path */
+            source_path: string;
+            /**
+             * Model
+             * @description tiny|base|small|medium|large-v3
+             * @default small
+             */
+            model: string;
+            /**
+             * Language
+             * @description ISO code (es, en, ...). None -> auto-detect.
+             */
+            language?: string | null;
+        };
+        /**
+         * TranscribeResponse
+         * @description Transcription result for a Studio source.
+         */
+        TranscribeResponse: {
+            /** Srt Path */
+            srt_path: string;
+            /** Duration S */
+            duration_s: number;
+            /** Word Count */
+            word_count: number;
+            /** Language */
+            language: string;
+            /** Engine */
+            engine: string;
+            /** Entries */
+            entries: components["schemas"]["SrtEntry"][];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1619,6 +1849,36 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * VideoOptions
+         * @description Visual options passed to the Studio video renderer.
+         */
+        VideoOptions: {
+            /**
+             * Resolution
+             * @description 1920x1080 or 1280x720
+             * @default 1920x1080
+             */
+            resolution: string;
+            /**
+             * Ken Burns
+             * @default true
+             */
+            ken_burns: boolean;
+            /**
+             * Waveform Overlay
+             * @default true
+             */
+            waveform_overlay: boolean;
+            /** Title Text */
+            title_text?: string | null;
+            /**
+             * Subtitles Mode
+             * @description none | burn | soft
+             * @default burn
+             */
+            subtitles_mode: string;
         };
         /** VoiceMeta */
         VoiceMeta: {
@@ -3446,6 +3706,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcribe_api_studio_transcribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranscribeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscribeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_cover_api_studio_upload_cover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_cover_api_studio_upload_cover_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    render_video_api_studio_render_video_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenderVideoRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_renders_api_studio_renders_get: {
+        parameters: {
+            query?: {
+                /** @description audio | video */
+                kind?: string | null;
+                /** @description Filter by chapter */
+                chapter_id?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudioRendersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_render_api_studio_renders__render_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                render_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */

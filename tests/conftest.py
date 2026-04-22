@@ -126,6 +126,43 @@ class _FakeTorch:
             pass
 
 
+class _FakeWhisperSegment:
+    """Mimics a ``faster_whisper`` segment just enough for the transcriber."""
+
+    def __init__(self, start: float, end: float, text: str) -> None:
+        self.start = start
+        self.end = end
+        self.text = text
+
+
+class _FakeWhisperInfo:
+    def __init__(self, language: str = "en", duration: float = 6.0) -> None:
+        self.language = language
+        self.duration = duration
+
+
+class _FakeWhisperModel:
+    """Returns 3 deterministic fake segments; no model download needed."""
+
+    def __init__(self, *_: object, **__: object) -> None:
+        pass
+
+    def transcribe(
+        self,
+        _audio_path: str,
+        *,
+        language: str | None = None,
+        beam_size: int = 5,
+    ) -> tuple[list[_FakeWhisperSegment], _FakeWhisperInfo]:
+        _ = beam_size  # silence unused
+        segments = [
+            _FakeWhisperSegment(0.0, 2.0, "Fake transcription line one."),
+            _FakeWhisperSegment(2.0, 4.0, "Line two of fake text."),
+            _FakeWhisperSegment(4.0, 6.0, "Final line."),
+        ]
+        return iter(segments), _FakeWhisperInfo(language=language or "en", duration=6.0)
+
+
 def _install_stubs() -> None:
     edge_tts = types.ModuleType("edge_tts")
     edge_tts.Communicate = _FakeCommunicate  # type: ignore[attr-defined]
@@ -152,6 +189,13 @@ def _install_stubs() -> None:
         sys.modules["openvoice"] = openvoice
         sys.modules["openvoice.api"] = openvoice_api
         sys.modules["openvoice.se_extractor"] = openvoice_se
+
+    # Stub faster_whisper so the Studio transcriber can be imported and
+    # exercised without the real model download.
+    if "faster_whisper" not in sys.modules:
+        fw = types.ModuleType("faster_whisper")
+        fw.WhisperModel = _FakeWhisperModel  # type: ignore[attr-defined]
+        sys.modules["faster_whisper"] = fw
 
 
 # ---------------------------------------------------------------------------
