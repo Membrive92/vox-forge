@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { API_BASE } from "@/api/client";
 import type { StudioRender } from "@/api/studio";
@@ -14,7 +14,8 @@ interface Props {
   t: Translations;
   renders: readonly StudioRender[];
   loading: boolean;
-  onRefresh: (kind?: "audio" | "video") => void;
+  currentChapterId: string | null;
+  onRefresh: (options?: { kind?: "audio" | "video"; chapterId?: string }) => void;
   onDelete: (renderId: string) => void;
 }
 
@@ -39,12 +40,36 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
-export function RecentRenders({ t, renders, loading, onRefresh, onDelete }: Props) {
+export function RecentRenders({ t, renders, loading, currentChapterId, onRefresh, onDelete }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [scopeToChapter, setScopeToChapter] = useState(false);
+
+  // When the user selects a different chapter source in Studio, default
+  // the scope to that chapter so they see its versions first. Explicit
+  // toggle still wins once the user clicks it.
+  useEffect(() => {
+    if (currentChapterId) setScopeToChapter(true);
+  }, [currentChapterId]);
+
+  const buildOptions = (
+    nextFilter: Filter,
+    nextScope: boolean,
+  ): { kind?: "audio" | "video"; chapterId?: string } => {
+    const opts: { kind?: "audio" | "video"; chapterId?: string } = {};
+    if (nextFilter !== "all") opts.kind = nextFilter;
+    if (nextScope && currentChapterId) opts.chapterId = currentChapterId;
+    return opts;
+  };
 
   const handleFilter = (f: Filter): void => {
     setFilter(f);
-    onRefresh(f === "all" ? undefined : f);
+    onRefresh(buildOptions(f, scopeToChapter));
+  };
+
+  const toggleScope = (): void => {
+    const next = !scopeToChapter;
+    setScopeToChapter(next);
+    onRefresh(buildOptions(filter, next));
   };
 
   return (
@@ -56,18 +81,39 @@ export function RecentRenders({ t, renders, loading, onRefresh, onDelete }: Prop
         padding: 16,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
         <h3 style={{ margin: 0, fontSize: typography.size.base, fontWeight: 700 }}>
           {t.studioRecentTitle}
         </h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={loading}
-          onClick={() => onRefresh(filter === "all" ? undefined : filter)}
-        >
-          {t.studioRefresh}
-        </Button>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {currentChapterId && (
+            <button
+              type="button"
+              onClick={toggleScope}
+              style={{
+                padding: "4px 10px",
+                fontSize: typography.size.xs,
+                fontWeight: 600,
+                borderRadius: radii.sm,
+                background: scopeToChapter ? colors.primarySoft : "transparent",
+                color: scopeToChapter ? colors.primaryLight : colors.textDim,
+                border: `1px solid ${scopeToChapter ? colors.primaryBorder : colors.borderFaint}`,
+                cursor: "pointer",
+                fontFamily: fonts.sans,
+              }}
+            >
+              {t.studioRecentScopeChapter}
+            </button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={loading}
+            onClick={() => onRefresh(buildOptions(filter, scopeToChapter))}
+          >
+            {t.studioRefresh}
+          </Button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>

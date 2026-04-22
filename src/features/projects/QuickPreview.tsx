@@ -5,9 +5,11 @@
  */
 import { useEffect, useRef, useState } from "react";
 
+import { upsertPronunciation } from "@/api/pronunciation";
 import { synthesize } from "@/api/synthesis";
 import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
+import { PromptDialog } from "@/components/PromptDialog";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { Translations } from "@/i18n";
@@ -31,8 +33,20 @@ export function QuickPreview({
   t, chapterText, voiceId, profileId, speed, pitch, volume, outputFormat, onToast,
 }: Props) {
   const [generating, setGenerating] = useState(false);
+  const [pronOpen, setPronOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
+
+  const handleSavePronunciation = async (word: string, replacement: string): Promise<void> => {
+    if (!word.trim() || !replacement.trim()) return;
+    try {
+      await upsertPronunciation({ word: word.trim(), replacement: replacement.trim() });
+      onToast(t.pronunciationSaved.replace("{word}", word.trim()));
+      setPronOpen(false);
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    }
+  };
 
   // Abort any in-flight preview when the component unmounts (e.g. the
   // user switches chapters or closes the preview panel).
@@ -146,8 +160,26 @@ export function QuickPreview({
             pauseLabel={t.pause}
             stopLabel={t.stop}
           />
+          <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+            <Button variant="ghost" size="sm" onClick={() => setPronOpen(true)}>
+              {t.pronunciationFixButton}
+            </Button>
+          </div>
         </div>
       )}
+
+      <PromptDialog
+        open={pronOpen}
+        title={t.pronunciationFixTitle}
+        label={t.pronunciationWord}
+        secondaryLabel={t.pronunciationReplacement}
+        confirmText={t.saveProfile}
+        cancelText={t.cancel}
+        onConfirm={(word, replacement) =>
+          void handleSavePronunciation(word, replacement)
+        }
+        onCancel={() => setPronOpen(false)}
+      />
     </div>
   );
 }

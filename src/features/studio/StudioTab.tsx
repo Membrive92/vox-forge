@@ -208,7 +208,8 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
             t={t}
             renders={session.renders}
             loading={session.loadingRenders}
-            onRefresh={(kind) => void studio.refreshRenders(kind)}
+            currentChapterId={session.selected?.chapter_id ?? null}
+            onRefresh={(options) => void studio.refreshRenders(options)}
             onDelete={(id) => void studio.removeRender(id)}
           />
         </div>

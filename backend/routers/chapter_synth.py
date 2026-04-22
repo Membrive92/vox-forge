@@ -56,11 +56,17 @@ async def synthesize_chapter(
     cancel_token = create_cancellation_token(http_request)
     chunks = split_into_chunks(text)
 
+    # Chapter-level overrides take priority over project defaults. Lets
+    # a book use different narrators per chapter (POV switch,
+    # epistolary sections, etc.) without spawning separate projects.
+    voice_id = chapter.get("voice_id") or project["voice_id"]
+    profile_id = chapter.get("profile_id") or project["profile_id"]
+
     # Create a generation record
     gen = await pm.create_generation(
         chapter_id=chapter_id,
-        voice_id=project["voice_id"],
-        profile_id=project["profile_id"],
+        voice_id=voice_id,
+        profile_id=profile_id,
         output_format=fmt,
         speed=project["speed"],
         pitch=project["pitch"],
@@ -76,12 +82,12 @@ async def synthesize_chapter(
     from ..schemas import SynthesisRequest
     request = SynthesisRequest(
         text=text,
-        voice_id=project["voice_id"],
+        voice_id=voice_id,
         output_format=fmt,
         speed=project["speed"],
         pitch=project["pitch"],
         volume=project["volume"],
-        profile_id=project["profile_id"],
+        profile_id=profile_id,
     )
 
     try:

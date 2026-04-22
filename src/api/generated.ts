@@ -559,7 +559,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Export all chapters as ZIP */
+        /**
+         * Export all chapters as ZIP
+         * @description Build a ZIP with the best available audio per chapter.
+         *
+         *     Preference order for each chapter:
+         *       1. Latest Studio edit (``studio_renders`` kind="audio") � the user's
+         *          polished version.
+         *       2. Latest completed ``generation`` file on disk � cheaper than
+         *          re-synthesizing and preserves exactly what the user heard.
+         *       3. Fresh synthesis � only when neither of the above exists.
+         *
+         *     In addition, if the project has persisted video renders they are
+         *     bundled under a ``videos/`` folder so the export is a complete
+         *     project artefact, not just the raw narration.
+         */
         post: operations["batch_export_api_export__project_id__post"];
         delete?: never;
         options?: never;
@@ -1291,6 +1305,10 @@ export interface components {
              * @default 0
              */
             sort_order: number;
+            /** Voice Id */
+            voice_id?: string | null;
+            /** Profile Id */
+            profile_id?: string | null;
         };
         /** ChapterUpdate */
         ChapterUpdate: {
@@ -1300,6 +1318,10 @@ export interface components {
             text?: string | null;
             /** Sort Order */
             sort_order?: number | null;
+            /** Voice Id */
+            voice_id?: string | null;
+            /** Profile Id */
+            profile_id?: string | null;
         };
         /** CharacterMapping */
         CharacterMapping: {

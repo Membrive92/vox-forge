@@ -24,6 +24,8 @@ export interface Chapter {
   title: string;
   text: string;
   sort_order: number;
+  voice_id: string | null;
+  profile_id: string | null;
   created_at: string;
   updated_at: string;
 }

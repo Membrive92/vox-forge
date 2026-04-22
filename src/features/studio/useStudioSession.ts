@@ -68,7 +68,7 @@ export interface StudioSessionApi {
   downloadVideo: (filenameHint?: string) => void;
   clearVideo: () => void;
 
-  refreshRenders: (kind?: "audio" | "video") => Promise<void>;
+  refreshRenders: (options?: { kind?: "audio" | "video"; chapterId?: string }) => Promise<void>;
   removeRender: (renderId: string) => Promise<void>;
 }
 
@@ -363,19 +363,22 @@ export function useStudioSession(): StudioSessionApi {
 
   // ── Recent renders (B.2) ─────────────────────────────────────────
 
-  const refreshRenders = useCallback(async (kind?: "audio" | "video") => {
-    setLoadingRenders(true);
-    try {
-      const list = await listStudioRenders(kind ? { kind } : {});
-      setRenders(list);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
-      logger.error("Studio: failed to load renders", { error: msg });
-    } finally {
-      setLoadingRenders(false);
-    }
-  }, []);
+  const refreshRenders = useCallback(
+    async (options?: { kind?: "audio" | "video"; chapterId?: string }) => {
+      setLoadingRenders(true);
+      try {
+        const list = await listStudioRenders(options ?? {});
+        setRenders(list);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+        logger.error("Studio: failed to load renders", { error: msg });
+      } finally {
+        setLoadingRenders(false);
+      }
+    },
+    [],
+  );
 
   const removeRender = useCallback(
     async (renderId: string) => {

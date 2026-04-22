@@ -4,10 +4,13 @@ import { isAbortError } from "@/api/client";
 import { crossLingualSynthesize } from "@/api/experimental";
 import { AudioRecorder } from "@/components/AudioRecorder";
 import { Button } from "@/components/Button";
+import { PromptDialog } from "@/components/PromptDialog";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { useProfiles } from "@/hooks/useProfiles";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+import type { Language } from "@/types/domain";
 
 interface ExperimentalTabProps {
   t: Translations;
@@ -19,9 +22,12 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
   const [sampleFile, setSampleFile] = useState<File | null>(null);
   const [language, setLanguage] = useState("es");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [saveProfileOpen, setSaveProfileOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const sampleInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
+  const { create: createProfile } = useProfiles();
 
   useEffect(() => () => {
     abortRef.current?.abort();
@@ -68,6 +74,31 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
     document.body.appendChild(a);
     a.click();
     a.remove();
+  };
+
+  // Save the experimental sample as a reusable profile. The uploaded
+  // sample is stored (via ``createProfile``) so the user can pick it
+  // from the voice selector in any tab afterwards.
+  const handleSaveAsProfile = async (name: string): Promise<void> => {
+    if (!sampleFile || !name.trim()) return;
+    setSavingProfile(true);
+    try {
+      await createProfile({
+        name: name.trim(),
+        voiceId: "",                       // cloned profile; no system-voice base
+        language: language as Language,
+        speed: 100,
+        pitch: 0,
+        volume: 80,
+        sampleFile,
+      });
+      onToast(t.expSavedAsProfile.replace("{name}", name.trim()));
+      setSaveProfileOpen(false);
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   return (
@@ -189,6 +220,18 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
             <Icons.Upload />
             {sampleFile ? sampleFile.name : t.expVoiceSample}
           </button>
+
+          {sampleFile && (
+            <div style={{ marginTop: 8, textAlign: "center" }}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSaveProfileOpen(true)}
+              >
+                {t.expSaveAsProfile}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Target language */}
@@ -234,6 +277,17 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
           </Button>
         )}
       </div>
+
+      <PromptDialog
+        open={saveProfileOpen}
+        title={t.expSaveAsProfileTitle}
+        label={t.profileName}
+        confirmText={savingProfile ? t.generating : t.saveProfile}
+        cancelText={t.cancel}
+        initialValue=""
+        onConfirm={(name) => void handleSaveAsProfile(name)}
+        onCancel={() => setSaveProfileOpen(false)}
+      />
     </div>
   );
 }

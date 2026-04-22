@@ -123,6 +123,9 @@ export const es = {
   expGenerating: "Generando...",
   expReady: "Audio generado (experimental)",
   expWarning: "Experimental: el acento puede no coincidir con el idioma objetivo",
+  expSaveAsProfile: "Guardar muestra como perfil",
+  expSaveAsProfileTitle: "Guardar como perfil de voz",
+  expSavedAsProfile: "Perfil «{name}» guardado",
   tabActivity: "Actividad",
   tabWorkbench: "Proyecto",
   estimatedDuration: "≈ {dur} de audio",
@@ -210,10 +213,14 @@ export const es = {
   workbenchNeedCoverFirst: "Añade una portada al proyecto antes de renderizar vídeo",
   workbenchVideoCount: "{n} vídeos",
   chapterStatusSynth: "Sintetizado",
+  chapterStatusError: "Fallo — reintentar",
   chapterStatusEdits: "{n} ediciones",
   chapterStatusVideos: "{n} vídeos",
   chapterCharactersDetected: "{n} personajes",
   chapterCharactersHint: "Etiquetas [Nombre] detectadas — asignar voces en Casting",
+  chapterVoice: "Voz del capítulo",
+  chapterVoiceInherit: "Heredar del proyecto ({name})",
+  chapterVoiceClear: "Volver a la voz del proyecto",
   workbenchIncompleteJobs: "{n} trabajos de síntesis interrumpidos esperan reanudarse.",
   workbenchResumeJobs: "Ir a Síntesis rápida",
 
@@ -256,6 +263,11 @@ export const es = {
   previewButton: "Previsualizar",
   previewLoading: "...",
   previewCancelled: "Previsualización cancelada",
+  pronunciationFixButton: "¿Pronuncia mal una palabra?",
+  pronunciationFixTitle: "Añadir regla de pronunciación",
+  pronunciationWord: "Palabra original",
+  pronunciationReplacement: "Pronunciar como",
+  pronunciationSaved: "Regla «{word}» guardada",
 
   // Cancellation toasts (shared across tabs)
   synthesisCancelled: "Síntesis cancelada",
@@ -394,6 +406,7 @@ export const es = {
   studioRecentFilterAudio: "Audio",
   studioRecentFilterVideo: "Vídeo",
   studioRecentDelete: "Eliminar",
+  studioRecentScopeChapter: "Sólo este capítulo",
 } as const;
 
 export type TranslationKey = keyof typeof es;

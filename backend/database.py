@@ -37,13 +37,18 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at  TEXT NOT NULL
 );
 
--- Chapters within a project
+-- Chapters within a project. ``voice_id`` and ``profile_id`` are
+-- per-chapter overrides; when NULL the chapter inherits from the
+-- project. Useful for audiobooks with multiple narrators (a POV
+-- change, epistolary sections, etc.).
 CREATE TABLE IF NOT EXISTS chapters (
     id          TEXT PRIMARY KEY,
     project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     title       TEXT NOT NULL DEFAULT 'Chapter',
     text        TEXT NOT NULL DEFAULT '',
     sort_order  INTEGER NOT NULL DEFAULT 0,
+    voice_id    TEXT DEFAULT NULL,
+    profile_id  TEXT DEFAULT NULL,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
@@ -118,6 +123,8 @@ async def init_db() -> None:
         # we try/except on the duplicate-column error.
         for column_def in (
             "ALTER TABLE projects ADD COLUMN cover_path TEXT DEFAULT NULL",
+            "ALTER TABLE chapters ADD COLUMN voice_id TEXT DEFAULT NULL",
+            "ALTER TABLE chapters ADD COLUMN profile_id TEXT DEFAULT NULL",
         ):
             try:
                 await db.execute(column_def)

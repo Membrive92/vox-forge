@@ -125,6 +125,9 @@ export const en: Record<TranslationKey, string> = {
   expGenerating: "Generating...",
   expReady: "Audio generated (experimental)",
   expWarning: "Experimental: the accent may not match the target language",
+  expSaveAsProfile: "Save sample as profile",
+  expSaveAsProfileTitle: "Save as voice profile",
+  expSavedAsProfile: "Profile \"{name}\" saved",
   tabActivity: "Activity",
   tabWorkbench: "Workbench",
   estimatedDuration: "≈ {dur} of audio",
@@ -212,10 +215,14 @@ export const en: Record<TranslationKey, string> = {
   workbenchNeedCoverFirst: "Add a project cover before rendering video",
   workbenchVideoCount: "{n} videos",
   chapterStatusSynth: "Synthesized",
+  chapterStatusError: "Failed — retry",
   chapterStatusEdits: "{n} edits",
   chapterStatusVideos: "{n} videos",
   chapterCharactersDetected: "{n} characters",
   chapterCharactersHint: "[Name] tags detected — assign voices in Cast",
+  chapterVoice: "Chapter voice",
+  chapterVoiceInherit: "Inherit from project ({name})",
+  chapterVoiceClear: "Revert to project voice",
   workbenchIncompleteJobs: "{n} interrupted synthesis jobs waiting to resume.",
   workbenchResumeJobs: "Go to Quick Synth",
 
@@ -258,6 +265,11 @@ export const en: Record<TranslationKey, string> = {
   previewButton: "Preview",
   previewLoading: "...",
   previewCancelled: "Preview cancelled",
+  pronunciationFixButton: "Mispronounced a word?",
+  pronunciationFixTitle: "Add pronunciation rule",
+  pronunciationWord: "Original word",
+  pronunciationReplacement: "Pronounce as",
+  pronunciationSaved: "Rule \"{word}\" saved",
 
   // Cancellation toasts (shared across tabs)
   synthesisCancelled: "Synthesis cancelled",
@@ -396,4 +408,5 @@ export const en: Record<TranslationKey, string> = {
   studioRecentFilterAudio: "Audio",
   studioRecentFilterVideo: "Video",
   studioRecentDelete: "Delete",
+  studioRecentScopeChapter: "Only this chapter",
 };

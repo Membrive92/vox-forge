@@ -43,12 +43,16 @@ class ChapterCreate(BaseModel):
     title: str = Field(default="Chapter", max_length=200)
     text: str = Field(default="")
     sort_order: int = Field(default=0, ge=0)
+    voice_id: Optional[str] = None
+    profile_id: Optional[str] = None
 
 
 class ChapterUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=200)
     text: Optional[str] = None
     sort_order: Optional[int] = Field(default=None, ge=0)
+    voice_id: Optional[str] = None
+    profile_id: Optional[str] = None
 
 
 class SplitRequest(BaseModel):
@@ -111,7 +115,9 @@ async def create_chapter(project_id: str, body: ChapterCreate) -> dict[str, Any]
 
 @router.patch("/chapters/{chapter_id}")
 async def update_chapter(chapter_id: str, body: ChapterUpdate) -> dict[str, Any]:
-    result = await pm.update_chapter(chapter_id, **body.model_dump(exclude_none=True))
+    # ``exclude_unset`` so callers can null out ``voice_id`` /
+    # ``profile_id`` to revert the chapter to the project's voice.
+    result = await pm.update_chapter(chapter_id, **body.model_dump(exclude_unset=True))
     if result is None:
         raise HTTPException(404, "Chapter not found")
     return result

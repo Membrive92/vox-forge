@@ -125,22 +125,33 @@ async def create_chapter(
     title: str = "Chapter",
     text: str = "",
     sort_order: int = 0,
+    voice_id: str | None = None,
+    profile_id: str | None = None,
 ) -> dict[str, Any]:
     cid = _new_id()
     now = _now()
     async with get_db() as db:
         await db.execute(
-            """INSERT INTO chapters (id, project_id, title, text, sort_order, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (cid, project_id, title, text, sort_order, now, now),
+            """INSERT INTO chapters
+               (id, project_id, title, text, sort_order, voice_id, profile_id,
+                created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (cid, project_id, title, text, sort_order, voice_id, profile_id, now, now),
         )
         await db.commit()
     return (await get_chapter(cid))  # type: ignore[return-value]
 
 
 async def update_chapter(chapter_id: str, **fields: Any) -> dict[str, Any] | None:
-    allowed = {"title", "text", "sort_order"}
-    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    allowed = {"title", "text", "sort_order", "voice_id", "profile_id"}
+    # ``voice_id`` / ``profile_id`` are explicitly nullable — sending
+    # None clears the override so the chapter falls back to the
+    # project's voice again.
+    nullable = {"voice_id", "profile_id"}
+    updates = {
+        k: v for k, v in fields.items()
+        if k in allowed and (v is not None or k in nullable)
+    }
     if not updates:
         return await get_chapter(chapter_id)
     updates["updated_at"] = _now()

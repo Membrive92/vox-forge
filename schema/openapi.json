@@ -1479,6 +1479,7 @@
           "export"
         ],
         "summary": "Export all chapters as ZIP",
+        "description": "Build a ZIP with the best available audio per chapter.\n\nPreference order for each chapter:\n  1. Latest Studio edit (``studio_renders`` kind=\"audio\") — the user's\n     polished version.\n  2. Latest completed ``generation`` file on disk — cheaper than\n     re-synthesizing and preserves exactly what the user heard.\n  3. Fresh synthesis — only when neither of the above exists.\n\nIn addition, if the project has persisted video renders they are\nbundled under a ``videos/`` folder so the export is a complete\nproject artefact, not just the raw narration.",
         "operationId": "batch_export_api_export__project_id__post",
         "parameters": [
           {
@@ -3120,6 +3121,28 @@
             "minimum": 0.0,
             "title": "Sort Order",
             "default": 0
+          },
+          "voice_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice Id"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
           }
         },
         "type": "object",
@@ -3161,6 +3184,28 @@
               }
             ],
             "title": "Sort Order"
+          },
+          "voice_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice Id"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
           }
         },
         "type": "object",
