@@ -13,6 +13,7 @@ export interface Project {
   pitch: number;
   volume: number;
   output_format: string;
+  cover_path: string | null;
   created_at: string;
   updated_at: string;
 }

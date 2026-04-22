@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   createChapter,
@@ -6,22 +6,34 @@ import {
   deleteChapter,
   deleteProject,
   listChapters,
+  listGenerations,
   listProjects,
   splitIntoChapters,
   updateChapter,
   updateProject,
   type Chapter,
+  type Generation,
   type Project,
 } from "@/api/projects";
-import { API_BASE } from "@/api/client";
+import { API_BASE, isAbortError } from "@/api/client";
+import { listIncompleteJobs } from "@/api/synthesis";
+import {
+  listStudioRenders,
+  renderVideo,
+  uploadCover,
+  type StudioRender,
+} from "@/api/studio";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { IconButton } from "@/components/IconButton";
 import { Skeleton } from "@/components/Skeleton";
 import * as Icons from "@/components/icons";
+import { ALL_VOICES, VOICES } from "@/constants/voices";
+import { useProfiles } from "@/hooks/useProfiles";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, space, transitions, typography } from "@/theme/tokens";
+import type { Profile } from "@/types/domain";
 
 import { AmbienceMixer } from "./AmbienceMixer";
 import { CharacterCasting } from "./CharacterCasting";
@@ -63,15 +75,53 @@ interface ChapterCardProps {
   onUpdate: (id: string, data: Partial<Chapter>) => Promise<void>;
   onDelete: (id: string) => void;
   onToast: (msg: string) => void;
+  onOpenStudioWithSource: (generationId: string) => void;
 }
 
-function ChapterCard({ t, chapter, project, onUpdate, onDelete, onToast }: ChapterCardProps) {
+// Regex to detect [Character] markup at the start of a line. Case-
+// insensitive and allows accented chars. Used to surface a "N personajes"
+// badge so users discover the Cast feature.
+const CHARACTER_TAG_RE = /(?:^|\n)\s*\[([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\s'-]{0,39})\]/g;
+
+function detectCharacters(text: string): string[] {
+  const seen = new Set<string>();
+  for (const m of text.matchAll(CHARACTER_TAG_RE)) {
+    const name = m[1]?.trim();
+    if (name) seen.add(name);
+  }
+  return [...seen];
+}
+
+function ChapterCard({ t, chapter, project, onUpdate, onDelete, onToast, onOpenStudioWithSource }: ChapterCardProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [generations, setGenerations] = useState<Generation[]>([]);
+  const [renders, setRenders] = useState<StudioRender[]>([]);
+  const [isRendering, setIsRendering] = useState(false);
+  const renderAbortRef = useRef<AbortController | null>(null);
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const [gens, rnds] = await Promise.all([
+        listGenerations(chapter.id),
+        listStudioRenders({ chapterId: chapter.id }),
+      ]);
+      setGenerations(gens);
+      setRenders(rnds);
+    } catch { /* non-critical */ }
+  }, [chapter.id]);
+
+  useEffect(() => { void loadStatus(); }, [loadStatus]);
+  useEffect(() => () => { renderAbortRef.current?.abort(); }, []);
+
+  const latestDoneGen = generations.find((g) => g.status === "done" && g.file_path);
+  const audioEditCount = renders.filter((r) => r.kind === "audio").length;
+  const videoRenderCount = renders.filter((r) => r.kind === "video").length;
   // One panel at a time — cleaner than 4 independent booleans and makes
   // the toolbar feel like a mini-tab bar.
   const [activePanel, setActivePanel] = useState<PanelKey>(null);
   const [title, setTitle] = useState(chapter.title);
   const [text, setText] = useState(chapter.text);
+  const characters = useMemo(() => detectCharacters(text), [text]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { setTitle(chapter.title); }, [chapter.title]);
@@ -88,6 +138,44 @@ function ChapterCard({ t, chapter, project, onUpdate, onDelete, onToast }: Chapt
 
   const togglePanel = (key: Exclude<PanelKey, null>): void => {
     setActivePanel((prev) => (prev === key ? null : key));
+  };
+
+  const handleRenderVideo = async (): Promise<void> => {
+    if (!latestDoneGen?.file_path) return;
+    if (!project.cover_path) {
+      onToast(t.workbenchNeedCoverFirst);
+      return;
+    }
+    const controller = new AbortController();
+    renderAbortRef.current = controller;
+    setIsRendering(true);
+    try {
+      await renderVideo(
+        {
+          audio_path: latestDoneGen.file_path,
+          cover_path: project.cover_path,
+          project_id: project.id,
+          chapter_id: chapter.id,
+          options: { title_text: chapter.title, subtitles_mode: "none" },
+        },
+        controller.signal,
+      );
+      onToast(t.workbenchVideoReady);
+      await loadStatus();
+    } catch (e) {
+      if (isAbortError(e)) {
+        onToast(t.renderCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
+    } finally {
+      setIsRendering(false);
+      if (renderAbortRef.current === controller) renderAbortRef.current = null;
+    }
+  };
+
+  const handleCancelRender = (): void => {
+    renderAbortRef.current?.abort();
   };
 
   return (
@@ -190,6 +278,80 @@ function ChapterCard({ t, chapter, project, onUpdate, onDelete, onToast }: Chapt
         </IconButton>
       </div>
 
+      {/* Status row — chips + character hint + render-video action */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: space[2],
+          marginTop: space[2],
+          flexWrap: "wrap",
+        }}
+      >
+        <StatusChip
+          label={t.chapterStatusSynth}
+          active={latestDoneGen !== undefined}
+          color={colors.primary}
+        />
+        <StatusChip
+          label={t.chapterStatusEdits.replace("{n}", String(audioEditCount))}
+          active={audioEditCount > 0}
+          color="#a78bfa"
+          {...(audioEditCount > 0 && latestDoneGen
+            ? { onClick: (() => {
+                const g = latestDoneGen;
+                return () => onOpenStudioWithSource(g.id);
+              })() }
+            : {})}
+        />
+        <StatusChip
+          label={t.chapterStatusVideos.replace("{n}", String(videoRenderCount))}
+          active={videoRenderCount > 0}
+          color="#f59e0b"
+        />
+        {characters.length > 0 && (
+          <button
+            type="button"
+            onClick={() => togglePanel("cast")}
+            title={t.chapterCharactersHint}
+            style={{
+              padding: "2px 8px",
+              fontSize: 10,
+              fontWeight: 700,
+              fontFamily: fonts.mono,
+              borderRadius: radii.sm,
+              background: "rgba(34,197,94,0.15)",
+              color: "#4ade80",
+              border: "1px solid rgba(34,197,94,0.3)",
+              cursor: "pointer",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            {t.chapterCharactersDetected.replace("{n}", String(characters.length))}
+          </button>
+        )}
+        <div style={{ flex: 1 }} />
+        {latestDoneGen && (
+          isRendering ? (
+            <Button variant="danger" size="sm" onClick={handleCancelRender}>
+              {t.cancel}
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Icons.Mic />}
+              onClick={() => void handleRenderVideo()}
+              disabled={!project.cover_path}
+              title={!project.cover_path ? t.workbenchNeedCoverFirst : undefined}
+            >
+              {t.workbenchRenderVideo}
+            </Button>
+          )
+        )}
+      </div>
+
       {/* Body */}
       {!collapsed && (
         <>
@@ -237,6 +399,7 @@ function ChapterCard({ t, chapter, project, onUpdate, onDelete, onToast }: Chapt
                 chapterId={chapter.id}
                 chapterTitle={chapter.title}
                 onToast={onToast}
+                onOpenStudioWithSource={onOpenStudioWithSource}
               />
             </div>
           )}
@@ -262,6 +425,42 @@ function ChapterCard({ t, chapter, project, onUpdate, onDelete, onToast }: Chapt
 }
 
 // Consistent toolbar button — one style for all 4 tools, only active state differs.
+// Small inline chip used in the status row. If ``onClick`` is provided
+// and ``active``, renders as a clickable link (e.g. "2 edits" jumps to
+// Studio); otherwise it's a passive indicator.
+function StatusChip({
+  label,
+  active,
+  color,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  color: string;
+  onClick?: () => void;
+}) {
+  const baseStyle: React.CSSProperties = {
+    padding: "2px 8px",
+    fontSize: 10,
+    fontWeight: 700,
+    fontFamily: fonts.mono,
+    borderRadius: radii.sm,
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    background: active ? `${color}26` : "rgba(148,163,184,0.08)",
+    color: active ? color : colors.textFaint,
+    border: active ? `1px solid ${color}55` : `1px solid ${colors.borderFaint}`,
+  };
+  if (onClick && active) {
+    return (
+      <button type="button" onClick={onClick} style={{ ...baseStyle, cursor: "pointer" }}>
+        {label}
+      </button>
+    );
+  }
+  return <span style={baseStyle}>{label}</span>;
+}
+
 function ToolToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
@@ -288,15 +487,33 @@ function ToolToggle({ label, active, onClick }: { label: string; active: boolean
 
 // ── WorkbenchTab ────────────────────────────────────────────────────
 
-export function WorkbenchTab({ t, onToast }: { t: Translations; onToast: (msg: string) => void }) {
+interface WorkbenchTabProps {
+  t: Translations;
+  onToast: (msg: string) => void;
+  onOpenStudioWithSource: (generationId: string) => void;
+  onNavigateToQuickSynth: () => void;
+}
+
+export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQuickSynth }: WorkbenchTabProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [projectName, setProjectName] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [projectsLoading, setProjectsLoading] = useState(true);
+  const [incompleteCount, setIncompleteCount] = useState(0);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const bulkTextRef = useRef<HTMLTextAreaElement>(null);
+  const { profiles } = useProfiles();
+
+  // Surface interrupted synthesis jobs as a small banner so the user
+  // can resume from the Workbench instead of remembering to go to Quick
+  // Synth. The full resume UI lives in SynthTab — we just nudge.
+  useEffect(() => {
+    void listIncompleteJobs()
+      .then((r) => setIncompleteCount(r.count))
+      .catch(() => setIncompleteCount(0));
+  }, []);
 
   const selected = projects.find((p) => p.id === selectedId) ?? null;
 
@@ -330,7 +547,14 @@ export function WorkbenchTab({ t, onToast }: { t: Translations; onToast: (msg: s
 
   const handleNewProject = useCallback(async () => {
     try {
-      const p = await createProject({ name: t.workbenchDefaultProjectName });
+      // Default to the first ES voice; without it, QuickPreview /
+      // Synthesize fire off an empty voice_id and Edge-TTS rejects it.
+      const defaultVoice = VOICES.es[0]?.id ?? "";
+      const p = await createProject({
+        name: t.workbenchDefaultProjectName,
+        voice_id: defaultVoice,
+        language: "es",
+      });
       setProjects((prev) => [p, ...prev]);
       setSelectedId(p.id);
       setRenaming(true);
@@ -354,6 +578,50 @@ export function WorkbenchTab({ t, onToast }: { t: Translations; onToast: (msg: s
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } catch { onToast("Failed to rename project"); }
   }, [selected, projectName, onToast]);
+
+  const handleChangeVoice = useCallback(
+    async (voiceId: string, profileId: string | null) => {
+      if (!selected) return;
+      try {
+        // Derive language from the voice id prefix ("es-ES-..." → "es").
+        const lang = voiceId.slice(0, 2) || selected.language;
+        const updated = await updateProject(selected.id, {
+          voice_id: voiceId,
+          profile_id: profileId,
+          language: lang,
+        });
+        setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      } catch {
+        onToast("Failed to update voice");
+      }
+    },
+    [selected, onToast],
+  );
+
+  const handleSetCover = useCallback(
+    async (file: File) => {
+      if (!selected) return;
+      try {
+        const { path } = await uploadCover(file);
+        const updated = await updateProject(selected.id, { cover_path: path });
+        setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+        onToast(t.workbenchCoverSet);
+      } catch (e) {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
+    },
+    [selected, onToast, t.workbenchCoverSet, t.unknownError],
+  );
+
+  const handleClearCover = useCallback(async () => {
+    if (!selected) return;
+    try {
+      const updated = await updateProject(selected.id, { cover_path: null });
+      setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    } catch {
+      onToast("Failed to clear cover");
+    }
+  }, [selected, onToast]);
 
   const handleAddChapter = useCallback(async () => {
     if (!selectedId) return;
@@ -434,6 +702,30 @@ export function WorkbenchTab({ t, onToast }: { t: Translations; onToast: (msg: s
 
       {/* Main */}
       <div style={{ flex: 1, overflowY: "auto", padding: space[6] }}>
+        {incompleteCount > 0 && (
+          <div
+            role="status"
+            style={{
+              marginBottom: space[4],
+              padding: "10px 14px",
+              background: "rgba(245,158,11,0.08)",
+              border: "1px solid rgba(245,158,11,0.3)",
+              borderRadius: radii.md,
+              display: "flex",
+              alignItems: "center",
+              gap: space[3],
+              fontSize: typography.size.sm,
+            }}
+          >
+            <span style={{ color: "#f59e0b", fontWeight: 700 }}>⚠</span>
+            <span style={{ color: colors.textMuted, flex: 1 }}>
+              {t.workbenchIncompleteJobs.replace("{n}", String(incompleteCount))}
+            </span>
+            <Button variant="ghost" size="sm" onClick={onNavigateToQuickSynth}>
+              {t.workbenchResumeJobs}
+            </Button>
+          </div>
+        )}
         {!selected ? (
           <EmptyState
             icon={<Icons.Book />}
@@ -522,6 +814,20 @@ export function WorkbenchTab({ t, onToast }: { t: Translations; onToast: (msg: s
                 </span>
               )}
             </div>
+
+            {/* Project voice + cover */}
+            <ProjectVoicePicker
+              t={t}
+              project={selected}
+              profiles={profiles}
+              onChange={(voiceId, profileId) => void handleChangeVoice(voiceId, profileId)}
+            />
+            <ProjectCoverPicker
+              t={t}
+              project={selected}
+              onPickCover={(file) => void handleSetCover(file)}
+              onClearCover={() => void handleClearCover()}
+            />
 
             {/* Primary actions */}
             <div style={{ display: "flex", gap: space[2], margin: `${space[4]}px 0 ${space[5]}px` }}>
@@ -613,6 +919,7 @@ export function WorkbenchTab({ t, onToast }: { t: Translations; onToast: (msg: s
                   onUpdate={handleUpdateChapter}
                   onDelete={(id) => void handleDeleteChapter(id)}
                   onToast={onToast}
+                  onOpenStudioWithSource={onOpenStudioWithSource}
                 />
               ))
             )}
@@ -749,6 +1056,189 @@ interface ProjectRowProps {
   onSelect: () => void;
   onDelete: () => void;
 }
+
+// ── ProjectVoicePicker ──────────────────────────────────────────────
+
+interface VoicePickerProps {
+  t: Translations;
+  project: Project;
+  profiles: readonly Profile[];
+  onChange: (voiceId: string, profileId: string | null) => void;
+}
+
+// Value encoding: system voices use "voice:<id>", profiles use "profile:<id>"
+// so the same <select> can disambiguate with a single string value.
+function ProjectVoicePicker({ t, project, profiles, onChange }: VoicePickerProps) {
+  const currentValue = project.profile_id
+    ? `profile:${project.profile_id}`
+    : `voice:${project.voice_id}`;
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
+    const raw = e.target.value;
+    if (raw.startsWith("profile:")) {
+      const id = raw.slice("profile:".length);
+      const p = profiles.find((pp) => pp.id === id);
+      if (!p) return;
+      onChange(p.voiceId, p.id);
+    } else if (raw.startsWith("voice:")) {
+      onChange(raw.slice("voice:".length), null);
+    }
+  };
+
+  const profilesWithSample = profiles.filter((p) => p.sampleName !== null);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: space[2],
+        padding: `${space[2]}px 0 ${space[3]}px`,
+        borderBottom: `1px solid ${colors.borderSubtle}`,
+      }}
+    >
+      <label
+        style={{
+          fontSize: typography.size.xs,
+          color: colors.textDim,
+          fontWeight: typography.weight.semibold,
+          textTransform: "uppercase",
+          letterSpacing: "1px",
+        }}
+      >
+        {t.voice}
+      </label>
+      <select
+        value={currentValue}
+        onChange={handleChange}
+        style={{
+          padding: "6px 10px",
+          borderRadius: radii.sm,
+          background: colors.surfaceAlt,
+          border: `1px solid ${colors.border}`,
+          color: colors.text,
+          fontSize: typography.size.sm,
+          fontFamily: fonts.sans,
+          outline: "none",
+          cursor: "pointer",
+          minWidth: 240,
+        }}
+      >
+        {profilesWithSample.length > 0 && (
+          <optgroup label={t.castingClonedProfiles}>
+            {profilesWithSample.map((p) => (
+              <option key={p.id} value={`profile:${p.id}`}>
+                {p.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label={`${t.castingSystemVoices} — ${t.voicesLangSpanish}`}>
+          {VOICES.es.map((v) => (
+            <option key={v.id} value={`voice:${v.id}`}>
+              {v.name} · {v.accent}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label={`${t.castingSystemVoices} — ${t.voicesLangEnglish}`}>
+          {VOICES.en.map((v) => (
+            <option key={v.id} value={`voice:${v.id}`}>
+              {v.name} · {v.accent}
+            </option>
+          ))}
+        </optgroup>
+        {/* If the project's current voice_id isn't in the known list
+           (e.g. legacy empty string), show it as a fallback so the
+           selector doesn't silently drop the value. */}
+        {!ALL_VOICES.some((v) => v.id === project.voice_id) &&
+          !project.profile_id && (
+            <option value={`voice:${project.voice_id}`} disabled>
+              {project.voice_id || "—"}
+            </option>
+          )}
+      </select>
+    </div>
+  );
+}
+
+// ── ProjectCoverPicker ──────────────────────────────────────────────
+
+interface CoverPickerProps {
+  t: Translations;
+  project: Project;
+  onPickCover: (file: File) => void;
+  onClearCover: () => void;
+}
+
+function ProjectCoverPicker({ t, project, onPickCover, onClearCover }: CoverPickerProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const coverFilename = project.cover_path
+    ? project.cover_path.split(/[\\/]/).pop() ?? project.cover_path
+    : null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: space[2],
+        padding: `${space[2]}px 0 ${space[3]}px`,
+        borderBottom: `1px solid ${colors.borderSubtle}`,
+      }}
+    >
+      <label
+        style={{
+          fontSize: typography.size.xs,
+          color: colors.textDim,
+          fontWeight: typography.weight.semibold,
+          textTransform: "uppercase",
+          letterSpacing: "1px",
+        }}
+      >
+        {t.workbenchCover}
+      </label>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".png,.jpg,.jpeg,.webp"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onPickCover(f);
+          e.target.value = "";
+        }}
+      />
+      {coverFilename ? (
+        <>
+          <span
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.textMuted,
+              fontFamily: fonts.mono,
+              maxWidth: 240,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {coverFilename}
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => inputRef.current?.click()}>
+            {t.workbenchChangeCover}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClearCover}>
+            ×
+          </Button>
+        </>
+      ) : (
+        <Button variant="secondary" size="sm" onClick={() => inputRef.current?.click()}>
+          {t.workbenchUploadCover}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 
 function SidebarProjectRow({ t, project, active, onSelect, onDelete }: ProjectRowProps) {
   const [hover, setHover] = useState(false);

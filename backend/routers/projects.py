@@ -23,6 +23,7 @@ class ProjectCreate(BaseModel):
     speed: int = Field(default=100, ge=50, le=200)
     pitch: int = Field(default=0, ge=-10, le=10)
     volume: int = Field(default=80, ge=0, le=100)
+    cover_path: Optional[str] = None
 
 
 class ProjectUpdate(BaseModel):
@@ -35,6 +36,7 @@ class ProjectUpdate(BaseModel):
     speed: Optional[int] = Field(default=None, ge=50, le=200)
     pitch: Optional[int] = Field(default=None, ge=-10, le=10)
     volume: Optional[int] = Field(default=None, ge=0, le=100)
+    cover_path: Optional[str] = None
 
 
 class ChapterCreate(BaseModel):
@@ -79,7 +81,9 @@ async def update_project(project_id: str, body: ProjectUpdate) -> dict[str, Any]
     p = await pm.get_project(project_id)
     if p is None:
         raise HTTPException(404, "Project not found")
-    result = await pm.update_project(project_id, **body.model_dump(exclude_none=True))
+    # ``exclude_unset`` (not ``exclude_none``) so callers can explicitly
+    # clear nullable fields like ``profile_id`` by sending null.
+    result = await pm.update_project(project_id, **body.model_dump(exclude_unset=True))
     return result  # type: ignore[return-value]
 
 

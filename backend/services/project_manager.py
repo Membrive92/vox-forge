@@ -52,6 +52,7 @@ async def create_project(
     speed: int = 100,
     pitch: int = 0,
     volume: int = 80,
+    cover_path: str | None = None,
 ) -> dict[str, Any]:
     pid = _new_id()
     now = _now()
@@ -59,10 +60,10 @@ async def create_project(
         await db.execute(
             """INSERT INTO projects
                (id, name, description, language, voice_id, profile_id,
-                speed, pitch, volume, output_format, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                speed, pitch, volume, output_format, cover_path, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (pid, name, description, language, voice_id, profile_id,
-             speed, pitch, volume, output_format, now, now),
+             speed, pitch, volume, output_format, cover_path, now, now),
         )
         await db.commit()
     return (await get_project(pid))  # type: ignore[return-value]
@@ -71,9 +72,16 @@ async def create_project(
 async def update_project(project_id: str, **fields: Any) -> dict[str, Any] | None:
     allowed = {
         "name", "description", "language", "voice_id", "profile_id",
-        "speed", "pitch", "volume", "output_format",
+        "speed", "pitch", "volume", "output_format", "cover_path",
     }
-    updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
+    # Explicitly nullable fields: passing None must clear them in the
+    # DB. ``profile_id`` so users can revert from a cloned profile to a
+    # system voice; ``cover_path`` so they can remove a project cover.
+    nullable = {"profile_id", "cover_path"}
+    updates = {
+        k: v for k, v in fields.items()
+        if k in allowed and (v is not None or k in nullable)
+    }
     if not updates:
         return await get_project(project_id)
     updates["updated_at"] = _now()
