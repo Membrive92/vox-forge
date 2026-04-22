@@ -19,6 +19,7 @@ interface Props {
   onRemove: (index: number) => void;
   onClear: () => void;
   onApply: () => void;
+  onCancelApply: () => void;
   onClearRegion: () => void;
   onOutputFormatChange: (fmt: string) => void;
   onNeedRegion: () => void;
@@ -60,6 +61,7 @@ export function EditOperationsPanel({
   onRemove,
   onClear,
   onApply,
+  onCancelApply,
   onClearRegion,
   onOutputFormatChange,
   onNeedRegion,
@@ -283,17 +285,22 @@ export function EditOperationsPanel({
       </div>
 
       <div style={{ display: "flex", gap: 8 }}>
-        <Button
-          variant="primary"
-          fullWidth
-          loading={isProcessing}
-          disabled={operations.length === 0 || isProcessing}
-          onClick={onApply}
-        >
-          {operations.length === 1
-            ? t.studioApplyOne
-            : t.studioApply.replace("{n}", String(operations.length))}
-        </Button>
+        {isProcessing ? (
+          <Button variant="danger" fullWidth onClick={onCancelApply}>
+            {t.cancel}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            fullWidth
+            disabled={operations.length === 0}
+            onClick={onApply}
+          >
+            {operations.length === 1
+              ? t.studioApplyOne
+              : t.studioApply.replace("{n}", String(operations.length))}
+          </Button>
+        )}
         <Button
           variant="ghost"
           onClick={onClear}

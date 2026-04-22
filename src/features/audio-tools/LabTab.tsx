@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { isAbortError } from "@/api/client";
 import { listPresets, processAudio, randomPreset, type Preset, type VoiceLabParams } from "@/api/voiceLab";
 import { AudioRecorder } from "@/components/AudioRecorder";
 import { Button } from "@/components/Button";
@@ -39,10 +40,15 @@ export function LabTab({ t, onToast }: LabTabProps) {
   const [format, setFormat] = useState("mp3");
   const [savePresetOpen, setSavePresetOpen] = useState(false);
   const sourceInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
 
   useEffect(() => {
     listPresets().then(setServerPresets).catch(() => {});
+  }, []);
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
   }, []);
 
   const presets: Preset[] = [...serverPresets, ...custom.presets];
@@ -91,16 +97,27 @@ export function LabTab({ t, onToast }: LabTabProps) {
   const handleProcess = async (): Promise<void> => {
     if (!sourceFile) return;
     logger.info("Lab processing started", { preset: activePreset, format, params });
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsProcessing(true);
     try {
-      const result = await processAudio(sourceFile, params, format);
+      const result = await processAudio(sourceFile, params, format, controller.signal);
       player.load(result.blob, result.duration);
       onToast(t.labReady);
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      if (isAbortError(e)) {
+        onToast(t.processingCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
     } finally {
       setIsProcessing(false);
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  };
+
+  const handleCancelProcess = (): void => {
+    abortRef.current?.abort();
   };
 
   const handleDownload = (): void => {
@@ -185,17 +202,22 @@ export function LabTab({ t, onToast }: LabTabProps) {
           </div>
 
           <div style={{ marginTop: 16 }}>
-            <Button
-              variant="success"
-              size="lg"
-              icon={<Icons.Waveform />}
-              loading={isProcessing}
-              disabled={!sourceFile}
-              fullWidth
-              onClick={() => void handleProcess()}
-            >
-              {isProcessing ? t.labProcessing : t.labProcess}
-            </Button>
+            {isProcessing ? (
+              <Button variant="danger" size="lg" fullWidth onClick={handleCancelProcess}>
+                {t.cancel}
+              </Button>
+            ) : (
+              <Button
+                variant="success"
+                size="lg"
+                icon={<Icons.Waveform />}
+                disabled={!sourceFile}
+                fullWidth
+                onClick={() => void handleProcess()}
+              >
+                {t.labProcess}
+              </Button>
+            )}
           </div>
         </div>
 

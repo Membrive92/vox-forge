@@ -3,7 +3,7 @@
  * committing to a full synthesis. Useful to check voice/settings without
  * burning 3 minutes of GPU time on a long chapter.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { synthesize } from "@/api/synthesis";
 import { Button } from "@/components/Button";
@@ -31,7 +31,14 @@ export function QuickPreview({
   t, chapterText, voiceId, profileId, speed, pitch, volume, outputFormat, onToast,
 }: Props) {
   const [generating, setGenerating] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
+
+  // Abort any in-flight preview when the component unmounts (e.g. the
+  // user switches chapters or closes the preview panel).
+  useEffect(() => () => {
+    abortRef.current?.abort();
+  }, []);
 
   // Take the first ~300 chars but cut at the last full sentence so we
   // don't leave a dangling phrase.
@@ -42,24 +49,40 @@ export function QuickPreview({
       onToast(t.previewNoText);
       return;
     }
+    const controller = new AbortController();
+    abortRef.current = controller;
     setGenerating(true);
     try {
-      const result = await synthesize({
-        text: snippet,
-        voiceId,
-        format: outputFormat as "mp3" | "wav" | "ogg" | "flac",
-        speed,
-        pitch,
-        volume,
-        profileId: profileId ?? undefined,
-      });
+      const result = await synthesize(
+        {
+          text: snippet,
+          voiceId,
+          format: outputFormat as "mp3" | "wav" | "ogg" | "flac",
+          speed,
+          pitch,
+          volume,
+          profileId: profileId ?? undefined,
+        },
+        undefined,
+        controller.signal,
+      );
       player.load(result.blob, result.duration);
       onToast(t.previewReady.replace("{dur}", result.duration.toFixed(1)));
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      // AbortError is the user clicking Cancel — not an actual failure.
+      if (e instanceof DOMException && e.name === "AbortError") {
+        onToast(t.previewCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
     } finally {
       setGenerating(false);
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  };
+
+  const handleCancel = (): void => {
+    abortRef.current?.abort();
   };
 
   return (
@@ -86,16 +109,25 @@ export function QuickPreview({
             {t.previewDescription.replace("{n}", String(Math.min(PREVIEW_CHARS, chapterText.length)))}
           </p>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          icon={<Icons.Waveform />}
-          loading={generating}
-          disabled={snippet.length === 0}
-          onClick={() => void handlePreview()}
-        >
-          {generating ? t.previewLoading : t.previewButton}
-        </Button>
+        {generating ? (
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleCancel}
+          >
+            {t.cancel}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Icons.Waveform />}
+            disabled={snippet.length === 0}
+            onClick={() => void handlePreview()}
+          >
+            {t.previewButton}
+          </Button>
+        )}
       </div>
 
       {player.url && (

@@ -12,6 +12,7 @@ export async function crossLingualSynthesize(
   voiceSample: File,
   language: string = "es",
   outputFormat: string = "mp3",
+  signal?: AbortSignal,
 ): Promise<CrossLingualResult> {
   const fd = new FormData();
   fd.append("text", text);
@@ -19,7 +20,9 @@ export async function crossLingualSynthesize(
   fd.append("language", language);
   fd.append("output_format", outputFormat);
 
-  const res = await fetch(`${API_BASE}/experimental/cross-lingual`, { method: "POST", body: fd });
+  const init: RequestInit = { method: "POST", body: fd };
+  if (signal) init.signal = signal;
+  const res = await fetch(`${API_BASE}/experimental/cross-lingual`, init);
   if (!res.ok) {
     let detail = res.statusText;
     try { const b = (await res.json()) as { detail?: string }; if (b.detail) detail = b.detail; } catch { /* */ }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   getChunkMap,
@@ -7,6 +7,8 @@ import {
   type ChapterSynthResult,
   type ChunkInfo,
 } from "@/api/chapterSynth";
+import { isAbortError } from "@/api/client";
+import { listStudioRenders, type StudioRender } from "@/api/studio";
 import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Skeleton } from "@/components/Skeleton";
@@ -20,15 +22,24 @@ interface Props {
   chapterId: string;
   chapterTitle: string;
   onToast: (msg: string) => void;
+  onOpenStudioWithSource: (generationId: string) => void;
 }
 
-export function ChunkMap({ t, chapterId, chapterTitle, onToast }: Props) {
+export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWithSource }: Props) {
   const [chunks, setChunks] = useState<ChunkInfo[]>([]);
   const [genId, setGenId] = useState<string | null>(null);
   const [synthesizing, setSynthesizing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
+  const [studioEdits, setStudioEdits] = useState<StudioRender[]>([]);
+  const synthAbortRef = useRef<AbortController | null>(null);
+  const regenAbortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
+
+  useEffect(() => () => {
+    synthAbortRef.current?.abort();
+    regenAbortRef.current?.abort();
+  }, []);
 
   const loadMap = useCallback(async () => {
     setLoading(true);
@@ -39,36 +50,64 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast }: Props) {
     } catch { /* first time — no generation yet */ } finally {
       setLoading(false);
     }
+    // Studio edits linked to this chapter — used to show an indicator
+    // and to let users jump back to any past version.
+    try {
+      const edits = await listStudioRenders({ kind: "audio", chapterId });
+      setStudioEdits(edits);
+    } catch { /* non-critical */ }
   }, [chapterId]);
 
   useEffect(() => { void loadMap(); }, [loadMap]);
 
   const handleSynthesize = async (): Promise<void> => {
+    const controller = new AbortController();
+    synthAbortRef.current = controller;
     setSynthesizing(true);
     try {
-      const result: ChapterSynthResult = await synthesizeChapter(chapterId);
+      const result: ChapterSynthResult = await synthesizeChapter(chapterId, controller.signal);
       player.load(result.blob, result.duration);
       setGenId(result.generationId);
       onToast(`${chapterTitle} synthesized (${result.chunks} chunks, ${result.engine})`);
       await loadMap();
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      if (isAbortError(e)) {
+        onToast(t.synthesisCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
     } finally {
       setSynthesizing(false);
+      if (synthAbortRef.current === controller) synthAbortRef.current = null;
     }
   };
 
+  const handleCancelSynthesize = (): void => {
+    synthAbortRef.current?.abort();
+  };
+
   const handleRegen = async (index: number): Promise<void> => {
+    const controller = new AbortController();
+    regenAbortRef.current = controller;
     setRegenIndex(index);
     try {
-      await regenerateChunk(chapterId, index);
+      await regenerateChunk(chapterId, index, controller.signal);
       onToast(`Chunk ${index + 1} regenerated`);
       await loadMap();
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      if (isAbortError(e)) {
+        onToast(t.synthesisCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
     } finally {
       setRegenIndex(null);
+      if (regenAbortRef.current === controller) regenAbortRef.current = null;
     }
+  };
+
+  const handleCancelRegen = (): void => {
+    regenAbortRef.current?.abort();
   };
 
   return (
@@ -87,19 +126,61 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast }: Props) {
           alignItems: "center",
           justifyContent: "space-between",
           marginBottom: 16,
+          gap: 12,
+          flexWrap: "wrap",
         }}
       >
-        <h4 style={{ margin: 0, fontSize: typography.size.base, fontWeight: 700 }}>
-          {t.chunkMapTitle} — {chapterTitle}
-        </h4>
-        <Button
-          variant="primary"
-          icon={<Icons.Waveform />}
-          loading={synthesizing}
-          onClick={() => void handleSynthesize()}
-        >
-          {synthesizing ? t.chunkSynthesizing : t.chunkSynthesize}
-        </Button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <h4 style={{ margin: 0, fontSize: typography.size.base, fontWeight: 700 }}>
+            {t.chunkMapTitle} — {chapterTitle}
+          </h4>
+          {studioEdits.length > 0 && (
+            <button
+              type="button"
+              onClick={() => genId && onOpenStudioWithSource(genId)}
+              title={t.chunkOpenInStudio}
+              style={{
+                padding: "3px 8px",
+                fontSize: 10,
+                fontWeight: 700,
+                fontFamily: fonts.mono,
+                borderRadius: radii.sm,
+                background: "rgba(139,92,246,0.15)",
+                color: "#a78bfa",
+                border: "1px solid rgba(139,92,246,0.3)",
+                cursor: genId ? "pointer" : "default",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              {t.chunkEditedCount.replace("{n}", String(studioEdits.length))}
+            </button>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {genId && !synthesizing ? (
+            <Button
+              variant="secondary"
+              icon={<Icons.Scissors />}
+              onClick={() => onOpenStudioWithSource(genId)}
+            >
+              {t.chunkOpenInStudio}
+            </Button>
+          ) : null}
+          {synthesizing ? (
+            <Button variant="danger" onClick={handleCancelSynthesize}>
+              {t.cancel}
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              icon={<Icons.Waveform />}
+              onClick={() => void handleSynthesize()}
+            >
+              {t.chunkSynthesize}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Player for the full chapter audio */}
@@ -184,24 +265,34 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast }: Props) {
                   </p>
                 </div>
                 <button
-                  onClick={() => void handleRegen(chunk.index)}
-                  disabled={isRegen || !genId}
-                  title={`Regenerate chunk ${chunk.index + 1}`}
+                  onClick={() =>
+                    isRegen ? handleCancelRegen() : void handleRegen(chunk.index)
+                  }
+                  disabled={!isRegen && !genId}
+                  title={
+                    isRegen
+                      ? t.cancel
+                      : `Regenerate chunk ${chunk.index + 1}`
+                  }
                   style={{
                     padding: "6px 12px",
                     fontSize: typography.size.xs,
                     fontWeight: 600,
-                    background: isRegen ? colors.textDark : "rgba(245,158,11,0.1)",
-                    color: isRegen ? colors.textFaint : "#f59e0b",
-                    border: "1px solid rgba(245,158,11,0.2)",
+                    background: isRegen
+                      ? "rgba(248,113,113,0.15)"
+                      : "rgba(245,158,11,0.1)",
+                    color: isRegen ? colors.danger : "#f59e0b",
+                    border: isRegen
+                      ? `1px solid ${colors.dangerBorder}`
+                      : "1px solid rgba(245,158,11,0.2)",
                     borderRadius: radii.sm,
-                    cursor: isRegen || !genId ? "default" : "pointer",
+                    cursor: !isRegen && !genId ? "default" : "pointer",
                     fontFamily: fonts.sans,
                     opacity: genId ? 1 : 0.3,
                     flexShrink: 0,
                   }}
                 >
-                  {isRegen ? t.chunkRegenerating : t.chunkRegen}
+                  {isRegen ? t.cancel : t.chunkRegen}
                 </button>
               </div>
             );

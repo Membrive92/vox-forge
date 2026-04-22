@@ -24,8 +24,13 @@ export interface ChapterSynthResult {
   chunks: number;
 }
 
-export async function synthesizeChapter(chapterId: string): Promise<ChapterSynthResult> {
-  const res = await fetch(`${API_BASE}/chapters/${chapterId}/synthesize`, { method: "POST" });
+export async function synthesizeChapter(
+  chapterId: string,
+  signal?: AbortSignal,
+): Promise<ChapterSynthResult> {
+  const init: RequestInit = { method: "POST" };
+  if (signal) init.signal = signal;
+  const res = await fetch(`${API_BASE}/chapters/${chapterId}/synthesize`, init);
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -46,10 +51,16 @@ export function getChunkMap(chapterId: string): Promise<ChunkMapResponse> {
   return getJson<ChunkMapResponse>(`/chapters/${chapterId}/chunks`);
 }
 
-export async function regenerateChunk(chapterId: string, chunkIndex: number): Promise<Blob> {
+export async function regenerateChunk(
+  chapterId: string,
+  chunkIndex: number,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const init: RequestInit = { method: "POST" };
+  if (signal) init.signal = signal;
   const res = await fetch(
     `${API_BASE}/chapters/${chapterId}/regenerate-chunk/${chunkIndex}`,
-    { method: "POST" },
+    init,
   );
   if (!res.ok) {
     let detail = res.statusText;

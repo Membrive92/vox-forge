@@ -14,6 +14,7 @@ import {
   uploadAmbience,
   type AmbienceTrack,
 } from "@/api/ambience";
+import { isAbortError } from "@/api/client";
 import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Slider } from "@/components/Slider";
@@ -37,8 +38,13 @@ export function AmbienceMixer({ t, chapterId, onToast }: Props) {
   const [mixing, setMixing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mixAbortRef = useRef<AbortController | null>(null);
   const previewPlayer = useAudioPlayer();
   const mixPlayer = useAudioPlayer();
+
+  useEffect(() => () => {
+    mixAbortRef.current?.abort();
+  }, []);
 
   const loadTracks = useCallback(async () => {
     try {
@@ -88,6 +94,8 @@ export function AmbienceMixer({ t, chapterId, onToast }: Props) {
 
   const handleMix = async (): Promise<void> => {
     if (!selectedId) return;
+    const controller = new AbortController();
+    mixAbortRef.current = controller;
     setMixing(true);
     try {
       const result = await mixChapter(
@@ -96,14 +104,24 @@ export function AmbienceMixer({ t, chapterId, onToast }: Props) {
         volumeDb,
         fadeIn * 1000,
         fadeOut * 1000,
+        controller.signal,
       );
       mixPlayer.load(result.blob, result.duration);
       onToast(`Mixed audio ready (${result.duration.toFixed(1)}s)`);
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      if (isAbortError(e)) {
+        onToast(t.processingCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
     } finally {
       setMixing(false);
+      if (mixAbortRef.current === controller) mixAbortRef.current = null;
     }
+  };
+
+  const handleCancelMix = (): void => {
+    mixAbortRef.current?.abort();
   };
 
   const handleDownloadMix = (): void => {
@@ -252,15 +270,20 @@ export function AmbienceMixer({ t, chapterId, onToast }: Props) {
           />
 
           <div style={{ marginTop: 8 }}>
-            <Button
-              variant="success"
-              icon={<Icons.Waveform />}
-              loading={mixing}
-              fullWidth
-              onClick={() => void handleMix()}
-            >
-              {mixing ? t.ambientMixing : t.ambientMix}
-            </Button>
+            {mixing ? (
+              <Button variant="danger" fullWidth onClick={handleCancelMix}>
+                {t.cancel}
+              </Button>
+            ) : (
+              <Button
+                variant="success"
+                icon={<Icons.Waveform />}
+                fullWidth
+                onClick={() => void handleMix()}
+              >
+                {t.ambientMix}
+              </Button>
+            )}
           </div>
         </div>
       )}

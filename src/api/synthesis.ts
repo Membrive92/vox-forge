@@ -21,6 +21,7 @@ export function newJobId(): string {
 export async function synthesize(
   params: SynthesisParams,
   jobId?: string,
+  signal?: AbortSignal,
 ): Promise<AudioResponse> {
   const body: SynthesisRequestDTO = {
     text: params.text,
@@ -39,11 +40,13 @@ export async function synthesize(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (jobId) headers["X-Synthesis-Job-ID"] = jobId;
 
-  const res = await fetch(`${API_BASE}/synthesize`, {
+  const fetchInit: RequestInit = {
     method: "POST",
     headers,
     body: JSON.stringify(body),
-  });
+  };
+  if (signal) fetchInit.signal = signal;
+  const res = await fetch(`${API_BASE}/synthesize`, fetchInit);
 
   if (!res.ok) {
     let detail = res.statusText;

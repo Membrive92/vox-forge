@@ -5,13 +5,14 @@
  * characters, lets the user assign a voice profile or built-in voice to
  * each one, and runs cast synthesis on demand.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   castSynthesize,
   extractCharacters,
   type CharacterMapping,
 } from "@/api/characterSynth";
+import { isAbortError } from "@/api/client";
 import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import * as Icons from "@/components/icons";
@@ -33,8 +34,13 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [scanning, setScanning] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const { profiles } = useProfiles();
   const player = useAudioPlayer();
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+  }, []);
 
   const scan = useCallback(async () => {
     if (!chapterText.trim()) {
@@ -62,6 +68,8 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
   };
 
   const handleGenerate = async (): Promise<void> => {
+    const controller = new AbortController();
+    abortRef.current = controller;
     setGenerating(true);
     try {
       const cast: CharacterMapping[] = characters.map((c) => {
@@ -76,7 +84,7 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
         return { character: c };
       });
 
-      const result = await castSynthesize(chapterText, cast);
+      const result = await castSynthesize(chapterText, cast, "mp3", controller.signal);
       player.load(result.blob, result.duration);
 
       if (result.unmapped.length > 0) {
@@ -85,10 +93,19 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
         onToast(`Cast synthesis ready (${result.segments} segments)`);
       }
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      if (isAbortError(e)) {
+        onToast(t.synthesisCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
     } finally {
       setGenerating(false);
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  };
+
+  const handleCancel = (): void => {
+    abortRef.current?.abort();
   };
 
   const handleDownload = (): void => {
@@ -235,19 +252,22 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
 
       {characters.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <Button
-            variant="primary"
-            icon={<Icons.Waveform />}
-            loading={generating}
-            fullWidth
-            onClick={() => void handleGenerate()}
-          >
-            {generating
-              ? t.generating
-              : characters.length === 1
+          {generating ? (
+            <Button variant="danger" fullWidth onClick={handleCancel}>
+              {t.cancel}
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              icon={<Icons.Waveform />}
+              fullWidth
+              onClick={() => void handleGenerate()}
+            >
+              {characters.length === 1
                 ? t.castingCastVoice
                 : t.castingCastVoices.replace("{n}", String(characters.length))}
-          </Button>
+            </Button>
+          )}
         </div>
       )}
 

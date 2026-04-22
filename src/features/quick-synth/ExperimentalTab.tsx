@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { isAbortError } from "@/api/client";
 import { crossLingualSynthesize } from "@/api/experimental";
 import { AudioRecorder } from "@/components/AudioRecorder";
 import { Button } from "@/components/Button";
@@ -19,22 +20,44 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
   const [language, setLanguage] = useState("es");
   const [isGenerating, setIsGenerating] = useState(false);
   const sampleInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+  }, []);
 
   const canGenerate = text.trim().length > 0 && sampleFile !== null && !isGenerating;
 
   const handleGenerate = async (): Promise<void> => {
     if (!sampleFile || !text.trim()) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsGenerating(true);
     try {
-      const result = await crossLingualSynthesize(text, sampleFile, language);
+      const result = await crossLingualSynthesize(
+        text,
+        sampleFile,
+        language,
+        "mp3",
+        controller.signal,
+      );
       player.load(result.blob, result.duration);
       onToast(t.expReady);
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      if (isAbortError(e)) {
+        onToast(t.synthesisCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
     } finally {
       setIsGenerating(false);
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  };
+
+  const handleCancel = (): void => {
+    abortRef.current?.abort();
   };
 
   const handleDownload = (): void => {
@@ -188,18 +211,28 @@ export function ExperimentalTab({ t, onToast }: ExperimentalTabProps) {
           </div>
         </div>
 
-        {/* Generate */}
-        <Button
-          variant="warning"
-          size="lg"
-          icon={<Icons.Waveform />}
-          loading={isGenerating}
-          disabled={!canGenerate}
-          fullWidth
-          onClick={() => void handleGenerate()}
-        >
-          {isGenerating ? t.expGenerating : t.expGenerate}
-        </Button>
+        {/* Generate / Cancel */}
+        {isGenerating ? (
+          <Button
+            variant="danger"
+            size="lg"
+            fullWidth
+            onClick={handleCancel}
+          >
+            {t.cancel}
+          </Button>
+        ) : (
+          <Button
+            variant="warning"
+            size="lg"
+            icon={<Icons.Waveform />}
+            disabled={!canGenerate}
+            fullWidth
+            onClick={() => void handleGenerate()}
+          >
+            {t.expGenerate}
+          </Button>
+        )}
       </div>
     </div>
   );

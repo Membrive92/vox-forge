@@ -30,12 +30,15 @@ export async function castSynthesize(
   text: string,
   cast: CharacterMapping[],
   outputFormat: string = "mp3",
+  signal?: AbortSignal,
 ): Promise<CastSynthesisResult> {
-  const res = await fetch(`${API_BASE}/character-synth/synthesize`, {
+  const init: RequestInit = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, cast, output_format: outputFormat }),
-  });
+  };
+  if (signal) init.signal = signal;
+  const res = await fetch(`${API_BASE}/character-synth/synthesize`, init);
 
   if (!res.ok) {
     let detail = res.statusText;

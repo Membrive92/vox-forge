@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Toast } from "@/components/Toast";
 import * as Icons from "@/components/icons";
@@ -26,6 +26,28 @@ export default function App() {
   const [lang, setLang] = useState<Language>("es");
   const [tab, setTab] = useState<Tab>("workbench");
   const [text, setText] = useState("");
+
+  // Keep tabs mounted after first visit so in-flight jobs (synth, render,
+  // transcribe) aren't wiped when the user navigates away mid-work. The
+  // fetch/polling lives inside the tab's hooks — if we unmount the
+  // component, its state setters become no-ops when the backend
+  // eventually resolves.
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set([tab]));
+  useEffect(() => {
+    setVisitedTabs((prev) => (prev.has(tab) ? prev : new Set([...prev, tab])));
+  }, [tab]);
+
+  // Cross-tab navigation intent. When the Workbench triggers "Edit in
+  // Studio" on a chapter, it stashes the generation id here + switches
+  // tab. StudioTab reads it on mount/change, selects the matching
+  // source, then calls ``clearPendingStudioSource`` so it doesn't
+  // re-fire if the user navigates back and forth.
+  const [pendingStudioSourceId, setPendingStudioSourceId] = useState<string | null>(null);
+  const openStudioWithSource = (sourceId: string): void => {
+    setPendingStudioSourceId(sourceId);
+    setTab("studio");
+  };
+  const clearPendingStudioSource = (): void => setPendingStudioSourceId(null);
 
   const esVoices = VOICES.es;
   const initialVoice = esVoices[0]?.id ?? "";
@@ -148,33 +170,84 @@ export default function App() {
       <TabsNav t={t} tab={tab} setTab={setTab} errorCount={errorBadge} />
 
       <main className="vf-main-narrow" style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
-        {tab === "quick-synth" && (
-          <QuickSynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} />
+        {visitedTabs.has("quick-synth") && (
+          <TabHost active={tab === "quick-synth"}>
+            <QuickSynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} />
+          </TabHost>
         )}
-        {tab === "workbench" && <WorkbenchTab t={t} onToast={toast.show} />}
-        {tab === "voices" && (
-          <VoicesUnifiedTab
-            t={t}
-            settings={settings}
-            draft={draft}
-            profiles={profiles}
-            dragOver={dragOver}
-            setDragOver={setDragOver}
-            onSaveProfile={handleSaveProfile}
-            onUseProfile={handleUseProfile}
-            onEditProfile={handleEditProfile}
-            onDeleteProfile={(id) => void handleDeleteProfile(id)}
-            onToast={toast.show}
-            voicePreview={voicePreview}
-            samplePlayer={samplePlayer}
-          />
+        {visitedTabs.has("workbench") && (
+          <TabHost active={tab === "workbench"}>
+            <WorkbenchTab
+              t={t}
+              onToast={toast.show}
+              onOpenStudioWithSource={openStudioWithSource}
+              onNavigateToQuickSynth={() => setTab("quick-synth")}
+            />
+          </TabHost>
         )}
-        {tab === "audio-tools" && (
-          <AudioToolsTab t={t} profiles={profiles} onToast={toast.show} />
+        {visitedTabs.has("voices") && (
+          <TabHost active={tab === "voices"}>
+            <VoicesUnifiedTab
+              t={t}
+              settings={settings}
+              draft={draft}
+              profiles={profiles}
+              dragOver={dragOver}
+              setDragOver={setDragOver}
+              onSaveProfile={handleSaveProfile}
+              onUseProfile={handleUseProfile}
+              onEditProfile={handleEditProfile}
+              onDeleteProfile={(id) => void handleDeleteProfile(id)}
+              onToast={toast.show}
+              voicePreview={voicePreview}
+              samplePlayer={samplePlayer}
+            />
+          </TabHost>
         )}
-        {tab === "studio" && <StudioTab t={t} onToast={toast.show} />}
-        {tab === "activity" && <ActivityTab t={t} onToast={toast.show} />}
+        {visitedTabs.has("audio-tools") && (
+          <TabHost active={tab === "audio-tools"}>
+            <AudioToolsTab t={t} profiles={profiles} onToast={toast.show} />
+          </TabHost>
+        )}
+        {visitedTabs.has("studio") && (
+          <TabHost active={tab === "studio"}>
+            <StudioTab
+              t={t}
+              onToast={toast.show}
+              pendingSourceId={pendingStudioSourceId}
+              onPendingSourceConsumed={clearPendingStudioSource}
+            />
+          </TabHost>
+        )}
+        {visitedTabs.has("activity") && (
+          <TabHost active={tab === "activity"}>
+            <ActivityTab t={t} onToast={toast.show} />
+          </TabHost>
+        )}
       </main>
+    </div>
+  );
+}
+
+interface TabHostProps {
+  active: boolean;
+  children: React.ReactNode;
+}
+
+// Wraps a tab so it stays mounted when hidden (to preserve in-flight jobs,
+// polling, form drafts, audio players). Inactive hosts are visually hidden
+// AND taken out of the a11y / focus tree so screen readers and Tab
+// keyboard nav don't see stale content.
+function TabHost({ active, children }: TabHostProps) {
+  return (
+    <div
+      hidden={!active}
+      aria-hidden={active ? undefined : "true"}
+      // @ts-expect-error — "inert" is valid HTML5; React types haven't caught up everywhere.
+      inert={active ? undefined : ""}
+      style={active ? undefined : { display: "none" }}
+    >
+      {children}
     </div>
   );
 }
@@ -308,11 +381,14 @@ interface TabsNavProps {
 }
 
 function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
+  // Audio Tools (Convert + Lab) is deliberately excluded from the top
+  // nav — it's standalone file-processing that doesn't fit the
+  // audiobook production flow. The component is still reachable via
+  // ``tab === "audio-tools"`` (legacy links) but nothing surfaces it.
   const tabs: readonly { id: Tab; icon: JSX.Element; label: string }[] = [
     { id: "workbench", icon: <Icons.Book />, label: t.tabWorkbench },
     { id: "quick-synth", icon: <Icons.Zap />, label: t.tabQuickSynth },
     { id: "voices", icon: <Icons.Mic2 />, label: t.tabVoices },
-    { id: "audio-tools", icon: <Icons.SlidersIcon />, label: t.tabAudioTools },
     { id: "studio", icon: <Icons.Scissors />, label: t.tabStudio },
     { id: "activity", icon: <Icons.Clock />, label: errorCount > 0 ? `${t.tabActivity} (${errorCount})` : t.tabActivity },
   ];

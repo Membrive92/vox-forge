@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { isAbortError } from "@/api/client";
 import { fetchProgress, newJobId, synthesize } from "@/api/synthesis";
 import type { SynthesisParams } from "@/types/domain";
 
@@ -21,10 +22,12 @@ export interface RunSynthesisOptions {
   steps: readonly string[];
   onSuccess: (blob: Blob, duration: number, engine: string) => void;
   onError: (message: string) => void;
+  onCancelled?: () => void;
 }
 
 export interface SynthesisHook extends SynthesisState {
   run: (opts: RunSynthesisOptions) => Promise<void>;
+  cancel: () => void;
 }
 
 export function useSynthesis(): SynthesisHook {
@@ -36,6 +39,7 @@ export function useSynthesis(): SynthesisHook {
   const [chunksTotal, setChunksTotal] = useState(0);
   const [lastEngine, setLastEngine] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const clearPoll = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -44,8 +48,9 @@ export function useSynthesis(): SynthesisHook {
     }
   }, []);
 
-  useEffect(() => {
-    return () => clearPoll();
+  useEffect(() => () => {
+    clearPoll();
+    abortRef.current?.abort();
   }, [clearPoll]);
 
   const reset = useCallback(() => {
@@ -59,10 +64,14 @@ export function useSynthesis(): SynthesisHook {
     setLastEngine(null);
   }, [clearPoll]);
 
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
   const runningRef = useRef(false);
 
   const run = useCallback(
-    async ({ params, steps, onSuccess, onError }: RunSynthesisOptions) => {
+    async ({ params, steps, onSuccess, onError, onCancelled }: RunSynthesisOptions) => {
       if (!params.text.trim()) return;
       if (runningRef.current) return;
       runningRef.current = true;
@@ -75,6 +84,8 @@ export function useSynthesis(): SynthesisHook {
       setStepLabel(steps[0] ?? "");
 
       const jobId = newJobId();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       // Poll progress every 800ms. Backend reports chunks_done/chunks_total.
       intervalRef.current = window.setInterval(() => {
@@ -94,7 +105,7 @@ export function useSynthesis(): SynthesisHook {
       }, POLL_INTERVAL_MS);
 
       try {
-        const { blob, duration, engine } = await synthesize(params, jobId);
+        const { blob, duration, engine } = await synthesize(params, jobId, controller.signal);
         clearPoll();
         setProgress(100);
         setIsGenerating(false);
@@ -107,7 +118,13 @@ export function useSynthesis(): SynthesisHook {
         setIsGenerating(false);
         setProgress(0);
         runningRef.current = false;
-        onError(e instanceof Error ? e.message : "Unknown error");
+        if (isAbortError(e)) {
+          onCancelled?.();
+        } else {
+          onError(e instanceof Error ? e.message : "Unknown error");
+        }
+      } finally {
+        if (abortRef.current === controller) abortRef.current = null;
       }
     },
     [clearPoll],
@@ -115,6 +132,6 @@ export function useSynthesis(): SynthesisHook {
 
   return {
     isGenerating, isGenerated, progress, stepLabel,
-    chunksDone, chunksTotal, lastEngine, reset, run,
+    chunksDone, chunksTotal, lastEngine, reset, run, cancel,
   };
 }

@@ -140,6 +140,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
         onToast(`${t.audioReady} — ${engineLabel}`);
       },
       onError: (msg) => onToast(`Error: ${msg}`),
+      onCancelled: () => onToast(t.synthesisCancelled),
     });
   };
 
@@ -533,17 +534,27 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
           previewName={exportCfg.renderFilename(settings.format)}
         />
 
-        <Button
-          variant="primary"
-          size="lg"
-          icon={<Icons.Waveform />}
-          loading={synthesis.isGenerating}
-          disabled={!canGenerate}
-          fullWidth
-          onClick={() => void handleGenerate()}
-        >
-          {synthesis.isGenerating ? t.generating : t.generate}
-        </Button>
+        {synthesis.isGenerating ? (
+          <Button
+            variant="danger"
+            size="lg"
+            fullWidth
+            onClick={synthesis.cancel}
+          >
+            {t.cancel}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="lg"
+            icon={<Icons.Waveform />}
+            disabled={!canGenerate}
+            fullWidth
+            onClick={() => void handleGenerate()}
+          >
+            {t.generate}
+          </Button>
+        )}
 
         <p
           style={{

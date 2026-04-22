@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { isAbortError } from "@/api/client";
 import { convertVoice } from "@/api/conversion";
 import { Button } from "@/components/Button";
 import { Slider } from "@/components/Slider";
@@ -28,7 +29,12 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
   const [bassBoost, setBassBoost] = useState(0);
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const targetInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+  }, []);
 
   const profilesWithSample = profiles.filter((p) => p.sampleName !== null);
 
@@ -40,23 +46,38 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
   const handleConvert = async (): Promise<void> => {
     if (!sourceFile || !canConvert) return;
     logger.info("Voice conversion started", { targetMode, format, pitchShift, formantShift, bassBoost });
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsConverting(true);
     try {
-      const result = await convertVoice(sourceFile, {
-        profileId: targetMode === "profile" ? (selectedProfileId ?? undefined) : undefined,
-        targetSample: targetMode === "file" ? (targetFile ?? undefined) : undefined,
-        outputFormat: format,
-        pitchShift,
-        formantShift,
-        bassBoostDb: bassBoost,
-      });
+      const result = await convertVoice(
+        sourceFile,
+        {
+          profileId: targetMode === "profile" ? (selectedProfileId ?? undefined) : undefined,
+          targetSample: targetMode === "file" ? (targetFile ?? undefined) : undefined,
+          outputFormat: format,
+          pitchShift,
+          formantShift,
+          bassBoostDb: bassBoost,
+        },
+        controller.signal,
+      );
       player.load(result.blob, result.duration);
       onToast(t.conversionReady);
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      if (isAbortError(e)) {
+        onToast(t.processingCancelled);
+      } else {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
     } finally {
       setIsConverting(false);
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  };
+
+  const handleCancel = (): void => {
+    abortRef.current?.abort();
   };
 
   const handleDownload = (): void => {
@@ -423,18 +444,23 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
           ))}
         </div>
 
-        {/* Convert button */}
-        <Button
-          variant="primary"
-          size="lg"
-          icon={<Icons.Waveform />}
-          loading={isConverting}
-          disabled={!canConvert}
-          fullWidth
-          onClick={() => void handleConvert()}
-        >
-          {isConverting ? t.converting : t.convertButton}
-        </Button>
+        {/* Convert / Cancel */}
+        {isConverting ? (
+          <Button variant="danger" size="lg" fullWidth onClick={handleCancel}>
+            {t.cancel}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="lg"
+            icon={<Icons.Waveform />}
+            disabled={!canConvert}
+            fullWidth
+            onClick={() => void handleConvert()}
+          >
+            {t.convertButton}
+          </Button>
+        )}
       </div>
     </div>
   );

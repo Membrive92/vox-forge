@@ -20,6 +20,15 @@ export class ApiError extends Error {
   }
 }
 
+/** True if the caller cancelled a request via ``AbortController.abort()``.
+ *
+ * Use this in ``catch`` blocks to distinguish user-initiated cancels from
+ * real errors: show a neutral "cancelled" toast for aborts, an error toast
+ * otherwise. Browsers throw ``DOMException`` with name ``"AbortError"``. */
+export function isAbortError(e: unknown): boolean {
+  return e instanceof DOMException && e.name === "AbortError";
+}
+
 function newRequestId(): string {
   // 12-char random id — matches backend format
   return Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 8);
@@ -44,6 +53,7 @@ interface RequestOptions {
   method: string;
   headers?: Record<string, string>;
   body?: BodyInit | null;
+  signal?: AbortSignal;
 }
 
 async function request(path: string, opts: RequestOptions): Promise<Response> {
@@ -56,7 +66,9 @@ async function request(path: string, opts: RequestOptions): Promise<Response> {
   logger.debug(`→ ${opts.method} ${path}`, { requestId, method: opts.method, path });
 
   try {
-    const res = await fetch(url, { method: opts.method, headers, body: opts.body ?? null });
+    const init: RequestInit = { method: opts.method, headers, body: opts.body ?? null };
+    if (opts.signal) init.signal = opts.signal;
+    const res = await fetch(url, init);
     const elapsed = Math.round(performance.now() - started);
     const serverId = res.headers.get("X-Request-ID") ?? requestId;
 
@@ -74,6 +86,7 @@ async function request(path: string, opts: RequestOptions): Promise<Response> {
   } catch (err) {
     const elapsed = Math.round(performance.now() - started);
     if (err instanceof ApiError) throw err;
+    if (isAbortError(err)) throw err; // caller cancelled — don't log as failure
     logger.error(`✗ ${opts.method} ${path} network error (${elapsed}ms)`, {
       requestId,
       error: err instanceof Error ? err.message : String(err),
@@ -82,36 +95,56 @@ async function request(path: string, opts: RequestOptions): Promise<Response> {
   }
 }
 
-export async function getJson<T>(path: string): Promise<T> {
-  const res = await request(path, { method: "GET" });
+export async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const res = await request(path, signal ? { method: "GET", signal } : { method: "GET" });
   return (await res.json()) as T;
 }
 
-export async function postJson<T, B = unknown>(path: string, body: B): Promise<T> {
-  const res = await request(path, {
+export async function postJson<T, B = unknown>(
+  path: string,
+  body: B,
+  signal?: AbortSignal,
+): Promise<T> {
+  const opts: RequestOptions = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  };
+  if (signal) opts.signal = signal;
+  const res = await request(path, opts);
   return (await res.json()) as T;
 }
 
-export async function patchJson<T, B = unknown>(path: string, body: B): Promise<T> {
-  const res = await request(path, {
+export async function patchJson<T, B = unknown>(
+  path: string,
+  body: B,
+  signal?: AbortSignal,
+): Promise<T> {
+  const opts: RequestOptions = {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  };
+  if (signal) opts.signal = signal;
+  const res = await request(path, opts);
   return (await res.json()) as T;
 }
 
-export async function postForm<T>(path: string, form: FormData): Promise<T> {
-  const res = await request(path, { method: "POST", body: form });
+export async function postForm<T>(
+  path: string,
+  form: FormData,
+  signal?: AbortSignal,
+): Promise<T> {
+  const opts: RequestOptions = { method: "POST", body: form };
+  if (signal) opts.signal = signal;
+  const res = await request(path, opts);
   return (await res.json()) as T;
 }
 
-export async function deleteResource(path: string): Promise<void> {
-  await request(path, { method: "DELETE" });
+export async function deleteResource(path: string, signal?: AbortSignal): Promise<void> {
+  const opts: RequestOptions = { method: "DELETE" };
+  if (signal) opts.signal = signal;
+  await request(path, opts);
 }
 
 export interface AudioResponse {
@@ -124,12 +157,18 @@ export interface AudioResponse {
   requestId: string | undefined;
 }
 
-export async function postJsonForAudio<B>(path: string, body: B): Promise<AudioResponse> {
-  const res = await request(path, {
+export async function postJsonForAudio<B>(
+  path: string,
+  body: B,
+  signal?: AbortSignal,
+): Promise<AudioResponse> {
+  const opts: RequestOptions = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  };
+  if (signal) opts.signal = signal;
+  const res = await request(path, opts);
   const duration = Number.parseFloat(res.headers.get("X-Audio-Duration") ?? "0");
   const sizeBytes = Number.parseInt(res.headers.get("X-Audio-Size") ?? "0", 10);
   const chunks = Number.parseInt(res.headers.get("X-Audio-Chunks") ?? "1", 10);

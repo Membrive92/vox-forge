@@ -38,6 +38,7 @@ export async function processAudio(
   audioFile: File,
   params: VoiceLabParams,
   outputFormat: string = "mp3",
+  signal?: AbortSignal,
 ): Promise<LabResult> {
   const fd = new FormData();
   fd.append("audio", audioFile);
@@ -51,7 +52,9 @@ export async function processAudio(
   fd.append("speed", String(params.speed));
   fd.append("output_format", outputFormat);
 
-  const res = await fetch(`${API_BASE}/voice-lab/process`, { method: "POST", body: fd });
+  const init: RequestInit = { method: "POST", body: fd };
+  if (signal) init.signal = signal;
+  const res = await fetch(`${API_BASE}/voice-lab/process`, init);
 
   if (!res.ok) {
     let detail = res.statusText;

@@ -20,6 +20,7 @@ export interface ConvertOptions {
 export async function convertVoice(
   audioFile: File,
   options: ConvertOptions,
+  signal?: AbortSignal,
 ): Promise<ConversionResult> {
   const fd = new FormData();
   fd.append("audio", audioFile);
@@ -30,7 +31,9 @@ export async function convertVoice(
   fd.append("formant_shift", String(options.formantShift ?? 0));
   fd.append("bass_boost_db", String(options.bassBoostDb ?? 0));
 
-  const res = await fetch(`${API_BASE}/convert`, { method: "POST", body: fd });
+  const init: RequestInit = { method: "POST", body: fd };
+  if (signal) init.signal = signal;
+  const res = await fetch(`${API_BASE}/convert`, init);
 
   if (!res.ok) {
     let detail = res.statusText;

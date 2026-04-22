@@ -61,6 +61,7 @@ export async function mixChapter(
   volumeDb: number = -15,
   fadeInMs: number = 3000,
   fadeOutMs: number = 3000,
+  signal?: AbortSignal,
 ): Promise<MixChapterResult> {
   const fd = new FormData();
   fd.append("ambient_track_id", ambientTrackId);
@@ -68,10 +69,9 @@ export async function mixChapter(
   fd.append("fade_in_ms", String(fadeInMs));
   fd.append("fade_out_ms", String(fadeOutMs));
 
-  const res = await fetch(`${API_BASE}/ambience/mix-chapter/${chapterId}`, {
-    method: "POST",
-    body: fd,
-  });
+  const init: RequestInit = { method: "POST", body: fd };
+  if (signal) init.signal = signal;
+  const res = await fetch(`${API_BASE}/ambience/mix-chapter/${chapterId}`, init);
 
   if (!res.ok) {
     let detail = res.statusText;
