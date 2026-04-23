@@ -14,7 +14,10 @@ export type EditOperationType =
   | "delete_region"
   | "fade_in"
   | "fade_out"
-  | "normalize";
+  | "normalize"
+  | "loudness"
+  | "denoise"
+  | "compressor";
 
 export interface StudioOperation {
   type: EditOperationType;

@@ -46,6 +46,12 @@ function describeOp(op: StudioOperation, t: Translations): string {
       return `${t.studioOpFadeOut} · ${op.params["duration_ms"] ?? 0}ms`;
     case "normalize":
       return `${t.studioOpNormalize} · ${op.params["headroom_db"] ?? -1}dB`;
+    case "loudness":
+      return `${t.studioOpLoudness} · ${op.params["target_lufs"] ?? -16} LUFS`;
+    case "denoise":
+      return `${t.studioOpDenoise} · ${Math.round((op.params["strength"] ?? 0.5) * 100)}%`;
+    case "compressor":
+      return `${t.studioOpCompressor} · ${Math.round((op.params["amount"] ?? 0.5) * 100)}%`;
     default:
       return op.type;
   }
@@ -68,6 +74,9 @@ export function EditOperationsPanel({
 }: Props) {
   const [fadeMs, setFadeMs] = useState(1000);
   const [headroom, setHeadroom] = useState(-1);
+  const [lufs, setLufs] = useState(-16);
+  const [denoiseStrength, setDenoiseStrength] = useState(50);   // 0..100
+  const [compressorAmount, setCompressorAmount] = useState(40); // 0..100
 
   const requireRegion = (): StudioRegion | null => {
     if (!region) {
@@ -141,6 +150,27 @@ export function EditOperationsPanel({
           >
             {t.studioOpNormalize}
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onAdd({ type: "loudness", params: { target_lufs: lufs } })}
+          >
+            {t.studioOpLoudness}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onAdd({ type: "denoise", params: { strength: denoiseStrength / 100 } })}
+          >
+            {t.studioOpDenoise}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onAdd({ type: "compressor", params: { amount: compressorAmount / 100 } })}
+          >
+            {t.studioOpCompressor}
+          </Button>
           {region ? (
             <Button variant="ghost" size="sm" onClick={onClearRegion}>
               {t.studioClearRegion}
@@ -186,6 +216,67 @@ export function EditOperationsPanel({
               step={0.5}
               value={headroom}
               onChange={(e) => setHeadroom(Number(e.target.value))}
+              style={inputStyle}
+            />
+          </label>
+          <label
+            title={t.studioLufsHint}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: typography.size.xs,
+              color: colors.textDim,
+            }}
+          >
+            {t.studioLufsTarget}
+            <input
+              type="number"
+              min={-24}
+              max={-10}
+              step={1}
+              value={lufs}
+              onChange={(e) => setLufs(Number(e.target.value))}
+              style={inputStyle}
+            />
+          </label>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: typography.size.xs,
+              color: colors.textDim,
+            }}
+          >
+            {t.studioDenoiseStrength}
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={5}
+              value={denoiseStrength}
+              onChange={(e) => setDenoiseStrength(Number(e.target.value))}
+              style={inputStyle}
+            />
+          </label>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: typography.size.xs,
+              color: colors.textDim,
+            }}
+          >
+            {t.studioCompressorAmount}
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={5}
+              value={compressorAmount}
+              onChange={(e) => setCompressorAmount(Number(e.target.value))}
               style={inputStyle}
             />
           </label>

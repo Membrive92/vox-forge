@@ -842,3 +842,120 @@ def test_sources_expose_project_and_chapter_ids(client) -> None:
     sources = client.get("/api/studio/sources").json()["sources"]
     src = next(s for s in sources if s["id"] == gen_id)
     assert src["project_id"] and src["chapter_id"]
+
+
+# ── Sprint 2 C: LUFS / denoise / compressor ────────────────────────
+
+
+def _patch_dsp_runners(monkeypatch) -> None:
+    """Swap the three external-tool runners for a no-op that just
+    copies the input WAV to the output. Keeps tests fast and lets the
+    round-trip path exercise its cleanup without needing real ffmpeg/
+    librosa/pedalboard on the audio bytes."""
+    import shutil as _shutil
+    from backend.services import audio_editor
+
+    def fake_loudnorm(in_path, out_path, target_lufs=-16.0):
+        _shutil.copy(str(in_path), str(out_path))
+
+    def fake_denoise(in_path, out_path, strength=0.5):
+        _shutil.copy(str(in_path), str(out_path))
+
+    def fake_compressor(in_path, out_path, amount=0.5, threshold_db=-18.0):
+        _shutil.copy(str(in_path), str(out_path))
+
+    monkeypatch.setattr(audio_editor, "_run_loudnorm", fake_loudnorm)
+    monkeypatch.setattr(audio_editor, "_run_denoise", fake_denoise)
+    monkeypatch.setattr(audio_editor, "_run_compressor", fake_compressor)
+
+
+def test_loudness_op_registered(client) -> None:
+    from backend.services.audio_editor import VALID_OPERATIONS
+    assert "loudness" in VALID_OPERATIONS
+    assert "denoise" in VALID_OPERATIONS
+    assert "compressor" in VALID_OPERATIONS
+
+
+def test_loudness_op_applies_via_round_trip(client, monkeypatch) -> None:
+    _patch_dsp_runners(monkeypatch)
+    from backend.services.audio_editor import EditOperation, apply_operations
+
+    src = _seed_source("loud_src.mp3")
+    out = apply_operations(
+        src,
+        [EditOperation(type="loudness", params={"target_lufs": -16.0})],
+    )
+    assert out.exists()
+
+
+def test_loudness_rejects_out_of_range(client) -> None:
+    from backend.services.audio_editor import EditOperation, apply_operations
+
+    src = _seed_source("loud_bad.mp3")
+    with pytest.raises(Exception) as exc:
+        apply_operations(src, [EditOperation(type="loudness", params={"target_lufs": -2.0})])
+    assert "range" in str(exc.value).lower() or "target_lufs" in str(exc.value).lower()
+
+
+def test_denoise_op_applies(client, monkeypatch) -> None:
+    _patch_dsp_runners(monkeypatch)
+    from backend.services.audio_editor import EditOperation, apply_operations
+
+    src = _seed_source("den_src.mp3")
+    out = apply_operations(
+        src,
+        [EditOperation(type="denoise", params={"strength": 0.3})],
+    )
+    assert out.exists()
+
+
+def test_denoise_rejects_out_of_range(client) -> None:
+    from backend.services.audio_editor import EditOperation, apply_operations
+
+    src = _seed_source("den_bad.mp3")
+    with pytest.raises(Exception) as exc:
+        apply_operations(src, [EditOperation(type="denoise", params={"strength": 1.5})])
+    assert "range" in str(exc.value).lower() or "strength" in str(exc.value).lower()
+
+
+def test_compressor_op_applies(client, monkeypatch) -> None:
+    _patch_dsp_runners(monkeypatch)
+    from backend.services.audio_editor import EditOperation, apply_operations
+
+    src = _seed_source("cmp_src.mp3")
+    out = apply_operations(
+        src,
+        [EditOperation(type="compressor", params={"amount": 0.6})],
+    )
+    assert out.exists()
+
+
+def test_compressor_rejects_out_of_range(client) -> None:
+    from backend.services.audio_editor import EditOperation, apply_operations
+
+    src = _seed_source("cmp_bad.mp3")
+    with pytest.raises(Exception) as exc:
+        apply_operations(src, [EditOperation(type="compressor", params={"amount": 2.0})])
+    assert "range" in str(exc.value).lower() or "amount" in str(exc.value).lower()
+
+
+def test_full_pipeline_8_ops(client, monkeypatch) -> None:
+    """All 8 ops in a single batch — dispatch + round-trip integration."""
+    _patch_dsp_runners(monkeypatch)
+    from backend.services.audio_editor import EditOperation, apply_operations
+
+    src = _seed_source("full.mp3")
+    out = apply_operations(
+        src,
+        [
+            EditOperation(type="trim", params={"start_ms": 0, "end_ms": 900}),
+            EditOperation(type="delete_region", params={"start_ms": 50, "end_ms": 100}),
+            EditOperation(type="denoise", params={"strength": 0.3}),
+            EditOperation(type="compressor", params={"amount": 0.4}),
+            EditOperation(type="loudness", params={"target_lufs": -16.0}),
+            EditOperation(type="fade_in", params={"duration_ms": 30}),
+            EditOperation(type="fade_out", params={"duration_ms": 30}),
+            EditOperation(type="normalize", params={"headroom_db": -1.0}),
+        ],
+    )
+    assert out.exists()
