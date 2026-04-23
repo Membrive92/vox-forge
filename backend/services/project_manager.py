@@ -143,11 +143,14 @@ async def create_chapter(
 
 
 async def update_chapter(chapter_id: str, **fields: Any) -> dict[str, Any] | None:
-    allowed = {"title", "text", "sort_order", "voice_id", "profile_id"}
-    # ``voice_id`` / ``profile_id`` are explicitly nullable — sending
-    # None clears the override so the chapter falls back to the
-    # project's voice again.
-    nullable = {"voice_id", "profile_id"}
+    allowed = {
+        "title", "text", "sort_order",
+        "voice_id", "profile_id", "active_generation_id",
+    }
+    # Explicitly nullable fields — sending None clears them.
+    # ``voice_id``/``profile_id``: revert to project's voice.
+    # ``active_generation_id``: go back to "most recent done" behaviour.
+    nullable = {"voice_id", "profile_id", "active_generation_id"}
     updates = {
         k: v for k, v in fields.items()
         if k in allowed and (v is not None or k in nullable)

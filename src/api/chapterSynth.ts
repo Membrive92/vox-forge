@@ -1,6 +1,6 @@
-/** Chapter-level synthesis + chunk regen API. */
+/** Chapter-level synthesis + chunk regen + audio upload API. */
 
-import { API_BASE, ApiError, getJson } from "./client";
+import { API_BASE, ApiError, getJson, postForm } from "./client";
 
 export interface ChunkInfo {
   index: number;
@@ -71,4 +71,33 @@ export async function regenerateChunk(
     throw new ApiError(res.status, detail);
   }
   return res.blob();
+}
+
+export interface UploadedChapterGeneration {
+  id: string;
+  chapter_id: string;
+  engine: string;
+  status: string;
+  duration: number;
+  file_path: string;
+  output_format: string;
+}
+
+/** Save a pre-recorded audio file as a new generation for ``chapterId``.
+ *
+ * Works for both external recordings (user uploads a file) and the
+ * in-app recorder's ``Blob`` output (wrap it in a ``File`` first). The
+ * returned generation becomes the chapter's active take. */
+export function uploadChapterAudio(
+  chapterId: string,
+  audio: File,
+  signal?: AbortSignal,
+): Promise<UploadedChapterGeneration> {
+  const fd = new FormData();
+  fd.append("audio", audio);
+  return postForm<UploadedChapterGeneration>(
+    `/chapters/${chapterId}/upload-audio`,
+    fd,
+    signal,
+  );
 }

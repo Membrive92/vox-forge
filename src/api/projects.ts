@@ -26,6 +26,7 @@ export interface Chapter {
   sort_order: number;
   voice_id: string | null;
   profile_id: string | null;
+  active_generation_id: string | null;
   created_at: string;
   updated_at: string;
 }

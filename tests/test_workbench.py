@@ -354,3 +354,103 @@ def test_invalid_format_no_ghost_job(client) -> None:
 
     after = client.get("/api/synthesize/incomplete").json()["count"]
     assert after == before, "Invalid format must not create a ghost job"
+
+
+# ── A1: upload-audio + A3: active_generation_id ─────────────────────
+
+def _create_chapter(client, project_id: str, title: str = "C1") -> dict:
+    response = client.post(
+        f"/api/projects/{project_id}/chapters",
+        json={"title": title, "text": "some text", "sort_order": 0},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_upload_chapter_audio_creates_generation(client) -> None:
+    project = _create_project(client, "Upload Test")
+    chapter = _create_chapter(client, project["id"])
+
+    files = {"audio": ("narration.wav", b"RIFF" + b"\x00" * 64, "audio/wav")}
+    response = client.post(
+        f"/api/chapters/{chapter['id']}/upload-audio",
+        files=files,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["engine"] == "upload"
+    assert body["status"] == "done"
+    assert body["chapter_id"] == chapter["id"]
+    assert body["file_path"].endswith(".wav")
+
+    # It becomes the chapter's active generation
+    refreshed = client.get(f"/api/projects/chapters/{chapter['id']}/generations").json()
+    assert len(refreshed) == 1
+    assert refreshed[0]["id"] == body["id"]
+
+
+def test_upload_chapter_audio_rejects_bad_mime(client) -> None:
+    project = _create_project(client, "Bad Mime")
+    chapter = _create_chapter(client, project["id"])
+
+    files = {"audio": ("virus.exe", b"MZ" + b"\x00" * 32, "application/octet-stream")}
+    response = client.post(
+        f"/api/chapters/{chapter['id']}/upload-audio",
+        files=files,
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_sample"
+
+
+def test_upload_chapter_audio_nonexistent_chapter_404(client) -> None:
+    files = {"audio": ("a.wav", b"RIFF" + b"\x00" * 16, "audio/wav")}
+    response = client.post("/api/chapters/does_not_exist/upload-audio", files=files)
+    assert response.status_code == 404
+
+
+def test_upload_chapter_audio_sets_active_generation(client) -> None:
+    """After upload, ``chapter.active_generation_id`` points at the new row."""
+    project = _create_project(client, "Active")
+    chapter = _create_chapter(client, project["id"])
+
+    files = {"audio": ("a.wav", b"RIFF" + b"\x00" * 64, "audio/wav")}
+    up = client.post(f"/api/chapters/{chapter['id']}/upload-audio", files=files).json()
+
+    # Patch would expose this, but we read chapter directly via list endpoint
+    chapters = client.get(f"/api/projects/{project['id']}/chapters").json()
+    target = next(c for c in chapters if c["id"] == chapter["id"])
+    assert target["active_generation_id"] == up["id"]
+
+
+def test_active_generation_id_can_be_cleared(client) -> None:
+    """PATCH with null clears the override so chapter falls back to newest."""
+    project = _create_project(client, "Clearable")
+    chapter = _create_chapter(client, project["id"])
+    files = {"audio": ("a.wav", b"RIFF" + b"\x00" * 64, "audio/wav")}
+    client.post(f"/api/chapters/{chapter['id']}/upload-audio", files=files)
+
+    response = client.patch(
+        f"/api/projects/chapters/{chapter['id']}",
+        json={"active_generation_id": None},
+    )
+    assert response.status_code == 200
+    assert response.json()["active_generation_id"] is None
+
+
+def test_chapter_update_accepts_active_generation_id(client) -> None:
+    """PATCH can explicitly set an older generation as active."""
+    project = _create_project(client, "Switch")
+    chapter = _create_chapter(client, project["id"])
+    files = {"audio": ("a.wav", b"RIFF" + b"\x00" * 64, "audio/wav")}
+    first = client.post(f"/api/chapters/{chapter['id']}/upload-audio", files=files).json()
+    files2 = {"audio": ("b.wav", b"RIFF" + b"\x00" * 64, "audio/wav")}
+    second = client.post(f"/api/chapters/{chapter['id']}/upload-audio", files=files2).json()
+
+    # After two uploads, the second is active. Switch back to the first.
+    response = client.patch(
+        f"/api/projects/chapters/{chapter['id']}",
+        json={"active_generation_id": first["id"]},
+    )
+    assert response.status_code == 200
+    assert response.json()["active_generation_id"] == first["id"]
+    assert first["id"] != second["id"]

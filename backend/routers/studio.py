@@ -84,12 +84,17 @@ def _is_within_allowed_roots(target: Path) -> bool:
 async def list_sources() -> StudioSourcesResponse:
     """Return chapter generations that have a usable audio file on disk."""
     sources: list[StudioSource] = []
+    # A chapter lists at most one source: its ``active_generation_id``
+    # (explicitly chosen) or else the newest "done" generation. Older
+    # takes are still reachable via the multi-take selector in the
+    # chapter card + the Recent Renders scope filter.
     async with get_db() as db:
         cursor = await db.execute(
             """SELECT g.id, g.file_path, g.duration, g.created_at,
                       g.chapter_id,
                       c.title     AS chapter_title,
                       c.project_id,
+                      c.active_generation_id,
                       p.name      AS project_name
                FROM generations g
                JOIN chapters c ON c.id = g.chapter_id
@@ -100,6 +105,18 @@ async def list_sources() -> StudioSourcesResponse:
                ORDER BY g.created_at DESC"""
         )
         rows: list[aiosqlite.Row] = await cursor.fetchall()
+
+    # Bucket rows per chapter, preferring the active one; fall back to
+    # newest (rows are already DESC by created_at).
+    per_chapter: dict[str, aiosqlite.Row] = {}
+    for row in rows:
+        cid = row["chapter_id"]
+        active_id = row["active_generation_id"]
+        if active_id and row["id"] == active_id:
+            per_chapter[cid] = row
+        elif cid not in per_chapter:
+            per_chapter[cid] = row
+    rows = list(per_chapter.values())
 
     for row in rows:
         path = Path(row["file_path"])

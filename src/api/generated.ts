@@ -550,6 +550,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapter_id}/upload-audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a pre-recorded audio file as a generation of this chapter
+         * @description Save the uploaded audio under ``data/output/`` and register a
+         *     ``generations`` row with ``engine="upload"`` and ``status="done"``.
+         *
+         *     Makes the chapter behave identically to a TTS-synthesized one
+         *     downstream: Studio can load it, Workbench can render a video from
+         *     it, export can bundle it. Browser recordings (webm/opus) and other
+         *     containers are accepted � ``AudioSegment.from_file`` handles them
+         *     via ffmpeg. The file is stored as-is, without transcoding, to
+         *     preserve quality.
+         */
+        post: operations["upload_chapter_audio_api_chapters__chapter_id__upload_audio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/export/{project_id}": {
         parameters: {
             query?: never;
@@ -1239,6 +1267,14 @@ export interface components {
              */
             tags: string;
         };
+        /** Body_upload_chapter_audio_api_chapters__chapter_id__upload_audio_post */
+        Body_upload_chapter_audio_api_chapters__chapter_id__upload_audio_post: {
+            /**
+             * Audio
+             * Format: binary
+             */
+            audio: string;
+        };
         /** Body_upload_cover_api_studio_upload_cover_post */
         Body_upload_cover_api_studio_upload_cover_post: {
             /**
@@ -1322,6 +1358,8 @@ export interface components {
             voice_id?: string | null;
             /** Profile Id */
             profile_id?: string | null;
+            /** Active Generation Id */
+            active_generation_id?: string | null;
         };
         /** CharacterMapping */
         CharacterMapping: {
@@ -3053,6 +3091,43 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_chapter_audio_api_chapters__chapter_id__upload_audio_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_chapter_audio_api_chapters__chapter_id__upload_audio_post"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

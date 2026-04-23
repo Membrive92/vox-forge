@@ -49,6 +49,10 @@ CREATE TABLE IF NOT EXISTS chapters (
     sort_order  INTEGER NOT NULL DEFAULT 0,
     voice_id    TEXT DEFAULT NULL,
     profile_id  TEXT DEFAULT NULL,
+    -- The "canonical" generation for this chapter (overrides the
+    -- default "most recent done"). Used by /sources and /export.
+    -- No FK constraint so a deleted generation doesn't break the row.
+    active_generation_id TEXT DEFAULT NULL,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
@@ -125,6 +129,7 @@ async def init_db() -> None:
             "ALTER TABLE projects ADD COLUMN cover_path TEXT DEFAULT NULL",
             "ALTER TABLE chapters ADD COLUMN voice_id TEXT DEFAULT NULL",
             "ALTER TABLE chapters ADD COLUMN profile_id TEXT DEFAULT NULL",
+            "ALTER TABLE chapters ADD COLUMN active_generation_id TEXT DEFAULT NULL",
         ):
             try:
                 await db.execute(column_def)

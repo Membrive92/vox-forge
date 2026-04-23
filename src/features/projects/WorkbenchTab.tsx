@@ -15,6 +15,7 @@ import {
   type Generation,
   type Project,
 } from "@/api/projects";
+import { uploadChapterAudio } from "@/api/chapterSynth";
 import { API_BASE, isAbortError } from "@/api/client";
 import { listIncompleteJobs } from "@/api/synthesis";
 import {
@@ -36,6 +37,7 @@ import { colors, fonts, radii, space, transitions, typography } from "@/theme/to
 import type { Profile } from "@/types/domain";
 
 import { AmbienceMixer } from "./AmbienceMixer";
+import { ChapterRecorder } from "./ChapterRecorder";
 import { CharacterCasting } from "./CharacterCasting";
 import { ChunkMap } from "./ChunkMap";
 import { QuickPreview } from "./QuickPreview";
@@ -98,6 +100,10 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [renders, setRenders] = useState<StudioRender[]>([]);
   const [isRendering, setIsRendering] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [recorderOpen, setRecorderOpen] = useState(false);
+  const [isSavingRecording, setIsSavingRecording] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const renderAbortRef = useRef<AbortController | null>(null);
 
   const loadStatus = useCallback(async () => {
@@ -146,7 +152,11 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
   };
 
   const handleRenderVideo = async (): Promise<void> => {
-    if (!latestDoneGen?.file_path) return;
+    // Use the chapter's active take, falling back to newest done.
+    const source = chapter.active_generation_id
+      ? generations.find((g) => g.id === chapter.active_generation_id) ?? latestDoneGen
+      : latestDoneGen;
+    if (!source?.file_path) return;
     if (!project.cover_path) {
       onToast(t.workbenchNeedCoverFirst);
       return;
@@ -157,7 +167,7 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
     try {
       await renderVideo(
         {
-          audio_path: latestDoneGen.file_path,
+          audio_path: source.file_path,
           cover_path: project.cover_path,
           project_id: project.id,
           chapter_id: chapter.id,
@@ -182,6 +192,49 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
   const handleCancelRender = (): void => {
     renderAbortRef.current?.abort();
   };
+
+  const handleUploadAudio = async (file: File): Promise<void> => {
+    setIsUploading(true);
+    try {
+      await uploadChapterAudio(chapter.id, file);
+      onToast(t.chapterUploadSuccess);
+      await loadStatus();
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSaveRecording = async (file: File): Promise<void> => {
+    setIsSavingRecording(true);
+    try {
+      await uploadChapterAudio(chapter.id, file);
+      onToast(t.chapterUploadSuccess);
+      setRecorderOpen(false);
+      await loadStatus();
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    } finally {
+      setIsSavingRecording(false);
+    }
+  };
+
+  const handleSetActiveGeneration = async (genId: string | null): Promise<void> => {
+    try {
+      await onUpdate(chapter.id, { active_generation_id: genId });
+      await loadStatus();
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    }
+  };
+
+  // Current "active" generation according to chapter metadata, falling
+  // back to the newest ``done`` one. This is what the chapter's status
+  // row + render-video button operate on.
+  const activeGen = chapter.active_generation_id
+    ? generations.find((g) => g.id === chapter.active_generation_id) ?? latestDoneGen
+    : latestDoneGen;
 
   return (
     <div
@@ -399,6 +452,66 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
               boxSizing: "border-box",
             }}
           />
+
+          {/* Audio source row: upload / record / pick active take */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: space[2],
+              marginTop: space[2],
+              flexWrap: "wrap",
+            }}
+          >
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".wav,.mp3,.ogg,.flac,.webm,.m4a"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleUploadAudio(f);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={isUploading}
+              onClick={() => uploadInputRef.current?.click()}
+              icon={<Icons.Upload />}
+            >
+              {t.chapterUploadAudio}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Icons.Mic />}
+              onClick={() => setRecorderOpen(true)}
+            >
+              {t.chapterRecord}
+            </Button>
+            <div style={{ flex: 1 }} />
+            {generations.length > 1 && (
+              <TakeSelector
+                t={t}
+                generations={generations}
+                activeId={activeGen?.id ?? null}
+                onChange={handleSetActiveGeneration}
+              />
+            )}
+          </div>
+
+          {recorderOpen && (
+            <div style={{ marginTop: space[3] }}>
+              <ChapterRecorder
+                t={t}
+                isSaving={isSavingRecording}
+                onSave={handleSaveRecording}
+                onCancel={() => setRecorderOpen(false)}
+              />
+            </div>
+          )}
 
           {activePanel === "preview" && (
             <div style={{ marginTop: space[3] }}>
@@ -1079,6 +1192,79 @@ interface ProjectRowProps {
   active: boolean;
   onSelect: () => void;
   onDelete: () => void;
+}
+
+// ── TakeSelector ───────────────────────────────────────────────────
+
+interface TakeSelectorProps {
+  t: Translations;
+  generations: readonly Generation[];
+  activeId: string | null;
+  onChange: (genId: string | null) => Promise<void> | void;
+}
+
+function relativeWhen(iso: string): string {
+  const d = new Date(iso).getTime();
+  const now = Date.now();
+  const diffMs = now - d;
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return "ahora";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function TakeSelector({ t, generations, activeId, onChange }: TakeSelectorProps) {
+  const engineLabel = (engine: string): string => {
+    if (engine === "upload") return t.chapterTakeEngineUpload;
+    if (engine === "recording" || engine === "record") return t.chapterTakeEngineRecord;
+    return t.chapterTakeEngineTts;
+  };
+
+  return (
+    <label
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: space[1],
+        fontSize: typography.size.xs,
+        color: colors.textDim,
+      }}
+    >
+      {t.chapterTakes}
+      <select
+        value={activeId ?? ""}
+        onChange={(e) => void onChange(e.target.value || null)}
+        style={{
+          padding: "4px 8px",
+          borderRadius: radii.sm,
+          background: colors.surfaceAlt,
+          border: `1px solid ${colors.border}`,
+          color: colors.text,
+          fontSize: typography.size.xs,
+          fontFamily: fonts.sans,
+          outline: "none",
+          cursor: "pointer",
+        }}
+      >
+        {generations.map((g) => {
+          const dur = g.duration ? `${g.duration.toFixed(1)}s` : "—";
+          const label = t.chapterTakeLabel
+            .replace("{engine}", engineLabel(g.engine))
+            .replace("{when}", relativeWhen(g.created_at))
+            .replace("{dur}", dur);
+          return (
+            <option key={g.id} value={g.id}>
+              {label}{g.status !== "done" ? ` · ${g.status}` : ""}
+            </option>
+          );
+        })}
+      </select>
+    </label>
+  );
 }
 
 // ── ChapterVoicePicker ──────────────────────────────────────────────

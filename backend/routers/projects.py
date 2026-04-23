@@ -53,6 +53,7 @@ class ChapterUpdate(BaseModel):
     sort_order: Optional[int] = Field(default=None, ge=0)
     voice_id: Optional[str] = None
     profile_id: Optional[str] = None
+    active_generation_id: Optional[str] = None
 
 
 class SplitRequest(BaseModel):

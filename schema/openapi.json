@@ -1473,6 +1473,61 @@
         }
       }
     },
+    "/api/chapters/{chapter_id}/upload-audio": {
+      "post": {
+        "tags": [
+          "chapter-synth"
+        ],
+        "summary": "Upload a pre-recorded audio file as a generation of this chapter",
+        "description": "Save the uploaded audio under ``data/output/`` and register a\n``generations`` row with ``engine=\"upload\"`` and ``status=\"done\"``.\n\nMakes the chapter behave identically to a TTS-synthesized one\ndownstream: Studio can load it, Workbench can render a video from\nit, export can bundle it. Browser recordings (webm/opus) and other\ncontainers are accepted — ``AudioSegment.from_file`` handles them\nvia ffmpeg. The file is stored as-is, without transcoding, to\npreserve quality.",
+        "operationId": "upload_chapter_audio_api_chapters__chapter_id__upload_audio_post",
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chapter Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_chapter_audio_api_chapters__chapter_id__upload_audio_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Upload Chapter Audio Api Chapters  Chapter Id  Upload Audio Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/export/{project_id}": {
       "post": {
         "tags": [
@@ -2994,6 +3049,20 @@
         ],
         "title": "Body_upload_ambience_api_ambience_post"
       },
+      "Body_upload_chapter_audio_api_chapters__chapter_id__upload_audio_post": {
+        "properties": {
+          "audio": {
+            "type": "string",
+            "format": "binary",
+            "title": "Audio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio"
+        ],
+        "title": "Body_upload_chapter_audio_api_chapters__chapter_id__upload_audio_post"
+      },
       "Body_upload_cover_api_studio_upload_cover_post": {
         "properties": {
           "cover": {
@@ -3206,6 +3275,17 @@
               }
             ],
             "title": "Profile Id"
+          },
+          "active_generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Generation Id"
           }
         },
         "type": "object",
