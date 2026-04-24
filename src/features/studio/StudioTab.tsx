@@ -189,19 +189,21 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
             cover={session.cover}
             isUploadingCover={session.isUploadingCover}
             hasTranscript={session.transcript !== null}
+            transcriptEntries={session.transcript?.entries ?? []}
             isRendering={session.isRendering}
             videoUrl={session.videoUrl}
             videoMeta={session.videoMeta}
             onPickCover={(file) => void studio.setCover(file)}
             onClearCover={studio.clearCover}
-            onRender={(options) => {
-              void studio.renderCurrent(options).then(() => {
+            onRender={(options, images) => {
+              void studio.renderCurrent(options, images).then(() => {
                 void studio.refreshRenders();
               });
             }}
             onCancelRender={studio.cancelRender}
             onDownloadVideo={() => studio.downloadVideo()}
             onClearVideo={studio.clearVideo}
+            onToast={onToast}
           />
 
           <RecentRenders

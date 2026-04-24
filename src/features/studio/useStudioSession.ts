@@ -14,6 +14,7 @@ import {
   type StudioRender,
   type StudioSource,
   type TranscribeResult,
+  type VideoImage,
   type VideoOptions,
 } from "@/api/studio";
 import { logger } from "@/logging/logger";
@@ -63,7 +64,10 @@ export interface StudioSessionApi {
 
   setCover: (file: File) => Promise<void>;
   clearCover: () => void;
-  renderCurrent: (options: Partial<VideoOptions>) => Promise<void>;
+  renderCurrent: (
+    options: Partial<VideoOptions>,
+    images?: VideoImage[],
+  ) => Promise<void>;
   cancelRender: () => void;
   downloadVideo: (filenameHint?: string) => void;
   clearVideo: () => void;
@@ -292,8 +296,11 @@ export function useStudioSession(): StudioSessionApi {
   const clearCover = useCallback(() => setCoverState(null), []);
 
   const renderCurrent = useCallback(
-    async (options: Partial<VideoOptions>) => {
-      if (!selected || !cover) return;
+    async (options: Partial<VideoOptions>, images?: VideoImage[]) => {
+      if (!selected) return;
+      // Slideshow mode needs no cover; single-cover mode needs it.
+      const slideshow = images && images.length > 0;
+      if (!slideshow && !cover) return;
       const controller = new AbortController();
       renderAbortRef.current = controller;
       setIsRendering(true);
@@ -302,9 +309,10 @@ export function useStudioSession(): StudioSessionApi {
         const result = await renderVideo(
           {
             audio_path: selected.source_path,
-            cover_path: cover.path,
+            cover_path: slideshow ? null : cover?.path ?? null,
             subtitles_path: transcript?.srt_path ?? null,
             options,
+            images: slideshow ? images : null,
           },
           controller.signal,
         );

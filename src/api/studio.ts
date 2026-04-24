@@ -95,6 +95,7 @@ export interface VideoOptions {
   waveform_overlay: boolean;
   title_text: string | null;
   subtitles_mode: "none" | "burn" | "soft";
+  crossfade_s: number;
 }
 
 export const DEFAULT_VIDEO_OPTIONS: VideoOptions = {
@@ -103,7 +104,15 @@ export const DEFAULT_VIDEO_OPTIONS: VideoOptions = {
   waveform_overlay: true,
   title_text: null,
   subtitles_mode: "burn",
+  crossfade_s: 1.0,
 };
+
+export interface VideoImage {
+  /** Absolute path — must live under one of the allowed Studio roots. */
+  path: string;
+  /** When this image should start showing, in seconds from audio start. */
+  start_s: number;
+}
 
 export interface CoverUploadResult {
   filename: string;
@@ -114,10 +123,13 @@ export interface CoverUploadResult {
 
 export interface RenderVideoPayload {
   audio_path: string;
-  cover_path: string;
+  /** Optional when ``images`` is provided. */
+  cover_path?: string | null;
   subtitles_path?: string | null;
   project_id?: string | null;
   chapter_id?: string | null;
+  /** If non-empty, slideshow mode — one image per scene, chained by xfade. */
+  images?: VideoImage[] | null;
   options?: Partial<VideoOptions>;
 }
 
@@ -156,13 +168,22 @@ export async function renderVideo(
   payload: RenderVideoPayload,
   signal?: AbortSignal,
 ): Promise<RenderVideoResult> {
+  // Strip keys the backend doesn't need (cover_path is optional now;
+  // sending it as undefined is fine but explicit null is cleaner).
+  const body: Record<string, unknown> = {
+    audio_path: payload.audio_path,
+    options: { ...DEFAULT_VIDEO_OPTIONS, ...(payload.options ?? {}) },
+  };
+  if (payload.cover_path) body["cover_path"] = payload.cover_path;
+  if (payload.subtitles_path) body["subtitles_path"] = payload.subtitles_path;
+  if (payload.project_id) body["project_id"] = payload.project_id;
+  if (payload.chapter_id) body["chapter_id"] = payload.chapter_id;
+  if (payload.images && payload.images.length > 0) body["images"] = payload.images;
+
   const init: RequestInit = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ...payload,
-      options: { ...DEFAULT_VIDEO_OPTIONS, ...(payload.options ?? {}) },
-    }),
+    body: JSON.stringify(body),
   };
   if (signal) init.signal = signal;
   const res = await fetch(`${API_BASE}/studio/render-video`, init);

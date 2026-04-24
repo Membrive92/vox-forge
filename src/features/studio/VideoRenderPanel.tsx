@@ -1,10 +1,18 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
-import type { CoverUploadResult, VideoOptions } from "@/api/studio";
+import { uploadCover } from "@/api/studio";
+import type {
+  CoverUploadResult,
+  SrtEntry,
+  VideoImage,
+  VideoOptions,
+} from "@/api/studio";
 import { Button } from "@/components/Button";
 import * as Icons from "@/components/icons";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+
+import { detectScenes, type Scene } from "./scenes";
 
 interface Props {
   t: Translations;
@@ -12,15 +20,17 @@ interface Props {
   cover: CoverUploadResult | null;
   isUploadingCover: boolean;
   hasTranscript: boolean;
+  transcriptEntries: readonly SrtEntry[];
   isRendering: boolean;
   videoUrl: string | null;
   videoMeta: { durationS: number; sizeBytes: number; resolution: string } | null;
   onPickCover: (file: File) => void;
   onClearCover: () => void;
-  onRender: (options: Partial<VideoOptions>) => void;
+  onRender: (options: Partial<VideoOptions>, images?: VideoImage[]) => void;
   onCancelRender: () => void;
   onDownloadVideo: () => void;
   onClearVideo: () => void;
+  onToast: (msg: string) => void;
 }
 
 export function VideoRenderPanel({
@@ -29,6 +39,7 @@ export function VideoRenderPanel({
   cover,
   isUploadingCover,
   hasTranscript,
+  transcriptEntries,
   isRendering,
   videoUrl,
   videoMeta,
@@ -38,6 +49,7 @@ export function VideoRenderPanel({
   onCancelRender,
   onDownloadVideo,
   onClearVideo,
+  onToast,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [resolution, setResolution] = useState<VideoOptions["resolution"]>("1920x1080");
@@ -47,6 +59,9 @@ export function VideoRenderPanel({
   const [subsMode, setSubsMode] = useState<VideoOptions["subtitles_mode"]>(
     hasTranscript ? "burn" : "none",
   );
+  const [scenes, setScenes] = useState<Scene[]>([]);
+  const [sceneImages, setSceneImages] = useState<Record<number, CoverUploadResult>>({});
+  const [sceneUploadingIdx, setSceneUploadingIdx] = useState<number | null>(null);
 
   // If the user removes the transcript, reset subs to none so we don't
   // send an invalid request.
@@ -59,7 +74,58 @@ export function VideoRenderPanel({
     onPickCover(file);
   };
 
-  const canRender = enabled && cover !== null && !isRendering;
+  // Scene detection runs client-side from the transcript entries the
+  // transcribe endpoint already returned — no backend round-trip.
+  const handleDetectScenes = (): void => {
+    const next = detectScenes(transcriptEntries, 25);
+    setScenes(next);
+    // Clear any image that was assigned to a scene index that no
+    // longer exists after re-detection.
+    setSceneImages((prev) => {
+      const filtered: Record<number, CoverUploadResult> = {};
+      for (const [k, v] of Object.entries(prev)) {
+        const idx = Number(k);
+        if (idx < next.length) filtered[idx] = v;
+      }
+      return filtered;
+    });
+  };
+
+  const handlePickSceneImage = async (idx: number, file: File): Promise<void> => {
+    setSceneUploadingIdx(idx);
+    try {
+      const res = await uploadCover(file);
+      setSceneImages((prev) => ({ ...prev, [idx]: res }));
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSceneUploadingIdx(null);
+    }
+  };
+
+  const handleClearSceneImage = (idx: number): void => {
+    setSceneImages((prev) => {
+      const next = { ...prev };
+      delete next[idx];
+      return next;
+    });
+  };
+
+  // Render in slideshow mode only if the user has actually anchored at
+  // least one image to a scene. Otherwise fall back to the single-cover
+  // path so cover-only rendering still works.
+  const slideshowImages: VideoImage[] = useMemo(() => {
+    if (scenes.length === 0) return [];
+    return scenes
+      .map((sc, i) => {
+        const img = sceneImages[i];
+        return img ? { path: img.path, start_s: sc.start_s } : null;
+      })
+      .filter((x): x is VideoImage => x !== null);
+  }, [scenes, sceneImages]);
+
+  const useSlideshow = slideshowImages.length > 0;
+  const canRender = enabled && !isRendering && (useSlideshow || cover !== null);
 
   return (
     <div
@@ -252,6 +318,19 @@ export function VideoRenderPanel({
         />
       </label>
 
+      {/* Scene slideshow — only offered when a transcript exists */}
+      {hasTranscript && (
+        <SceneManager
+          t={t}
+          scenes={scenes}
+          sceneImages={sceneImages}
+          uploadingIdx={sceneUploadingIdx}
+          onDetect={handleDetectScenes}
+          onPickImage={(i, f) => void handlePickSceneImage(i, f)}
+          onClearImage={handleClearSceneImage}
+        />
+      )}
+
       {isRendering ? (
         <Button variant="danger" fullWidth onClick={onCancelRender}>
           {t.cancel}
@@ -262,16 +341,21 @@ export function VideoRenderPanel({
           fullWidth
           disabled={!canRender}
           onClick={() =>
-            onRender({
-              resolution,
-              ken_burns: kenBurns,
-              waveform_overlay: waveform,
-              title_text: titleText.trim() || null,
-              subtitles_mode: subsMode,
-            })
+            onRender(
+              {
+                resolution,
+                ken_burns: kenBurns,
+                waveform_overlay: waveform,
+                title_text: titleText.trim() || null,
+                subtitles_mode: subsMode,
+              },
+              useSlideshow ? slideshowImages : undefined,
+            )
           }
         >
-          {t.studioVideoRender}
+          {useSlideshow
+            ? t.studioVideoRenderSlideshow.replace("{n}", String(slideshowImages.length))
+            : t.studioVideoRender}
         </Button>
       )}
 
@@ -330,3 +414,174 @@ const selectStyle: React.CSSProperties = {
   fontFamily: fonts.sans,
   outline: "none",
 };
+
+// ── SceneManager ─────────────────────────────────────────────────────
+
+function formatMmSs(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+interface SceneManagerProps {
+  t: Translations;
+  scenes: readonly Scene[];
+  sceneImages: Record<number, CoverUploadResult>;
+  uploadingIdx: number | null;
+  onDetect: () => void;
+  onPickImage: (idx: number, file: File) => void;
+  onClearImage: (idx: number) => void;
+}
+
+function SceneManager({
+  t,
+  scenes,
+  sceneImages,
+  uploadingIdx,
+  onDetect,
+  onPickImage,
+  onClearImage,
+}: SceneManagerProps) {
+  // One hidden input per scene would be noisy — share a single ref and
+  // remember which scene triggered it so ``onChange`` routes correctly.
+  const pickerRef = useRef<HTMLInputElement>(null);
+  const targetIdxRef = useRef<number | null>(null);
+  const assignedCount = Object.keys(sceneImages).length;
+
+  const openPicker = (idx: number): void => {
+    targetIdxRef.current = idx;
+    pickerRef.current?.click();
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: 4,
+        marginBottom: 12,
+        padding: 10,
+        borderRadius: radii.md,
+        background: colors.surfaceAlt,
+        border: `1px solid ${colors.borderFaint}`,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: typography.size.sm, fontWeight: 600 }}>
+            {t.studioScenesTitle}
+          </div>
+          <div style={{ fontSize: typography.size.xs, color: colors.textDim }}>
+            {scenes.length === 0
+              ? t.studioScenesHint
+              : t.studioScenesProgress
+                  .replace("{assigned}", String(assignedCount))
+                  .replace("{total}", String(scenes.length))}
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onDetect}>
+          {scenes.length === 0 ? t.studioScenesDetect : t.studioScenesRedetect}
+        </Button>
+      </div>
+
+      {scenes.length > 0 && (
+        <ul
+          style={{
+            listStyle: "none",
+            margin: "10px 0 0",
+            padding: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            maxHeight: 240,
+            overflowY: "auto",
+          }}
+        >
+          {scenes.map((sc, i) => {
+            const img = sceneImages[i];
+            const uploading = uploadingIdx === i;
+            return (
+              <li
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 8px",
+                  borderRadius: radii.sm,
+                  background: colors.surface,
+                  border: `1px solid ${colors.borderFaint}`,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: typography.size.xs,
+                    fontFamily: fonts.mono,
+                    color: colors.textDim,
+                    minWidth: 56,
+                  }}
+                >
+                  {formatMmSs(sc.start_s)}
+                </span>
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: typography.size.xs,
+                    color: colors.textMuted,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {sc.text_preview}
+                </span>
+                {img ? (
+                  <>
+                    <span
+                      style={{
+                        fontSize: typography.size.xs,
+                        fontFamily: fonts.mono,
+                        color: "#4ade80",
+                        maxWidth: 120,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={img.filename}
+                    >
+                      ✓ {img.filename}
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={() => onClearImage(i)}>
+                      ×
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={uploading}
+                    onClick={() => openPicker(i)}
+                  >
+                    {t.studioScenesAddImage}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <input
+        ref={pickerRef}
+        type="file"
+        accept=".png,.jpg,.jpeg,.webp"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          const idx = targetIdxRef.current;
+          if (f && idx !== null) onPickImage(idx, f);
+          e.target.value = "";
+          targetIdxRef.current = null;
+        }}
+      />
+    </div>
+  );
+}

@@ -260,19 +260,35 @@ async def upload_cover(cover: UploadFile = File(...)) -> CoverUploadResponse:
     )
 
 
-@router.post("/render-video", summary="Render an MP4 from audio + cover")
+@router.post("/render-video", summary="Render an MP4 from audio + cover or slideshow")
 async def render_video(
     request: RenderVideoRequest,
     renderer: VideoRenderer = Depends(get_video_renderer),
 ) -> FileResponse:
     audio_path = Path(request.audio_path)
-    cover_path = Path(request.cover_path)
+    cover_path = Path(request.cover_path) if request.cover_path else None
     subs_path = Path(request.subtitles_path) if request.subtitles_path else None
+
+    # Build a list of image objects (if slideshow mode) and use it to
+    # gate the cover_path requirement.
+    from ..schemas import VideoImage as _VideoImage  # local to avoid cycle
+    image_list: list[_VideoImage] | None = request.images if request.images else None
+
+    if not image_list and cover_path is None:
+        raise InvalidSampleError("Either cover_path or images must be provided")
 
     # All input paths must live inside one of the allowed Studio roots —
     # same guard as /edit and /audio so a request cannot pull arbitrary
-    # files off disk and ship them through ffmpeg.
-    for p in (audio_path, cover_path, *( [subs_path] if subs_path else [] )):
+    # files off disk and ship them through ffmpeg. Slideshow images go
+    # through the same check individually.
+    paths_to_check: list[Path] = [audio_path]
+    if cover_path is not None:
+        paths_to_check.append(cover_path)
+    if subs_path is not None:
+        paths_to_check.append(subs_path)
+    if image_list:
+        paths_to_check.extend(Path(img.path) for img in image_list)
+    for p in paths_to_check:
         if not _is_within_allowed_roots(p):
             raise InvalidSampleError("Input path is outside allowed directories")
 
@@ -281,6 +297,7 @@ async def render_video(
         cover_path=cover_path,
         subtitles_path=subs_path,
         options=request.options,
+        images=image_list,
     )
 
     # Persist a history row so the FE can show recent renders.

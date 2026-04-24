@@ -229,16 +229,35 @@ class VideoOptions(BaseModel):
     waveform_overlay: bool = True
     title_text: Optional[str] = Field(default=None, max_length=200)
     subtitles_mode: str = Field(default="burn", description="none | burn | soft")
+    crossfade_s: float = Field(
+        default=1.0, ge=0.0, le=5.0,
+        description="Crossfade duration between images in a slideshow",
+    )
+
+
+class VideoImage(BaseModel):
+    """One image in a slideshow, anchored to a start time in the audio."""
+
+    path: str = Field(..., min_length=1)
+    start_s: float = Field(..., ge=0.0)
 
 
 class RenderVideoRequest(BaseModel):
-    """Render a Studio source + cover into an MP4."""
+    """Render a Studio source into an MP4.
+
+    Pass ``cover_path`` alone for a static cover (Phase B.2 behaviour).
+    Pass ``images`` (list) for a slideshow with one image per scene —
+    each image's ``start_s`` anchors it to that moment in the audio,
+    and successive images imply the previous one's end. ``cover_path``
+    is optional when ``images`` is provided.
+    """
 
     audio_path: str = Field(..., min_length=1)
-    cover_path: str = Field(..., min_length=1)
+    cover_path: Optional[str] = None
     subtitles_path: Optional[str] = None
     project_id: Optional[str] = None
     chapter_id: Optional[str] = None
+    images: Optional[list[VideoImage]] = None
     options: VideoOptions = Field(default_factory=VideoOptions)
 
 

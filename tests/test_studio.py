@@ -959,3 +959,147 @@ def test_full_pipeline_8_ops(client, monkeypatch) -> None:
         ],
     )
     assert out.exists()
+
+
+# ── Sprint 3 B1: slideshow multi-image render ──────────────────────
+
+
+def test_compute_image_durations_last_extends_to_audio_end(client) -> None:
+    from backend.schemas import VideoImage
+    from backend.services.video_renderer import _compute_image_durations
+
+    imgs = [
+        VideoImage(path="/x/a.png", start_s=0.0),
+        VideoImage(path="/x/b.png", start_s=10.0),
+        VideoImage(path="/x/c.png", start_s=25.0),
+    ]
+    dur = _compute_image_durations(imgs, audio_duration_s=40.0)
+    assert dur == [10.0, 15.0, 15.0]  # last = 40 - 25
+
+
+def test_compute_image_durations_min_half_second(client) -> None:
+    from backend.schemas import VideoImage
+    from backend.services.video_renderer import _compute_image_durations
+
+    imgs = [
+        VideoImage(path="/x/a.png", start_s=0.0),
+        VideoImage(path="/x/b.png", start_s=0.1),   # effectively same time
+    ]
+    dur = _compute_image_durations(imgs, audio_duration_s=30.0)
+    assert dur[0] >= 0.5  # clamped
+    assert dur[1] > 20    # rest of audio
+
+
+def test_build_slideshow_argv_has_per_image_input(client) -> None:
+    from backend.schemas import VideoImage, VideoOptions
+    from backend.services.video_renderer import _build_slideshow_argv
+
+    argv = _build_slideshow_argv(
+        audio_path=Path("/tmp/a.wav"),
+        images=[
+            VideoImage(path="/tmp/img1.png", start_s=0.0),
+            VideoImage(path="/tmp/img2.png", start_s=10.0),
+            VideoImage(path="/tmp/img3.png", start_s=20.0),
+        ],
+        audio_duration_s=30.0,
+        subtitles_path=None,
+        output_path=Path("/tmp/out.mp4"),
+        options=VideoOptions(subtitles_mode="none"),
+    )
+    # One ``-loop 1 -t X -i img`` triple per image + 1 audio input
+    # = 4 ``-i`` occurrences total
+    assert argv.count("-i") == 4
+    joined = " ".join(argv)
+    assert "/tmp/img1.png" in joined
+    assert "/tmp/img2.png" in joined
+    assert "/tmp/img3.png" in joined
+
+
+def test_build_slideshow_argv_uses_xfade(client) -> None:
+    from backend.schemas import VideoImage, VideoOptions
+    from backend.services.video_renderer import _build_slideshow_argv
+
+    argv = _build_slideshow_argv(
+        audio_path=Path("/tmp/a.wav"),
+        images=[
+            VideoImage(path="/tmp/img1.png", start_s=0.0),
+            VideoImage(path="/tmp/img2.png", start_s=10.0),
+        ],
+        audio_duration_s=20.0,
+        subtitles_path=None,
+        output_path=Path("/tmp/out.mp4"),
+        options=VideoOptions(subtitles_mode="none", crossfade_s=1.5),
+    )
+    joined = " ".join(argv)
+    assert "xfade" in joined
+    assert "duration=1.500" in joined
+
+
+def test_build_slideshow_argv_single_image_no_xfade(client) -> None:
+    """With n==1 the builder falls back to ``null`` — no transition."""
+    from backend.schemas import VideoImage, VideoOptions
+    from backend.services.video_renderer import _build_slideshow_argv
+
+    argv = _build_slideshow_argv(
+        audio_path=Path("/tmp/a.wav"),
+        images=[VideoImage(path="/tmp/solo.png", start_s=0.0)],
+        audio_duration_s=15.0,
+        subtitles_path=None,
+        output_path=Path("/tmp/out.mp4"),
+        options=VideoOptions(subtitles_mode="none"),
+    )
+    joined = " ".join(argv)
+    assert "xfade" not in joined
+    assert "[v0]null[vbase]" in joined
+
+
+def test_render_video_slideshow_happy_path(client, monkeypatch) -> None:
+    """Full router → renderer path with a slideshow payload.
+    ``_run_command`` is monkeypatched to skip real ffmpeg."""
+    _patch_ffmpeg_runner(monkeypatch)
+    src = _seed_source("slide_src.wav")
+    # Reuse the image seeding helper from cover tests
+    cover1 = _seed_cover("slide_a.png")
+    cover2 = _seed_cover("slide_b.png")
+
+    response = client.post(
+        "/api/studio/render-video",
+        json={
+            "audio_path": str(src.resolve()),
+            "images": [
+                {"path": str(cover1.resolve()), "start_s": 0.0},
+                {"path": str(cover2.resolve()), "start_s": 4.0},
+            ],
+            "options": {"resolution": "1280x720", "ken_burns": False,
+                        "waveform_overlay": False, "subtitles_mode": "none"},
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("video/")
+
+
+def test_render_video_rejects_neither_cover_nor_images(client, monkeypatch) -> None:
+    _patch_ffmpeg_runner(monkeypatch)
+    src = _seed_source("no_visuals.wav")
+    response = client.post(
+        "/api/studio/render-video",
+        json={"audio_path": str(src.resolve())},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_sample"
+
+
+def test_render_video_rejects_image_outside_roots(client, monkeypatch) -> None:
+    _patch_ffmpeg_runner(monkeypatch)
+    src = _seed_source("img_guard.wav")
+    response = client.post(
+        "/api/studio/render-video",
+        json={
+            "audio_path": str(src.resolve()),
+            "images": [
+                {"path": "/etc/passwd", "start_s": 0.0},
+            ],
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_sample"

@@ -995,7 +995,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Render an MP4 from audio + cover */
+        /** Render an MP4 from audio + cover or slideshow */
         post: operations["render_video_api_studio_render_video_post"];
         delete?: never;
         options?: never;
@@ -1652,19 +1652,27 @@ export interface components {
         };
         /**
          * RenderVideoRequest
-         * @description Render a Studio source + cover into an MP4.
+         * @description Render a Studio source into an MP4.
+         *
+         *     Pass ``cover_path`` alone for a static cover (Phase B.2 behaviour).
+         *     Pass ``images`` (list) for a slideshow with one image per scene �
+         *     each image's ``start_s`` anchors it to that moment in the audio,
+         *     and successive images imply the previous one's end. ``cover_path``
+         *     is optional when ``images`` is provided.
          */
         RenderVideoRequest: {
             /** Audio Path */
             audio_path: string;
             /** Cover Path */
-            cover_path: string;
+            cover_path?: string | null;
             /** Subtitles Path */
             subtitles_path?: string | null;
             /** Project Id */
             project_id?: string | null;
             /** Chapter Id */
             chapter_id?: string | null;
+            /** Images */
+            images?: components["schemas"]["VideoImage"][] | null;
             options?: components["schemas"]["VideoOptions"];
         };
         /**
@@ -1911,6 +1919,16 @@ export interface components {
             type: string;
         };
         /**
+         * VideoImage
+         * @description One image in a slideshow, anchored to a start time in the audio.
+         */
+        VideoImage: {
+            /** Path */
+            path: string;
+            /** Start S */
+            start_s: number;
+        };
+        /**
          * VideoOptions
          * @description Visual options passed to the Studio video renderer.
          */
@@ -1939,6 +1957,12 @@ export interface components {
              * @default burn
              */
             subtitles_mode: string;
+            /**
+             * Crossfade S
+             * @description Crossfade duration between images in a slideshow
+             * @default 1
+             */
+            crossfade_s: number;
         };
         /** VoiceMeta */
         VoiceMeta: {

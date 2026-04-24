@@ -2547,7 +2547,7 @@
         "tags": [
           "studio"
         ],
-        "summary": "Render an MP4 from audio + cover",
+        "summary": "Render an MP4 from audio + cover or slideshow",
         "operationId": "render_video_api_studio_render_video_post",
         "requestBody": {
           "content": {
@@ -4077,8 +4077,14 @@
             "title": "Audio Path"
           },
           "cover_path": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Cover Path"
           },
           "subtitles_path": {
@@ -4114,17 +4120,30 @@
             ],
             "title": "Chapter Id"
           },
+          "images": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VideoImage"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Images"
+          },
           "options": {
             "$ref": "#/components/schemas/VideoOptions"
           }
         },
         "type": "object",
         "required": [
-          "audio_path",
-          "cover_path"
+          "audio_path"
         ],
         "title": "RenderVideoRequest",
-        "description": "Render a Studio source + cover into an MP4."
+        "description": "Render a Studio source into an MP4.\n\nPass ``cover_path`` alone for a static cover (Phase B.2 behaviour).\nPass ``images`` (list) for a slideshow with one image per scene —\neach image's ``start_s`` anchors it to that moment in the audio,\nand successive images imply the previous one's end. ``cover_path``\nis optional when ``images`` is provided."
       },
       "SampleUploadResponse": {
         "properties": {
@@ -4715,6 +4734,27 @@
         ],
         "title": "ValidationError"
       },
+      "VideoImage": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Path"
+          },
+          "start_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Start S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "start_s"
+        ],
+        "title": "VideoImage",
+        "description": "One image in a slideshow, anchored to a start time in the audio."
+      },
       "VideoOptions": {
         "properties": {
           "resolution": {
@@ -4750,6 +4790,14 @@
             "title": "Subtitles Mode",
             "description": "none | burn | soft",
             "default": "burn"
+          },
+          "crossfade_s": {
+            "type": "number",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Crossfade S",
+            "description": "Crossfade duration between images in a slideshow",
+            "default": 1.0
           }
         },
         "type": "object",
