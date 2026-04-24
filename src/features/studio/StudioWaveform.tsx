@@ -134,11 +134,19 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
 
     useEffect(() => {
       const ws = wsRef.current;
-      if (!ws || lastZoomRef.current === zoom) return;
-      // Skip zoom if value hasn't actually changed (prevents re-application
-      // during timeupdate events that trigger parent re-renders).
+      if (!ws) return;
+
+      // Debounce zoom application: timeupdate events fire constantly during
+      // playback and trigger re-renders. Apply zoom only once after a delay
+      // to avoid re-triggering the effect repeatedly.
       lastZoomRef.current = zoom;
-      ws.zoom(zoom);
+      const timer = setTimeout(() => {
+        if (wsRef.current) {
+          wsRef.current.zoom(zoom);
+        }
+      }, 50);
+
+      return () => clearTimeout(timer);
     }, [zoom]);
 
     if (!audioUrl) {
