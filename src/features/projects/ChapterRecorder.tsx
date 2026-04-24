@@ -194,6 +194,24 @@ export function ChapterRecorder({ t, onSave, onCancel, isSaving = false }: Props
         gap: 16,
       }}
     >
+      {/* Info banner about recording */}
+      <div
+        style={{
+          padding: 10,
+          background: "rgba(59,130,246,0.1)",
+          border: "1px solid rgba(59,130,246,0.3)",
+          borderRadius: radii.sm,
+          fontSize: typography.size.xs,
+          color: colors.text,
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 8,
+        }}
+      >
+        <span style={{ fontSize: "1.2em", lineHeight: 1 }}>ℹ️</span>
+        <span>{t.recorderInfoBanner}</span>
+      </div>
+
       {/* Header + timer */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div

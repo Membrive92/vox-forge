@@ -41,6 +41,7 @@ import { ChapterRecorder } from "./ChapterRecorder";
 import { CharacterCasting } from "./CharacterCasting";
 import { ChunkMap } from "./ChunkMap";
 import { QuickPreview } from "./QuickPreview";
+import { getGenerationAudioUrl } from "@/api/studio";
 
 // ── Utility helpers ─────────────────────────────────────────────────
 
@@ -452,6 +453,87 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
               boxSizing: "border-box",
             }}
           />
+
+          {/* Audio playback panel for uploaded/recorded/synthesized audio */}
+          {activeGen?.status === "done" && activeGen?.file_path && (
+            <div
+              style={{
+                marginTop: space[3],
+                padding: space[3],
+                background: colors.surfaceAlt,
+                border: `1px solid ${colors.borderSubtle}`,
+                borderRadius: radii.md,
+                display: "flex",
+                flexDirection: "column",
+                gap: space[2],
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
+                <div style={{ flex: 1 }}>
+                  <audio
+                    controls
+                    src={getGenerationAudioUrl(activeGen.file_path)}
+                    style={{
+                      width: "100%",
+                      maxWidth: "100%",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: space[2], flexWrap: "wrap", fontSize: typography.size.xs }}>
+                  {activeGen.duration && (
+                    <span
+                      style={{
+                        padding: "2px 8px",
+                        background: colors.primarySoft,
+                        color: colors.primaryLight,
+                        borderRadius: radii.sm,
+                        fontFamily: fonts.mono,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {activeGen.duration.toFixed(1)}s
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      background: colors.surface,
+                      color: colors.textMuted,
+                      border: `1px solid ${colors.borderSubtle}`,
+                      borderRadius: radii.sm,
+                      fontFamily: fonts.mono,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {activeGen.engine === "upload"
+                      ? t.chapterTakeEngineUpload
+                      : activeGen.engine === "recording" || activeGen.engine === "record"
+                        ? t.chapterTakeEngineRecord
+                        : t.chapterTakeEngineTts}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Icons.Edit />}
+                    onClick={() => onOpenStudioWithSource(activeGen.id)}
+                  >
+                    {t.chapterEditInStudio}
+                  </Button>
+                </div>
+              </div>
+              {(activeGen.engine === "recording" || activeGen.engine === "record") && (
+                <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim }}>
+                  {t.chapterRecordedTakeNote}
+                </p>
+              )}
+              {activeGen.engine === "upload" && (
+                <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim }}>
+                  {t.chapterUploadTakeNote}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Audio source row: upload / record / pick active take */}
           <div

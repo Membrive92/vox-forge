@@ -64,6 +64,7 @@ export function VideoRenderPanel({
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [sceneImages, setSceneImages] = useState<Record<number, CoverUploadResult>>({});
   const [sceneUploadingIdx, setSceneUploadingIdx] = useState<number | null>(null);
+  const [sceneGeneratingIdx, setSceneGeneratingIdx] = useState<number | null>(null);
 
   // If the user removes the transcript, reset subs to none so we don't
   // send an invalid request.
@@ -98,6 +99,7 @@ export function VideoRenderPanel({
     try {
       const res = await uploadCover(file);
       setSceneImages((prev) => ({ ...prev, [idx]: res }));
+      onToast(t.studioScenesImageAdded.replace("{filename}", res.filename));
     } catch (e) {
       onToast(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -114,7 +116,7 @@ export function VideoRenderPanel({
     aspect: ImageAspectRatio,
     seed: number | undefined,
   ): Promise<void> => {
-    setSceneUploadingIdx(idx);
+    setSceneGeneratingIdx(idx);
     try {
       const gen: GenerateImageResult = await generateImage(prompt, aspect, seed);
       const asCover: CoverUploadResult = {
@@ -124,10 +126,11 @@ export function VideoRenderPanel({
         content_type: "image/png",
       };
       setSceneImages((prev) => ({ ...prev, [idx]: asCover }));
+      onToast(t.studioScenesGenSuccess);
     } catch (e) {
       onToast(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setSceneUploadingIdx(null);
+      setSceneGeneratingIdx(null);
     }
   };
 
@@ -353,6 +356,7 @@ export function VideoRenderPanel({
           scenes={scenes}
           sceneImages={sceneImages}
           uploadingIdx={sceneUploadingIdx}
+          isGeneratingIdx={sceneGeneratingIdx}
           onDetect={handleDetectScenes}
           onPickImage={(i, f) => void handlePickSceneImage(i, f)}
           onGenerateImage={(i, p, a, s) => void handleGenerateSceneImage(i, p, a, s)}
@@ -457,6 +461,7 @@ interface SceneManagerProps {
   scenes: readonly Scene[];
   sceneImages: Record<number, CoverUploadResult>;
   uploadingIdx: number | null;
+  isGeneratingIdx: number | null;
   onDetect: () => void;
   onPickImage: (idx: number, file: File) => void;
   onGenerateImage: (idx: number, prompt: string, aspect: ImageAspectRatio, seed: number | undefined) => void;
@@ -468,6 +473,7 @@ function SceneManager({
   scenes,
   sceneImages,
   uploadingIdx,
+  isGeneratingIdx,
   onDetect,
   onPickImage,
   onGenerateImage,
@@ -594,6 +600,7 @@ function SceneManager({
                       variant="secondary"
                       size="sm"
                       loading={uploading}
+                      disabled={isGeneratingIdx === i}
                       onClick={() => openPicker(i)}
                     >
                       {t.studioScenesAddImage}
@@ -601,6 +608,7 @@ function SceneManager({
                     <Button
                       variant="ghost"
                       size="sm"
+                      loading={isGeneratingIdx === i}
                       disabled={uploading}
                       onClick={() => openGenDialog(i)}
                     >
@@ -632,6 +640,7 @@ function SceneManager({
         <ImageGenDialog
           t={t}
           defaultPrompt={scenes[genDialogIdx].text_preview}
+          isGenerating={uploadingIdx === genDialogIdx}
           onCancel={closeGenDialog}
           onConfirm={(prompt, aspect, seed) => {
             const idx = genDialogIdx;
@@ -649,11 +658,12 @@ function SceneManager({
 interface ImageGenDialogProps {
   t: Translations;
   defaultPrompt: string;
+  isGenerating: boolean;
   onCancel: () => void;
   onConfirm: (prompt: string, aspect: ImageAspectRatio, seed: number | undefined) => void;
 }
 
-function ImageGenDialog({ t, defaultPrompt, onCancel, onConfirm }: ImageGenDialogProps) {
+function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }: ImageGenDialogProps) {
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [aspect, setAspect] = useState<ImageAspectRatio>("16:9");
   const [seedText, setSeedText] = useState("");
@@ -788,10 +798,10 @@ function ImageGenDialog({ t, defaultPrompt, onCancel, onConfirm }: ImageGenDialo
         </p>
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <Button variant="ghost" type="button" onClick={onCancel}>
+          <Button variant="ghost" type="button" onClick={onCancel} disabled={isGenerating}>
             {t.studioScenesGenCancel}
           </Button>
-          <Button variant="primary" type="submit" disabled={prompt.trim().length === 0}>
+          <Button variant="primary" type="submit" disabled={prompt.trim().length === 0 || isGenerating} loading={isGenerating}>
             {t.studioScenesGenSubmit}
           </Button>
         </div>

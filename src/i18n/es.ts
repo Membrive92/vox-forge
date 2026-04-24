@@ -453,6 +453,40 @@ export const es = {
   studioRecentFilterVideo: "Vídeo",
   studioRecentDelete: "Eliminar",
   studioRecentScopeChapter: "Sólo este capítulo",
+
+  // Fix #1: Audio playback in Workbench
+  chapterPlaybackEngine: "{engine}",
+  chapterPlaybackDuration: "{duration}",
+  chapterEditInStudio: "Editar en Studio",
+  chapterRecordedTakeNote: "Toma grabada · Lista para editar o exportar. Para resíntesis, cambia la voz arriba.",
+  chapterUploadTakeNote: "Toma subida · Lista para editar o exportar. Para resíntesis, cambia la voz arriba.",
+  recorderInfoBanner: "ℹ️ Esta grabación se guardará tal cual. Para sintetizar narración, usa la vista previa de voz o Síntesis rápida.",
+  takeUploadNote: "Toma pregrabada. Para sintetizar nueva narración, cambia la voz y usa Vista previa o Síntesis rápida.",
+
+  // Fix #2: Image generation success toast
+  studioScenesGenSuccess: "Imagen generada correctamente",
+
+  // Fix #3: Studio operations preview mode
+  studioPreview: "Vista previa",
+  studioPreviewLabel: "Vista previa (no guardado)",
+  studioPreviewWarning: "Esta es una vista previa. Haz clic en 'Aplicar' para guardar.",
+
+  // Fix #4: Confirmation dialogs
+  studioConfirmClearQueue: "¿Limpiar todas las {n} operaciones?",
+  studioConfirmRemoveOp: "¿Eliminar esta operación?",
+  studioConfirmCancel: "Cancelar",
+  studioConfirmApply: "Sí, limpiar",
+
+  // Fix #6: DSP parameter tooltips
+  studioLufsTip: "Volumen objetivo (LUFS). -16 es estándar podcast, -14 es audiolibro. Menor = más silencioso.",
+  studioDenoiseTip: "Elimina ruido de fondo. 0% = apagado, 50% = moderado (recomendado), 100% = agresivo.",
+  studioCompressorTip: "Iguala el volumen: partes silenciosas se amplifican, partes ruidosas se suavizan. Mayor = más compresión.",
+
+  // Fix #7: Scene image upload toast
+  studioScenesImageAdded: "Imagen añadida: {filename}",
+
+  // Fix #8: Video render success toast
+  studioVideoRenderSuccess: "Vídeo renderizado correctamente",
 } as const;
 
 export type TranslationKey = keyof typeof es;

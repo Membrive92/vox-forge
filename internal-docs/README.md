@@ -29,4 +29,5 @@ Documentacion tecnica interna del proyecto. Explica la arquitectura, los flujos 
 - [Frontend polish plan](frontend-polish-plan.md) — ✅ Fases 1-7 de pulido visual (implementadas)
 - [Studio module plan](studio-module-plan.md) — Editor de audio + render de video. Fase A (POC audio) ✅ y Fase B (transcripcion + MP4) ✅ implementadas; C y D pendientes
 - [Production workflow plan](production-workflow-plan.md) — Grabar/subir audio humano + denoise/LUFS + video con imágenes por escena. Sprints A-C-B documentados
+- [ComfyUI integration plan](comfyui-integration-plan.md) — Sustituir el `PlaceholderProvider` de imágenes por un `ComfyUIProvider` local (SDXL escenas + FLUX portadas). Fases F1-F6 documentadas
 - [Manual test plan](manual-test-plan.md) — Checklist de regresion por tab

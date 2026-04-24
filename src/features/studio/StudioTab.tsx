@@ -197,6 +197,7 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
             onClearCover={studio.clearCover}
             onRender={(options, images) => {
               void studio.renderCurrent(options, images).then(() => {
+                onToast(t.studioVideoRenderSuccess);
                 void studio.refreshRenders();
               });
             }}

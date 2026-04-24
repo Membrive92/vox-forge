@@ -55,6 +55,10 @@ export function getStudioAudioUrl(path: string): string {
   return `${API_BASE}/studio/audio?path=${encodeURIComponent(path)}`;
 }
 
+export function getGenerationAudioUrl(filePath: string): string {
+  return `${API_BASE}/static/generations/${encodeURIComponent(filePath)}`;
+}
+
 export interface SrtEntry {
   index: number;
   start_s: number;

@@ -455,4 +455,38 @@ export const en: Record<TranslationKey, string> = {
   studioRecentFilterVideo: "Video",
   studioRecentDelete: "Delete",
   studioRecentScopeChapter: "Only this chapter",
+
+  // Fix #1: Audio playback in Workbench
+  chapterPlaybackEngine: "{engine}",
+  chapterPlaybackDuration: "{duration}",
+  chapterEditInStudio: "Edit in Studio",
+  chapterRecordedTakeNote: "Recorded take · Ready to edit or export. To re-synthesize, switch to a TTS voice above.",
+  chapterUploadTakeNote: "Upload take · Ready to edit or export. To re-synthesize, switch to a TTS voice above.",
+  recorderInfoBanner: "ℹ️ This recording will be saved as-is. To synthesize narration, use the voice preview or Quick Synth.",
+  takeUploadNote: "Pre-recorded take. To synthesize new narration, switch voice and use Preview or Quick Synth.",
+
+  // Fix #2: Image generation success toast
+  studioScenesGenSuccess: "Image generated successfully",
+
+  // Fix #3: Studio operations preview mode
+  studioPreview: "Preview",
+  studioPreviewLabel: "Preview (not saved)",
+  studioPreviewWarning: "This is a preview. Click 'Apply' to save.",
+
+  // Fix #4: Confirmation dialogs
+  studioConfirmClearQueue: "Clear all {n} operations?",
+  studioConfirmRemoveOp: "Remove this operation?",
+  studioConfirmCancel: "Cancel",
+  studioConfirmApply: "Yes, clear",
+
+  // Fix #6: DSP parameter tooltips
+  studioLufsTip: "Target loudness (LUFS). -16 is podcast standard, -14 is audiobook. Lower = quieter.",
+  studioDenoiseTip: "Remove background noise. 0% = off, 50% = moderate (recommended), 100% = aggressive.",
+  studioCompressorTip: "Even out volume: quiet parts get louder, loud parts softer. Higher = more compression.",
+
+  // Fix #7: Scene image upload toast
+  studioScenesImageAdded: "Image added: {filename}",
+
+  // Fix #8: Video render success toast
+  studioVideoRenderSuccess: "Video rendered successfully",
 };
