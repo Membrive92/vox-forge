@@ -45,6 +45,7 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
     const wsRef = useRef<WaveSurfer | null>(null);
     const regionsRef = useRef<RegionsPlugin | null>(null);
     const activeRegionRef = useRef<Region | null>(null);
+    const lastZoomRef = useRef<number>(40);
     const [isPlaying, setIsPlaying] = useState(false);
     const [zoom, setZoom] = useState(40);
     const [currentTime, setCurrentTime] = useState(0);
@@ -132,7 +133,12 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
     }, [audioUrl, height, memoOnRegionChange]);
 
     useEffect(() => {
-      wsRef.current?.zoom(zoom);
+      const ws = wsRef.current;
+      if (!ws || lastZoomRef.current === zoom) return;
+      // Skip zoom if value hasn't actually changed (prevents re-application
+      // during timeupdate events that trigger parent re-renders).
+      lastZoomRef.current = zoom;
+      ws.zoom(zoom);
     }, [zoom]);
 
     if (!audioUrl) {
