@@ -5,7 +5,7 @@
  * start/end are reported up via ``onRegionChange``. Calling ``clearRegion``
  * (or selecting a new source) wipes the active region.
  */
-import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 
 import WaveSurfer from "wavesurfer.js";
 import RegionsPlugin, { type Region } from "wavesurfer.js/dist/plugins/regions.js";
@@ -49,6 +49,9 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
     const [zoom, setZoom] = useState(40);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+
+    // Memoize onRegionChange so it doesn't trigger WaveSurfer recreation on every render.
+    const memoOnRegionChange = useCallback(onRegionChange || (() => {}), [onRegionChange]);
 
     useImperativeHandle(ref, () => ({
       clearRegion: () => {
@@ -97,7 +100,7 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
 
       const reportRegion = (region: Region): void => {
         activeRegionRef.current = region;
-        onRegionChange?.({
+        memoOnRegionChange?.({
           startMs: Math.round(region.start * 1000),
           endMs: Math.round(region.end * 1000),
         });
@@ -113,7 +116,7 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
       regions.on("region-updated", (region) => reportRegion(region));
       regions.on("region-removed", () => {
         activeRegionRef.current = null;
-        onRegionChange?.(null);
+        memoOnRegionChange?.(null);
       });
 
       wsRef.current = ws;
@@ -126,7 +129,7 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
         regionsRef.current = null;
         activeRegionRef.current = null;
       };
-    }, [audioUrl, height, onRegionChange]);
+    }, [audioUrl, height, memoOnRegionChange]);
 
     useEffect(() => {
       wsRef.current?.zoom(zoom);
