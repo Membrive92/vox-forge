@@ -56,7 +56,8 @@ export function getStudioAudioUrl(path: string): string {
 }
 
 export function getGenerationAudioUrl(filePath: string): string {
-  return `${API_BASE}/static/generations/${encodeURIComponent(filePath)}`;
+  // Generations live in OUTPUT_DIR, which is in the allowed roots for /studio/audio.
+  return `${API_BASE}/studio/audio?path=${encodeURIComponent(filePath)}`;
 }
 
 export interface SrtEntry {
