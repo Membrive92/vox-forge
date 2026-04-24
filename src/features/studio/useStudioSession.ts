@@ -28,6 +28,7 @@ export interface StudioSession {
   resultBlob: Blob | null;
   resultUrl: string | null;
   error: string | null;
+  isPreviewMode: boolean;
 
   // Phase B.1 — transcription
   transcript: TranscribeResult | null;
@@ -55,6 +56,7 @@ export interface StudioSessionApi {
   moveOperation: (from: number, to: number) => void;
   clearOperations: () => void;
   apply: (outputFormat: string) => Promise<void>;
+  applyPreview: (outputFormat: string) => Promise<void>;
   cancelApply: () => void;
   download: (filenameHint?: string) => void;
 
@@ -85,6 +87,7 @@ export function useStudioSession(): StudioSessionApi {
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const lastUrlRef = useRef<string | null>(null);
 
   const [transcript, setTranscript] = useState<TranscribeResult | null>(null);
@@ -182,6 +185,7 @@ export function useStudioSession(): StudioSessionApi {
       applyAbortRef.current = controller;
       setIsProcessing(true);
       setError(null);
+      setIsPreviewMode(false);
       try {
         logger.info("Studio: applying edit", {
           source: selected.source_path,
@@ -207,6 +211,48 @@ export function useStudioSession(): StudioSessionApi {
           const msg = err instanceof Error ? err.message : String(err);
           setError(msg);
           logger.error("Studio: apply failed", { error: msg });
+        }
+      } finally {
+        setIsProcessing(false);
+        if (applyAbortRef.current === controller) applyAbortRef.current = null;
+      }
+    },
+    [selected, operations],
+  );
+
+  const applyPreview = useCallback(
+    async (outputFormat: string) => {
+      if (!selected || operations.length === 0) return;
+      const controller = new AbortController();
+      applyAbortRef.current = controller;
+      setIsProcessing(true);
+      setError(null);
+      try {
+        logger.info("Studio: applying edit preview", {
+          source: selected.source_path,
+          ops: operations.length,
+          format: outputFormat,
+        });
+        const result = await applyEdit(
+          selected.source_path,
+          operations,
+          outputFormat,
+          { projectId: selected.project_id, chapterId: selected.chapter_id },
+          controller.signal,
+        );
+        if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
+        const url = URL.createObjectURL(result.blob);
+        lastUrlRef.current = url;
+        setResultBlob(result.blob);
+        setResultUrl(url);
+        setIsPreviewMode(true);
+      } catch (err) {
+        if (isAbortError(err)) {
+          logger.info("Studio: apply preview cancelled");
+        } else {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(msg);
+          logger.error("Studio: apply preview failed", { error: msg });
         }
       } finally {
         setIsProcessing(false);
@@ -412,6 +458,7 @@ export function useStudioSession(): StudioSessionApi {
       resultBlob,
       resultUrl,
       error,
+      isPreviewMode,
       transcript,
       isTranscribing,
       cover,
@@ -430,6 +477,7 @@ export function useStudioSession(): StudioSessionApi {
     moveOperation,
     clearOperations,
     apply,
+    applyPreview,
     cancelApply,
     download,
     transcribe,

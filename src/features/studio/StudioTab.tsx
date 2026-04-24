@@ -74,6 +74,10 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
     void studio.apply(outputFormat);
   };
 
+  const handleApplyPreview = (): void => {
+    void studio.applyPreview(outputFormat);
+  };
+
   const handleClearRegion = (): void => {
     waveformRef.current?.clearRegion();
     setRegion(null);
@@ -125,6 +129,7 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
             onRemove={studio.removeOperation}
             onClear={studio.clearOperations}
             onApply={handleApply}
+            onApplyPreview={handleApplyPreview}
             onCancelApply={studio.cancelApply}
             onClearRegion={handleClearRegion}
             onOutputFormatChange={setOutputFormat}
@@ -142,6 +147,21 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
             <h3 style={{ margin: "0 0 12px", fontSize: typography.size.base, fontWeight: 700 }}>
               {t.studioResultTitle}
             </h3>
+            {session.isPreviewMode && (
+              <div
+                style={{
+                  padding: 12,
+                  marginBottom: 12,
+                  background: "rgba(250,204,21,0.1)",
+                  border: "1px solid rgba(250,204,21,0.3)",
+                  borderRadius: radii.md,
+                  fontSize: typography.size.xs,
+                  color: colors.text,
+                }}
+              >
+                {t.studioPreviewWarning}
+              </div>
+            )}
             {session.resultUrl ? (
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <audio
@@ -152,13 +172,15 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
                 <button
                   type="button"
                   onClick={() => studio.download(`studio_edit.${outputFormat}`)}
+                  disabled={session.isPreviewMode}
                   style={{
                     padding: "8px 14px",
                     borderRadius: radii.sm,
-                    background: colors.primary,
+                    background: session.isPreviewMode ? colors.textFaint : colors.primary,
                     border: "none",
                     color: "#fff",
-                    cursor: "pointer",
+                    cursor: session.isPreviewMode ? "not-allowed" : "pointer",
+                    opacity: session.isPreviewMode ? 0.5 : 1,
                     fontSize: typography.size.xs,
                     fontWeight: 700,
                     fontFamily: fonts.sans,

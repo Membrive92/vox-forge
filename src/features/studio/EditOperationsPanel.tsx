@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import type { StudioOperation } from "@/api/studio";
 import { Button } from "@/components/Button";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
 import type { Translations } from "@/i18n";
@@ -19,6 +20,7 @@ interface Props {
   onRemove: (index: number) => void;
   onClear: () => void;
   onApply: () => void;
+  onApplyPreview: () => void;
   onCancelApply: () => void;
   onClearRegion: () => void;
   onOutputFormatChange: (fmt: string) => void;
@@ -67,6 +69,7 @@ export function EditOperationsPanel({
   onRemove,
   onClear,
   onApply,
+  onApplyPreview,
   onCancelApply,
   onClearRegion,
   onOutputFormatChange,
@@ -77,6 +80,7 @@ export function EditOperationsPanel({
   const [lufs, setLufs] = useState(-16);
   const [denoiseStrength, setDenoiseStrength] = useState(50);   // 0..100
   const [compressorAmount, setCompressorAmount] = useState(40); // 0..100
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const requireRegion = (): StudioRegion | null => {
     if (!region) {
@@ -220,7 +224,6 @@ export function EditOperationsPanel({
             />
           </label>
           <label
-            title={t.studioLufsHint}
             style={{
               display: "flex",
               alignItems: "center",
@@ -230,6 +233,7 @@ export function EditOperationsPanel({
             }}
           >
             {t.studioLufsTarget}
+            <span title={t.studioLufsTip} style={{ cursor: "help", fontSize: "1.1em" }}>?</span>
             <input
               type="number"
               min={-24}
@@ -250,6 +254,7 @@ export function EditOperationsPanel({
             }}
           >
             {t.studioDenoiseStrength}
+            <span title={t.studioDenoiseTip} style={{ cursor: "help", fontSize: "1.1em" }}>?</span>
             <input
               type="number"
               min={0}
@@ -270,6 +275,7 @@ export function EditOperationsPanel({
             }}
           >
             {t.studioCompressorAmount}
+            <span title={t.studioCompressorTip} style={{ cursor: "help", fontSize: "1.1em" }}>?</span>
             <input
               type="number"
               min={0}
@@ -381,25 +387,49 @@ export function EditOperationsPanel({
             {t.cancel}
           </Button>
         ) : (
-          <Button
-            variant="primary"
-            fullWidth
-            disabled={operations.length === 0}
-            onClick={onApply}
-          >
-            {operations.length === 1
-              ? t.studioApplyOne
-              : t.studioApply.replace("{n}", String(operations.length))}
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              fullWidth
+              disabled={operations.length === 0}
+              onClick={onApplyPreview}
+            >
+              {t.studioPreview}
+            </Button>
+            <Button
+              variant="primary"
+              fullWidth
+              disabled={operations.length === 0}
+              onClick={onApply}
+            >
+              {operations.length === 1
+                ? t.studioApplyOne
+                : t.studioApply.replace("{n}", String(operations.length))}
+            </Button>
+          </>
         )}
         <Button
           variant="ghost"
-          onClick={onClear}
+          onClick={() => setShowClearConfirm(true)}
           disabled={operations.length === 0 || isProcessing}
         >
           {t.studioClearQueue}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        title={t.studioConfirmClearQueue.replace("{n}", String(operations.length))}
+        message={`This will remove ${operations.length} ${operations.length === 1 ? "operation" : "operations"} from the queue.`}
+        confirmText={t.studioConfirmApply}
+        confirmVariant="danger"
+        cancelText={t.studioConfirmCancel}
+        onConfirm={() => {
+          onClear();
+          setShowClearConfirm(false);
+        }}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   );
 }
