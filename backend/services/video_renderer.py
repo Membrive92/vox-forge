@@ -1,9 +1,9 @@
 """Render an audio file + cover image (+ optional subtitles) to MP4.
 
-Thin wrapper over ffmpeg via ``asyncio.create_subprocess_exec``. The
-argv builder is a pure function (``_build_ffmpeg_argv``) so it can be
-tested without running ffmpeg. Tests also monkeypatch
-``VideoRenderer._run_command`` to skip real encoding.
+Thin wrapper over ffmpeg via ``subprocess.run``. The argv builder is a
+pure function (``_build_ffmpeg_argv``) so it can be tested without
+running ffmpeg. Tests also monkeypatch ``VideoRenderer._run_command``
+to skip real encoding.
 """
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import asyncio
 import logging
 import re
 import shutil
+import subprocess
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -463,21 +464,29 @@ class VideoRenderer:
         )
 
     async def _run_command(self, argv: list[str], output_path: Path) -> None:
-        """Execute ffmpeg. Tests monkeypatch this to skip real encoding."""
+        """Execute ffmpeg. Tests monkeypatch this to skip real encoding.
+
+        Uses subprocess.run instead of asyncio.create_subprocess_exec to avoid
+        Windows platform limitations with subprocess.PIPE.
+        """
         if not shutil.which(argv[0]):
             raise SynthesisError(
                 "ffmpeg not found on PATH. Install it or add it to PATH.",
             )
 
         logger.info("Rendering video: %s", output_path.name)
-        proc = await asyncio.create_subprocess_exec(
-            *argv,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        # Run ffmpeg in a thread pool to avoid blocking the event loop.
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            subprocess.run,
+            argv,
+            None,
+            subprocess.PIPE,
+            subprocess.PIPE,
         )
-        _, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            tail = stderr.decode(errors="replace")[-2000:]
+        if result.returncode != 0:
+            tail = result.stderr.decode(errors="replace")[-2000:]
             raise SynthesisError(
-                f"ffmpeg exited {proc.returncode}: {tail.strip()}",
+                f"ffmpeg exited {result.returncode}: {tail.strip()}",
             )
