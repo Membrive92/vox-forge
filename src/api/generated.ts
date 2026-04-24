@@ -986,6 +986,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/generate-image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate a scene image from a text prompt
+         * @description Render a PNG for ``prompt`` at the chosen aspect ratio and save
+         *     it under ``STUDIO_COVERS_DIR`` so the slideshow pipeline can use it
+         *     without further upload steps.
+         */
+        post: operations["generate_image_api_studio_generate_image_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/render-video": {
         parameters: {
             query?: never;
@@ -1390,6 +1412,40 @@ export interface components {
             status: string;
             /** Id */
             id: string;
+        };
+        /**
+         * GenerateImageRequest
+         * @description Generate a scene image from a text prompt.
+         */
+        GenerateImageRequest: {
+            /** Prompt */
+            prompt: string;
+            /**
+             * Aspect Ratio
+             * @description 16:9 | 9:16 | 1:1 | 4:3
+             * @default 16:9
+             */
+            aspect_ratio: string;
+            /**
+             * Seed
+             * @description Optional seed for deterministic output.
+             */
+            seed?: number | null;
+        };
+        /** GenerateImageResponse */
+        GenerateImageResponse: {
+            /** Filename */
+            filename: string;
+            /** Path */
+            path: string;
+            /** Provider */
+            provider: string;
+            /** Aspect Ratio */
+            aspect_ratio: string;
+            /** Seed */
+            seed: number;
+            /** Size Kb */
+            size_kb: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3893,6 +3949,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoverUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_image_api_studio_generate_image_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateImageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateImageResponse"];
                 };
             };
             /** @description Validation Error */

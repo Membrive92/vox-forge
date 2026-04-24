@@ -28,6 +28,11 @@ noisereduce
 # Pydub's audioop dep is not bundled with Python 3.13+
 audioop-lts; python_version >= "3.13"
 
+# ── Image generation (Studio scene slideshow) ───────────────────────
+# PlaceholderProvider uses PIL to draw text-on-gradient scene images
+# when no external provider is configured.
+pillow
+
 # ── TTS engines ─────────────────────────────────────────────────────
 edge-tts
 

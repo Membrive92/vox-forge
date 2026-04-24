@@ -2542,6 +2542,48 @@
         }
       }
     },
+    "/api/studio/generate-image": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Generate a scene image from a text prompt",
+        "description": "Render a PNG for ``prompt`` at the chosen aspect ratio and save\nit under ``STUDIO_COVERS_DIR`` so the slideshow pipeline can use it\nwithout further upload steps.",
+        "operationId": "generate_image_api_studio_generate_image_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateImageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateImageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/render-video": {
       "post": {
         "tags": [
@@ -3365,6 +3407,80 @@
           "id"
         ],
         "title": "DeletedResponse"
+      },
+      "GenerateImageRequest": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "title": "Aspect Ratio",
+            "description": "16:9 | 9:16 | 1:1 | 4:3",
+            "default": "16:9"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed",
+            "description": "Optional seed for deterministic output."
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "GenerateImageRequest",
+        "description": "Generate a scene image from a text prompt."
+      },
+      "GenerateImageResponse": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "title": "Aspect Ratio"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "size_kb": {
+            "type": "number",
+            "title": "Size Kb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "path",
+          "provider",
+          "aspect_ratio",
+          "seed",
+          "size_kb"
+        ],
+        "title": "GenerateImageResponse"
       },
       "HTTPValidationError": {
         "properties": {

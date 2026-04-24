@@ -1103,3 +1103,60 @@ def test_render_video_rejects_image_outside_roots(client, monkeypatch) -> None:
     )
     assert response.status_code == 400
     assert response.json()["code"] == "invalid_sample"
+
+
+# ── Image generation (B.3) ──────────────────────────────────────────
+
+
+def test_generate_image_happy_path(client) -> None:
+    """Placeholder provider renders a PNG and returns a resolvable path."""
+    from backend.paths import STUDIO_COVERS_DIR
+
+    response = client.post(
+        "/api/studio/generate-image",
+        json={"prompt": "A lighthouse on a cliff at dusk", "aspect_ratio": "16:9", "seed": 42},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["provider"] == "placeholder"
+    assert body["seed"] == 42
+    assert body["aspect_ratio"] == "16:9"
+    assert body["filename"].startswith("gen_") and body["filename"].endswith(".png")
+    assert Path(body["path"]).exists()
+    assert Path(body["path"]).parent.resolve() == STUDIO_COVERS_DIR.resolve()
+
+
+def test_generate_image_is_deterministic_for_same_prompt_and_seed(client) -> None:
+    """Same prompt + seed -> byte-identical PNG output from the placeholder."""
+    payload = {"prompt": "Same input", "aspect_ratio": "1:1", "seed": 7}
+    first = client.post("/api/studio/generate-image", json=payload).json()
+    second = client.post("/api/studio/generate-image", json=payload).json()
+    assert Path(first["path"]).read_bytes() == Path(second["path"]).read_bytes()
+
+
+def test_generate_image_rejects_empty_prompt(client) -> None:
+    response = client.post(
+        "/api/studio/generate-image",
+        json={"prompt": "", "aspect_ratio": "16:9"},
+    )
+    assert response.status_code == 422
+
+
+def test_generate_image_rejects_invalid_aspect(client) -> None:
+    response = client.post(
+        "/api/studio/generate-image",
+        json={"prompt": "Valid prompt", "aspect_ratio": "21:9"},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_sample"
+
+
+def test_generate_image_autoseeds_when_not_provided(client) -> None:
+    response = client.post(
+        "/api/studio/generate-image",
+        json={"prompt": "Auto seed prompt", "aspect_ratio": "9:16"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert isinstance(body["seed"], int)
+    assert body["seed"] >= 0

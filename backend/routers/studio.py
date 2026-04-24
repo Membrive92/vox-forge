@@ -29,6 +29,8 @@ from ..exceptions import InvalidSampleError, SampleNotFound, UnsupportedFormatEr
 from ..paths import JOBS_DIR, OUTPUT_DIR, STUDIO_COVERS_DIR, STUDIO_DIR
 from ..schemas import (
     CoverUploadResponse,
+    GenerateImageRequest,
+    GenerateImageResponse,
     RenderVideoRequest,
     SrtEntry,
     StudioEditRequest,
@@ -39,7 +41,7 @@ from ..schemas import (
     TranscribeRequest,
     TranscribeResponse,
 )
-from ..services import studio_store
+from ..services import image_gen, studio_store
 from ..services.audio_editor import EditOperation, apply_operations
 from ..services.transcriber import Transcriber
 from ..services.video_renderer import VideoRenderer
@@ -257,6 +259,42 @@ async def upload_cover(cover: UploadFile = File(...)) -> CoverUploadResponse:
         path=str(filepath.resolve()),
         size_kb=round(len(content) / 1024, 1),
         content_type=cover.content_type or "application/octet-stream",
+    )
+
+
+@router.post(
+    "/generate-image",
+    summary="Generate a scene image from a text prompt",
+    response_model=GenerateImageResponse,
+)
+async def generate_image(request: GenerateImageRequest) -> GenerateImageResponse:
+    """Render a PNG for ``prompt`` at the chosen aspect ratio and save
+    it under ``STUDIO_COVERS_DIR`` so the slideshow pipeline can use it
+    without further upload steps."""
+    if request.aspect_ratio not in image_gen.VALID_ASPECT_RATIOS:
+        raise InvalidSampleError(
+            f"Invalid aspect ratio: {request.aspect_ratio}. "
+            f"Valid: {sorted(image_gen.VALID_ASPECT_RATIOS)}"
+        )
+
+    import random as _random  # local so tests can monkeypatch the module
+    provider = image_gen.get_provider()
+    seed = request.seed if request.seed is not None else _random.randint(0, 2**31 - 1)
+    filepath = await image_gen.generate_image(
+        prompt=request.prompt,
+        aspect=request.aspect_ratio,
+        seed=seed,
+        provider=provider,
+    )
+    size_kb = round(filepath.stat().st_size / 1024, 1)
+
+    return GenerateImageResponse(
+        filename=filepath.name,
+        path=str(filepath.resolve()),
+        provider=provider.name,
+        aspect_ratio=request.aspect_ratio,
+        seed=seed,
+        size_kb=size_kb,
     )
 
 

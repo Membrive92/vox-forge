@@ -24,6 +24,9 @@ mutagen
 
 audioop-lts; python_version >= "3.13"
 
+# Image generation placeholder (Studio scenes)
+pillow
+
 # Test runner
 pytest
 pytest-asyncio

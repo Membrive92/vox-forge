@@ -1,8 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 
-import { uploadCover } from "@/api/studio";
+import { generateImage, uploadCover } from "@/api/studio";
 import type {
   CoverUploadResult,
+  GenerateImageResult,
+  ImageAspectRatio,
   SrtEntry,
   VideoImage,
   VideoOptions,
@@ -96,6 +98,32 @@ export function VideoRenderPanel({
     try {
       const res = await uploadCover(file);
       setSceneImages((prev) => ({ ...prev, [idx]: res }));
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSceneUploadingIdx(null);
+    }
+  };
+
+  // Generated images share the same on-disk home (STUDIO_COVERS_DIR) as
+  // uploaded covers, so we reshape the response into CoverUploadResult to
+  // reuse the existing slideshow wiring without a second state shape.
+  const handleGenerateSceneImage = async (
+    idx: number,
+    prompt: string,
+    aspect: ImageAspectRatio,
+    seed: number | undefined,
+  ): Promise<void> => {
+    setSceneUploadingIdx(idx);
+    try {
+      const gen: GenerateImageResult = await generateImage(prompt, aspect, seed);
+      const asCover: CoverUploadResult = {
+        filename: gen.filename,
+        path: gen.path,
+        size_kb: gen.size_kb,
+        content_type: "image/png",
+      };
+      setSceneImages((prev) => ({ ...prev, [idx]: asCover }));
     } catch (e) {
       onToast(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -327,6 +355,7 @@ export function VideoRenderPanel({
           uploadingIdx={sceneUploadingIdx}
           onDetect={handleDetectScenes}
           onPickImage={(i, f) => void handlePickSceneImage(i, f)}
+          onGenerateImage={(i, p, a, s) => void handleGenerateSceneImage(i, p, a, s)}
           onClearImage={handleClearSceneImage}
         />
       )}
@@ -430,6 +459,7 @@ interface SceneManagerProps {
   uploadingIdx: number | null;
   onDetect: () => void;
   onPickImage: (idx: number, file: File) => void;
+  onGenerateImage: (idx: number, prompt: string, aspect: ImageAspectRatio, seed: number | undefined) => void;
   onClearImage: (idx: number) => void;
 }
 
@@ -440,6 +470,7 @@ function SceneManager({
   uploadingIdx,
   onDetect,
   onPickImage,
+  onGenerateImage,
   onClearImage,
 }: SceneManagerProps) {
   // One hidden input per scene would be noisy — share a single ref and
@@ -447,11 +478,15 @@ function SceneManager({
   const pickerRef = useRef<HTMLInputElement>(null);
   const targetIdxRef = useRef<number | null>(null);
   const assignedCount = Object.keys(sceneImages).length;
+  const [genDialogIdx, setGenDialogIdx] = useState<number | null>(null);
 
   const openPicker = (idx: number): void => {
     targetIdxRef.current = idx;
     pickerRef.current?.click();
   };
+
+  const openGenDialog = (idx: number): void => setGenDialogIdx(idx);
+  const closeGenDialog = (): void => setGenDialogIdx(null);
 
   return (
     <div
@@ -554,14 +589,24 @@ function SceneManager({
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    loading={uploading}
-                    onClick={() => openPicker(i)}
-                  >
-                    {t.studioScenesAddImage}
-                  </Button>
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={uploading}
+                      onClick={() => openPicker(i)}
+                    >
+                      {t.studioScenesAddImage}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={uploading}
+                      onClick={() => openGenDialog(i)}
+                    >
+                      {t.studioScenesGenerate}
+                    </Button>
+                  </>
                 )}
               </li>
             );
@@ -582,6 +627,175 @@ function SceneManager({
           targetIdxRef.current = null;
         }}
       />
+
+      {genDialogIdx !== null && scenes[genDialogIdx] ? (
+        <ImageGenDialog
+          t={t}
+          defaultPrompt={scenes[genDialogIdx].text_preview}
+          onCancel={closeGenDialog}
+          onConfirm={(prompt, aspect, seed) => {
+            const idx = genDialogIdx;
+            closeGenDialog();
+            onGenerateImage(idx, prompt, aspect, seed);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ── ImageGenDialog ─────────────────────────────────────────────────
+
+interface ImageGenDialogProps {
+  t: Translations;
+  defaultPrompt: string;
+  onCancel: () => void;
+  onConfirm: (prompt: string, aspect: ImageAspectRatio, seed: number | undefined) => void;
+}
+
+function ImageGenDialog({ t, defaultPrompt, onCancel, onConfirm }: ImageGenDialogProps) {
+  const [prompt, setPrompt] = useState(defaultPrompt);
+  const [aspect, setAspect] = useState<ImageAspectRatio>("16:9");
+  const [seedText, setSeedText] = useState("");
+
+  const submit = (): void => {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+    const seedNum = seedText.trim() === "" ? undefined : Number.parseInt(seedText.trim(), 10);
+    const seed = seedNum !== undefined && Number.isFinite(seedNum) && seedNum >= 0 ? seedNum : undefined;
+    onConfirm(trimmed, aspect, seed);
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        backdropFilter: "blur(4px)",
+      }}
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: colors.surface,
+          border: `1px solid ${colors.border}`,
+          borderRadius: radii.xl,
+          padding: 20,
+          width: "90%",
+          maxWidth: 520,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        }}
+      >
+        <h3 style={{ margin: "0 0 12px", fontSize: typography.size.lg, fontWeight: 700 }}>
+          {t.studioScenesGenDialogTitle}
+        </h3>
+
+        <label style={{ display: "block", fontSize: typography.size.xs, color: colors.textDim, marginBottom: 10 }}>
+          {t.studioScenesGenPromptLabel}
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder={t.studioScenesGenPromptPlaceholder}
+            rows={4}
+            style={{
+              display: "block",
+              width: "100%",
+              boxSizing: "border-box",
+              marginTop: 4,
+              padding: "8px 10px",
+              borderRadius: radii.sm,
+              background: colors.surfaceAlt,
+              border: `1px solid ${colors.border}`,
+              color: colors.text,
+              fontSize: typography.size.sm,
+              fontFamily: fonts.sans,
+              resize: "vertical",
+              outline: "none",
+            }}
+            autoFocus
+          />
+        </label>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <label style={{ fontSize: typography.size.xs, color: colors.textDim }}>
+            {t.studioScenesGenAspectLabel}
+            <select
+              value={aspect}
+              onChange={(e) => setAspect(e.target.value as ImageAspectRatio)}
+              style={{
+                display: "block",
+                marginTop: 4,
+                width: "100%",
+                padding: "6px 8px",
+                borderRadius: radii.sm,
+                background: colors.surfaceAlt,
+                border: `1px solid ${colors.border}`,
+                color: colors.text,
+                fontSize: typography.size.sm,
+                fontFamily: fonts.sans,
+                outline: "none",
+              }}
+            >
+              <option value="16:9">16:9</option>
+              <option value="9:16">9:16</option>
+              <option value="1:1">1:1</option>
+              <option value="4:3">4:3</option>
+            </select>
+          </label>
+
+          <label style={{ fontSize: typography.size.xs, color: colors.textDim }}>
+            {t.studioScenesGenSeedLabel}
+            <input
+              value={seedText}
+              onChange={(e) => setSeedText(e.target.value.replace(/[^0-9]/g, ""))}
+              inputMode="numeric"
+              placeholder="—"
+              style={{
+                display: "block",
+                marginTop: 4,
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "6px 10px",
+                borderRadius: radii.sm,
+                background: colors.surfaceAlt,
+                border: `1px solid ${colors.border}`,
+                color: colors.text,
+                fontSize: typography.size.sm,
+                fontFamily: fonts.mono,
+                outline: "none",
+              }}
+            />
+          </label>
+        </div>
+
+        <p style={{ margin: "0 0 12px", fontSize: typography.size.xs, color: colors.textFaint }}>
+          {t.studioScenesGenSeedHint}
+        </p>
+        <p style={{ margin: "0 0 16px", fontSize: typography.size.xs, color: colors.textFaint }}>
+          {t.studioScenesGenNote}
+        </p>
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <Button variant="ghost" type="button" onClick={onCancel}>
+            {t.studioScenesGenCancel}
+          </Button>
+          <Button variant="primary" type="submit" disabled={prompt.trim().length === 0}>
+            {t.studioScenesGenSubmit}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

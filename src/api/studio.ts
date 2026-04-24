@@ -164,6 +164,33 @@ export async function uploadCover(file: File): Promise<CoverUploadResult> {
   return postForm<CoverUploadResult>("/studio/upload-cover", fd);
 }
 
+// ── Image generation (Phase B.3) ──────────────────────────────────
+
+export type ImageAspectRatio = "16:9" | "9:16" | "1:1" | "4:3";
+
+export interface GenerateImageResult {
+  filename: string;
+  path: string;
+  provider: string;
+  aspect_ratio: ImageAspectRatio;
+  seed: number;
+  size_kb: number;
+}
+
+export function generateImage(
+  prompt: string,
+  aspectRatio: ImageAspectRatio = "16:9",
+  seed?: number,
+  signal?: AbortSignal,
+): Promise<GenerateImageResult> {
+  const body: Record<string, unknown> = {
+    prompt,
+    aspect_ratio: aspectRatio,
+  };
+  if (seed !== undefined) body["seed"] = seed;
+  return postJson<GenerateImageResult>("/studio/generate-image", body, signal);
+}
+
 export async function renderVideo(
   payload: RenderVideoPayload,
   signal?: AbortSignal,

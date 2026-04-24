@@ -286,3 +286,26 @@ class CoverUploadResponse(BaseModel):
     path: str
     size_kb: float
     content_type: str
+
+
+class GenerateImageRequest(BaseModel):
+    """Generate a scene image from a text prompt."""
+
+    prompt: str = Field(..., min_length=1, max_length=500)
+    aspect_ratio: str = Field(
+        default="16:9",
+        description="16:9 | 9:16 | 1:1 | 4:3",
+    )
+    seed: Optional[int] = Field(
+        default=None, ge=0, le=2**31 - 1,
+        description="Optional seed for deterministic output.",
+    )
+
+
+class GenerateImageResponse(BaseModel):
+    filename: str
+    path: str
+    provider: str
+    aspect_ratio: str
+    seed: int
+    size_kb: float
