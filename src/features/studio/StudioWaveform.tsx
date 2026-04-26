@@ -45,9 +45,9 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
     const wsRef = useRef<WaveSurfer | null>(null);
     const regionsRef = useRef<RegionsPlugin | null>(null);
     const activeRegionRef = useRef<Region | null>(null);
-    const lastZoomRef = useRef<number>(40);
+    const currentTimeRef = useRef<number>(0);
+    const displayUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [zoom, setZoom] = useState(40);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
 
@@ -91,7 +91,17 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
       ws.on("play", () => setIsPlaying(true));
       ws.on("pause", () => setIsPlaying(false));
       ws.on("finish", () => setIsPlaying(false));
-      ws.on("timeupdate", (t: number) => setCurrentTime(t));
+      ws.on("timeupdate", (t: number) => {
+        currentTimeRef.current = t;
+        // Update display text without causing re-renders. Only update state
+        // every 100ms to avoid constant re-renders from timeupdate events.
+        if (!displayUpdateTimerRef.current) {
+          displayUpdateTimerRef.current = window.setTimeout(() => {
+            setCurrentTime(currentTimeRef.current);
+            displayUpdateTimerRef.current = null;
+          }, 100) as unknown as NodeJS.Timeout;
+        }
+      });
       ws.on("ready", () => setDuration(ws.getDuration()));
 
       const disableDrag = regions.enableDragSelection(
@@ -124,6 +134,10 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
       regionsRef.current = regions;
 
       return () => {
+        if (displayUpdateTimerRef.current) {
+          clearTimeout(displayUpdateTimerRef.current);
+          displayUpdateTimerRef.current = null;
+        }
         disableDrag();
         ws.destroy();
         wsRef.current = null;
@@ -132,22 +146,6 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
       };
     }, [audioUrl, height, memoOnRegionChange]);
 
-    useEffect(() => {
-      const ws = wsRef.current;
-      if (!ws) return;
-
-      // Debounce zoom application: timeupdate events fire constantly during
-      // playback and trigger re-renders. Apply zoom only once after a delay
-      // to avoid re-triggering the effect repeatedly.
-      lastZoomRef.current = zoom;
-      const timer = setTimeout(() => {
-        if (wsRef.current) {
-          wsRef.current.zoom(zoom);
-        }
-      }, 50);
-
-      return () => clearTimeout(timer);
-    }, [zoom]);
 
     if (!audioUrl) {
       return (
@@ -205,26 +203,6 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
           >
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              marginLeft: "auto",
-              fontSize: typography.size.xs,
-              color: colors.textDim,
-            }}
-          >
-            {t.zoom}
-            <input
-              type="range"
-              min={10}
-              max={200}
-              value={zoom}
-              onChange={(e) => setZoom(Number(e.target.value))}
-              style={{ width: 100, accentColor: colors.primary }}
-            />
-          </label>
         </div>
 
         <p
