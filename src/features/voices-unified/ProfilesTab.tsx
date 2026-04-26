@@ -14,12 +14,13 @@ interface ProfilesTabProps {
   onUse: (profile: Profile) => void;
   onEdit: (profile: Profile) => void;
   onDelete: (profileId: string) => void;
+  onToggleCastilianAnchor: (profileId: string, value: boolean) => void;
   onNew: () => void;
   samplePlayer: SamplePlayerState;
   voicePreview: VoicePreviewState;
 }
 
-export function ProfilesTab({ t, profiles, onUse, onEdit, onDelete, onNew, samplePlayer, voicePreview }: ProfilesTabProps) {
+export function ProfilesTab({ t, profiles, onUse, onEdit, onDelete, onToggleCastilianAnchor, onNew, samplePlayer, voicePreview }: ProfilesTabProps) {
   return (
     <div>
       <div
@@ -48,6 +49,7 @@ export function ProfilesTab({ t, profiles, onUse, onEdit, onDelete, onNew, sampl
               onUse={() => onUse(p)}
               onEdit={() => onEdit(p)}
               onDelete={() => onDelete(p.id)}
+              onToggleCastilianAnchor={(v) => onToggleCastilianAnchor(p.id, v)}
               samplePlayer={samplePlayer}
               voicePreview={voicePreview}
             />
@@ -88,11 +90,12 @@ interface ProfileCardProps {
   onUse: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleCastilianAnchor: (value: boolean) => void;
   samplePlayer: SamplePlayerState;
   voicePreview: VoicePreviewState;
 }
 
-function ProfileCard({ t, profile, onUse, onEdit, onDelete, samplePlayer, voicePreview }: ProfileCardProps) {
+function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnchor, samplePlayer, voicePreview }: ProfileCardProps) {
   const voice = ALL_VOICES.find((v) => v.id === profile.voiceId);
   const params = [
     { label: t.speed, value: `${profile.speed}%` },
@@ -260,6 +263,40 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, samplePlayer, voiceP
         {voicePreview.previewingId === profile.voiceId ? <Icons.Stop /> : <Icons.Volume />}
         {voicePreview.previewingId === profile.voiceId ? t.stop : t.previewVoice} {voice?.name ?? ""}
       </button>
+
+      {/* Castilian anchor toggle: prepend the configured reference voice
+          to this profile's sample at synthesis time. Off by default. */}
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 10px",
+          borderRadius: radii.md,
+          background: profile.castilianAnchor
+            ? "rgba(245,158,11,0.1)"
+            : "rgba(30,41,59,0.4)",
+          border: `1px solid ${profile.castilianAnchor ? "rgba(245,158,11,0.4)" : colors.borderFaint}`,
+          cursor: "pointer",
+          marginBottom: 12,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={profile.castilianAnchor}
+          onChange={(e) => onToggleCastilianAnchor(e.target.checked)}
+          aria-label={t.profileCastilianAnchor}
+          style={{ accentColor: "#f59e0b", cursor: "pointer" }}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+          <span style={{ fontSize: typography.size.xs, fontWeight: 600, color: colors.text }}>
+            {t.profileCastilianAnchor}
+          </span>
+          <span style={{ fontSize: 10, color: colors.textFaint, lineHeight: 1.3 }}>
+            {t.profileCastilianAnchorHint}
+          </span>
+        </div>
+      </label>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <div style={{ flex: 1 }}>

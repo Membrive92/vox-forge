@@ -18,6 +18,7 @@ function makeProfile(overrides: Partial<ProfileDTO> = {}): ProfileDTO {
     volume: 80,
     sample_filename: null,
     sample_duration: null,
+    castilian_anchor: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,

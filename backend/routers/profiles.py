@@ -44,6 +44,7 @@ async def create_profile(
     speed: int = Form(default=100),
     pitch: int = Form(default=0),
     volume: int = Form(default=80),
+    castilian_anchor: bool = Form(default=False),
     sample: Optional[UploadFile] = File(default=None),
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> VoiceProfile:
@@ -79,6 +80,7 @@ async def create_profile(
         volume=volume,
         sample_filename=sample_filename,
         sample_duration=sample_duration,
+        castilian_anchor=castilian_anchor,
     )
     return await profiles.create(profile)
 

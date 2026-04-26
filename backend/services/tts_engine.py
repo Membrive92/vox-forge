@@ -227,6 +227,7 @@ class TTSEngine:
         sample_path: Path | None = None
         profile_language: str = "es"
         voice_id: str = request.voice_id
+        castilian_anchor: bool = False
 
         if request.profile_id:
             profile = self._profiles.get(request.profile_id)
@@ -238,6 +239,7 @@ class TTSEngine:
                 # come from the request (frontend sliders), not the profile.
                 voice_id = profile.voice_id
                 profile_language = profile.language
+                castilian_anchor = profile.castilian_anchor
                 if profile.sample_filename:
                     from ..paths import VOICES_DIR
 
@@ -247,7 +249,10 @@ class TTSEngine:
 
         # Route to clone engine if we have a sample
         if sample_path is not None:
-            return await self._synthesize_cloned(request, sample_path, profile_language, cancel_token, job_id)
+            return await self._synthesize_cloned(
+                request, sample_path, profile_language, cancel_token, job_id,
+                castilian_anchor=castilian_anchor,
+            )
 
         # Otherwise use Edge-TTS
         if voice_id not in all_voice_ids():
@@ -380,10 +385,39 @@ class TTSEngine:
         language: str,
         cancel_token: CancellationToken | None = None,
         job_id: str | None = None,
+        *,
+        castilian_anchor: bool = False,
     ) -> SynthesisResult:
         """Synthesize text using XTTS v2 voice cloning."""
         logger.info("Using XTTS v2 cloning with sample: %s", sample_path.name)
         clone = self._get_clone_engine()
+
+        # Audio anchor: if the profile is flagged, prepend the configured
+        # Castilian reference voice to its sample so XTTS hears Castilian
+        # articulation first when computing the speaker embedding. The
+        # anchored file is a temp wav we clean up after synthesis.
+        speaker_wav_path = sample_path
+        anchor_temp: Path | None = None
+        if castilian_anchor:
+            from .castilian_warmup import build_anchored_speaker_wav, get_reference_voice
+            ref = get_reference_voice()
+            if ref is not None:
+                from ..paths import TEMP_DIR
+                import uuid as _uuid
+                anchor_temp = TEMP_DIR / f"{_uuid.uuid4().hex[:8]}_anchored.wav"
+                build_anchored_speaker_wav(sample_path, ref, anchor_temp)
+                speaker_wav_path = anchor_temp
+                logger.info(
+                    "Castilian anchor active: prepended %s to %s",
+                    ref.name, sample_path.name,
+                )
+            else:
+                logger.warning(
+                    "Profile has castilian_anchor=True but no reference voice "
+                    "is configured under data/voices/reference/ — falling back "
+                    "to raw speaker_wav.",
+                )
+
         chunks = split_into_clone_chunks(request.text)
         logger.info("Text split into %d clone chunks (clause-level, no internal punctuation)", len(chunks))
         fmt_cfg = AUDIO_FORMATS[request.output_format]
@@ -393,16 +427,20 @@ class TTSEngine:
         if job_id:
             progress_registry.update(job_id, chunks_total=len(chunks), step="cloning")
 
-        path, chunk_count = await clone.synthesize_long(
-            chunks=chunks,
-            speaker_wav=sample_path,
-            language=language,
-            output_format=request.output_format,
-            format_config=fmt_cfg,
-            cancel_token=cancel_token,
-            speed=xtts_speed,
-            job_id=job_id,
-        )
+        try:
+            path, chunk_count = await clone.synthesize_long(
+                chunks=chunks,
+                speaker_wav=speaker_wav_path,
+                language=language,
+                output_format=request.output_format,
+                format_config=fmt_cfg,
+                cancel_token=cancel_token,
+                speed=xtts_speed,
+                job_id=job_id,
+            )
+        finally:
+            if anchor_temp is not None:
+                anchor_temp.unlink(missing_ok=True)
 
         # Volume post-processing (XTTS v2 doesn't support volume natively)
         self._apply_volume(path, request.volume)

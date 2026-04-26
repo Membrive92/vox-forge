@@ -421,3 +421,155 @@ class TestWarmupReachesEngine:
         assert len(captured_text) == 1
         assert "texto del usuario" in captured_text[0]
         assert captured_text[0] != "texto del usuario"  # was wrapped
+
+
+# ── Profile flag (castilian_anchor) end-to-end ──────────────────────
+
+
+class TestProfileCastilianAnchor:
+    """The castilian_anchor flag on a profile must (1) round-trip through
+    create + get + update, and (2) cause the production synthesis path
+    to wrap the speaker_wav with the reference voice before XTTS sees it.
+    """
+
+    def test_profile_create_accepts_anchor_flag(self, client) -> None:
+        files = {"sample": ("voice.wav", _fake_wav(), "audio/wav")}
+        r = client.post(
+            "/api/profiles",
+            data={
+                "name": "Anchored",
+                "voice_id": "es-ES-AlvaroNeural",
+                "castilian_anchor": "true",
+            },
+            files=files,
+        )
+        assert r.status_code == 200, r.json()
+        body = r.json()
+        assert body["castilian_anchor"] is True
+
+    def test_profile_create_default_is_off(self, client) -> None:
+        r = client.post(
+            "/api/profiles",
+            data={"name": "NotAnchored", "voice_id": "es-ES-AlvaroNeural"},
+        )
+        assert r.status_code == 200
+        assert r.json()["castilian_anchor"] is False
+
+    def test_profile_update_can_toggle_anchor(self, client) -> None:
+        created = client.post(
+            "/api/profiles",
+            data={"name": "Toggle", "voice_id": "es-ES-AlvaroNeural"},
+        ).json()
+        pid = created["id"]
+        r = client.patch(f"/api/profiles/{pid}", json={"castilian_anchor": True})
+        assert r.status_code == 200, r.json()
+        assert r.json()["castilian_anchor"] is True
+
+        r2 = client.patch(f"/api/profiles/{pid}", json={"castilian_anchor": False})
+        assert r2.status_code == 200
+        assert r2.json()["castilian_anchor"] is False
+
+    @pytest.mark.asyncio
+    async def test_synthesis_with_anchor_concatenates_reference(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """When a profile is anchor-flagged, _synthesize_cloned must build
+        an anchored speaker_wav (reference + sample) and pass it to the
+        clone engine instead of the raw sample."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from backend.services import castilian_warmup as cw_mod
+        from backend.services.tts_engine import TTSEngine
+        from backend.schemas import SynthesisRequest
+
+        # Configure a reference voice
+        ref_dir = tmp_path / "ref"
+        ref_dir.mkdir()
+        ref_file = ref_dir / "castilian.wav"
+        ref_file.write_bytes(b"RIFF" + b"\x00" * 100)
+        monkeypatch.setattr(cw_mod, "REFERENCE_VOICES_DIR", ref_dir)
+
+        # Capture what speaker_wav synthesize_long actually receives
+        captured_speaker_wav: list[Path] = []
+
+        async def fake_synth_long(*, speaker_wav, **kwargs):
+            captured_speaker_wav.append(Path(speaker_wav))
+            out = tmp_path / "out.mp3"
+            out.write_bytes(b"\xff\xfb\x90\x00")
+            return out, 1
+
+        # Build engine and stub clone path
+        from backend.dependencies import get_profile_manager
+        engine = TTSEngine(get_profile_manager())
+        fake_clone = MagicMock()
+        fake_clone.synthesize_long = AsyncMock(side_effect=fake_synth_long)
+        engine._get_clone_engine = lambda: fake_clone  # type: ignore[method-assign]
+
+        sample = tmp_path / "user_sample.wav"
+        sample.write_bytes(b"RIFF" + b"\x00" * 100)
+
+        request = SynthesisRequest(
+            text="Hola mundo.",
+            voice_id="es-ES-AlvaroNeural",
+            output_format="mp3",
+        )
+
+        with patch("backend.services.tts_engine.split_into_clone_chunks", return_value=["Hola mundo."]):
+            await engine._synthesize_cloned(
+                request, sample, "es", castilian_anchor=True,
+            )
+
+        assert len(captured_speaker_wav) == 1
+        # The speaker_wav passed to XTTS is NOT the user's raw sample —
+        # it's the temp anchored file we built.
+        assert captured_speaker_wav[0] != sample
+        assert captured_speaker_wav[0].name.endswith("_anchored.wav")
+
+    @pytest.mark.asyncio
+    async def test_synthesis_without_anchor_uses_raw_sample(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """The default path is unchanged: profiles without the flag pass
+        their raw sample straight to XTTS."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from backend.services import castilian_warmup as cw_mod
+        from backend.services.tts_engine import TTSEngine
+        from backend.schemas import SynthesisRequest
+
+        # Even with a reference present, if anchor=False we must NOT use it
+        ref_dir = tmp_path / "ref"
+        ref_dir.mkdir()
+        (ref_dir / "castilian.wav").write_bytes(b"RIFF" + b"\x00" * 100)
+        monkeypatch.setattr(cw_mod, "REFERENCE_VOICES_DIR", ref_dir)
+
+        captured: list[Path] = []
+
+        async def fake_synth_long(*, speaker_wav, **kwargs):
+            captured.append(Path(speaker_wav))
+            out = tmp_path / "out.mp3"
+            out.write_bytes(b"\xff\xfb\x90\x00")
+            return out, 1
+
+        from backend.dependencies import get_profile_manager
+        engine = TTSEngine(get_profile_manager())
+        fake_clone = MagicMock()
+        fake_clone.synthesize_long = AsyncMock(side_effect=fake_synth_long)
+        engine._get_clone_engine = lambda: fake_clone  # type: ignore[method-assign]
+
+        sample = tmp_path / "user_sample.wav"
+        sample.write_bytes(b"RIFF" + b"\x00" * 100)
+
+        request = SynthesisRequest(
+            text="Hola.",
+            voice_id="es-ES-AlvaroNeural",
+            output_format="mp3",
+        )
+
+        from unittest.mock import patch
+        with patch("backend.services.tts_engine.split_into_clone_chunks", return_value=["Hola."]):
+            await engine._synthesize_cloned(request, sample, "es")
+
+        assert len(captured) == 1
+        # Without the flag we pass the raw sample through unchanged.
+        assert captured[0] == sample

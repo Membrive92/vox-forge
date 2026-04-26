@@ -21,6 +21,10 @@ export interface Profile {
   volume: number;
   sampleName: string | null;
   sampleDuration: number | null;
+  /** When true, the configured Castilian reference voice is concatenated
+   * to the profile's sample before XTTS sees it (production audio
+   * anchor). Off by default. */
+  castilianAnchor: boolean;
 }
 
 export interface SynthesisParams {

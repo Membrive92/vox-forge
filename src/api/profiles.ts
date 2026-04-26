@@ -20,6 +20,7 @@ function toProfile(dto: ProfileDTO): Profile {
     volume: dto.volume,
     sampleName: dto.sample_filename ?? null,
     sampleDuration: dto.sample_duration ?? null,
+    castilianAnchor: dto.castilian_anchor ?? false,
   };
 }
 
@@ -36,6 +37,7 @@ export interface CreateProfileInput {
   pitch: number;
   volume: number;
   sampleFile: File | null;
+  castilianAnchor?: boolean;
 }
 
 export async function createProfile(input: CreateProfileInput): Promise<Profile> {
@@ -46,6 +48,7 @@ export async function createProfile(input: CreateProfileInput): Promise<Profile>
   fd.append("speed", String(input.speed));
   fd.append("pitch", String(input.pitch));
   fd.append("volume", String(input.volume));
+  if (input.castilianAnchor) fd.append("castilian_anchor", "true");
   if (input.sampleFile) fd.append("sample", input.sampleFile);
   const dto = await postForm<ProfileDTO>("/profiles", fd);
   return toProfile(dto);
@@ -58,6 +61,7 @@ export interface UpdateProfileInput {
   speed?: number;
   pitch?: number;
   volume?: number;
+  castilianAnchor?: boolean;
 }
 
 export async function updateProfile(
@@ -71,6 +75,7 @@ export async function updateProfile(
   if (input.speed !== undefined) body["speed"] = input.speed;
   if (input.pitch !== undefined) body["pitch"] = input.pitch;
   if (input.volume !== undefined) body["volume"] = input.volume;
+  if (input.castilianAnchor !== undefined) body["castilian_anchor"] = input.castilianAnchor;
   const dto = await patchJson<ProfileDTO>(`/profiles/${profileId}`, body);
   return toProfile(dto);
 }

@@ -154,6 +154,14 @@ export default function App() {
     }
   };
 
+  const handleToggleCastilianAnchor = async (id: string, value: boolean): Promise<void> => {
+    try {
+      await update(id, { castilianAnchor: value });
+    } catch (e) {
+      toast.show(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    }
+  };
+
   return (
     <div
       style={{
@@ -202,6 +210,7 @@ export default function App() {
               onUseProfile={handleUseProfile}
               onEditProfile={handleEditProfile}
               onDeleteProfile={(id) => void handleDeleteProfile(id)}
+              onToggleCastilianAnchor={(id, v) => void handleToggleCastilianAnchor(id, v)}
               onToast={toast.show}
               voicePreview={voicePreview}
               samplePlayer={samplePlayer}

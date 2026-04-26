@@ -48,6 +48,13 @@ class VoiceProfile(BaseModel):
     sample_filename: Optional[str] = None
     sample_duration: Optional[float] = None
     extra_samples: list[str] = Field(default_factory=list)
+    # When True, the configured Castilian reference voice is concatenated
+    # in front of this profile's sample before XTTS sees it. Same trick as
+    # the experimental "audio anchor" mode (E), but applied automatically
+    # in the production synthesis path. Off by default — only profiles
+    # explicitly created from the Castilian reference (or toggled on by
+    # the user) get the pre-roll.
+    castilian_anchor: bool = False
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)
 
@@ -61,6 +68,7 @@ class ProfileUpdate(BaseModel):
     speed: Optional[int] = Field(default=None, ge=50, le=200)
     pitch: Optional[int] = Field(default=None, ge=-10, le=10)
     volume: Optional[int] = Field(default=None, ge=0, le=100)
+    castilian_anchor: Optional[bool] = None
 
 
 class SampleUploadResponse(BaseModel):

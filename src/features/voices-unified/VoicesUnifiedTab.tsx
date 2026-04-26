@@ -36,6 +36,7 @@ interface Props {
   onUseProfile: (profile: Profile) => void;
   onEditProfile: (profile: Profile) => void;
   onDeleteProfile: (profileId: string) => void;
+  onToggleCastilianAnchor: (profileId: string, value: boolean) => void;
   onToast: (msg: string) => void;
   voicePreview: VoicePreviewState;
   samplePlayer: SamplePlayerState;
@@ -44,6 +45,7 @@ interface Props {
 export function VoicesUnifiedTab({
   t, settings, draft, profiles, dragOver, setDragOver,
   onSaveProfile, onUseProfile, onEditProfile, onDeleteProfile,
+  onToggleCastilianAnchor,
   onToast, voicePreview, samplePlayer,
 }: Props) {
   const [showCompare, setShowCompare] = useState(false);
@@ -105,6 +107,7 @@ export function VoicesUnifiedTab({
           onUse={onUseProfile}
           onEdit={onEditProfile}
           onDelete={onDeleteProfile}
+          onToggleCastilianAnchor={onToggleCastilianAnchor}
           onNew={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           samplePlayer={samplePlayer}
           voicePreview={voicePreview}

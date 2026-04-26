@@ -137,6 +137,8 @@ export const en: Record<TranslationKey, string> = {
   expCastilianReferenceMissing: "No reference voice configured. Drop a .wav into data/voices/reference/ to enable.",
   expSaveReferenceAsProfile: "Save Castilian voice as profile",
   expSaveReferenceAsProfileTitle: "Save Castilian voice as profile",
+  profileCastilianAnchor: "Anchor Castilian accent",
+  profileCastilianAnchorHint: "Prepend the configured Castilian reference voice to this profile's sample before each synthesis. Useful for non-Castilian voices you want to sound Castilian.",
   expCandidatesLabel: "Takes",
   expCandidatesHint: "Generate multiple takes and pick the best one. Useful when accent or pronunciation varies between attempts.",
   expCandidatesReady: "{n} takes ready",

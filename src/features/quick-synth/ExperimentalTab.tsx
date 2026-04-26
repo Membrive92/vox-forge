@@ -208,6 +208,12 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
         pitch: 0,
         volume: 80,
         sampleFile: fileToSave,
+        // When saving the Castilian reference itself as a profile, the
+        // anchor flag is redundant (the sample IS Castilian already), so
+        // off. When saving a user-provided sample, off too — they can
+        // toggle it from the profile card later if they want every
+        // synthesis to be anchored.
+        castilianAnchor: false,
       });
       onToast(t.expSavedAsProfile.replace("{name}", name.trim()));
       setSaveProfileMode(null);

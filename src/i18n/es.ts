@@ -135,6 +135,8 @@ export const es = {
   expCastilianReferenceMissing: "No hay voz de referencia configurada. Coloca un .wav en data/voices/reference/ para activarlo.",
   expSaveReferenceAsProfile: "Guardar voz castellana como perfil",
   expSaveReferenceAsProfileTitle: "Guardar voz castellana como perfil",
+  profileCastilianAnchor: "Anclar acento castellano",
+  profileCastilianAnchorHint: "Antepone la voz castellana de referencia al sample antes de cada síntesis. Útil para voces no-castellanas que quieres que suenen castellanas.",
   expCandidatesLabel: "Versiones",
   expCandidatesHint: "Genera varias versiones y elige la que mejor suene. Útil cuando el acento o pronunciación varía entre intentos.",
   expCandidatesReady: "{n} versiones generadas",

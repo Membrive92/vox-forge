@@ -1249,6 +1249,11 @@ export interface components {
              * @default 80
              */
             volume: number;
+            /**
+             * Castilian Anchor
+             * @default false
+             */
+            castilian_anchor: boolean;
             /** Sample */
             sample?: string | null;
         };
@@ -1756,6 +1761,8 @@ export interface components {
             pitch?: number | null;
             /** Volume */
             volume?: number | null;
+            /** Castilian Anchor */
+            castilian_anchor?: boolean | null;
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -2200,6 +2207,11 @@ export interface components {
             sample_duration?: number | null;
             /** Extra Samples */
             extra_samples?: string[];
+            /**
+             * Castilian Anchor
+             * @default false
+             */
+            castilian_anchor: boolean;
             /** Created At */
             created_at?: string;
             /** Updated At */

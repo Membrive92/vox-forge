@@ -3005,6 +3005,11 @@
             "title": "Volume",
             "default": 80
           },
+          "castilian_anchor": {
+            "type": "boolean",
+            "title": "Castilian Anchor",
+            "default": false
+          },
           "sample": {
             "anyOf": [
               {
@@ -4086,6 +4091,17 @@
               }
             ],
             "title": "Volume"
+          },
+          "castilian_anchor": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Castilian Anchor"
           }
         },
         "type": "object",
@@ -5165,6 +5181,11 @@
             },
             "type": "array",
             "title": "Extra Samples"
+          },
+          "castilian_anchor": {
+            "type": "boolean",
+            "title": "Castilian Anchor",
+            "default": false
           },
           "created_at": {
             "type": "string",
