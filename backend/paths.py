@@ -7,6 +7,7 @@ from .config import settings
 
 DATA_DIR: Path = settings.base_dir / settings.data_subdir
 VOICES_DIR: Path = DATA_DIR / "voices"
+REFERENCE_VOICES_DIR: Path = VOICES_DIR / "reference"
 PROFILES_DIR: Path = DATA_DIR / "profiles"
 OUTPUT_DIR: Path = DATA_DIR / "output"
 TEMP_DIR: Path = DATA_DIR / "temp"
@@ -23,8 +24,8 @@ PROFILES_FILE: Path = PROFILES_DIR / "profiles.json"
 def ensure_dirs() -> None:
     """Create data directories if they don't exist."""
     for d in (
-        VOICES_DIR, PROFILES_DIR, OUTPUT_DIR, TEMP_DIR, AMBIENCE_DIR,
-        STUDIO_DIR, STUDIO_SUBS_DIR, STUDIO_VIDEOS_DIR, STUDIO_COVERS_DIR,
+        VOICES_DIR, REFERENCE_VOICES_DIR, PROFILES_DIR, OUTPUT_DIR, TEMP_DIR,
+        AMBIENCE_DIR, STUDIO_DIR, STUDIO_SUBS_DIR, STUDIO_VIDEOS_DIR, STUDIO_COVERS_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
 

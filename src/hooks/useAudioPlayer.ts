@@ -8,6 +8,7 @@ export interface AudioPlayerState {
   playbackRate: number;
   isPlaying: boolean;
   load: (blob: Blob, duration: number) => void;
+  unload: () => void;
   toggle: () => void;
   stop: () => void;
   seek: (time: number) => void;
@@ -71,6 +72,17 @@ export function useAudioPlayer(): AudioPlayerState {
     setIsPlaying(false);
   }, []);
 
+  const unload = useCallback(() => {
+    if (currentUrlRef.current) {
+      URL.revokeObjectURL(currentUrlRef.current);
+      currentUrlRef.current = null;
+    }
+    setUrl(null);
+    setDuration(0);
+    setCurrentTime(0);
+    setIsPlaying(false);
+  }, []);
+
   const toggle = useCallback(() => {
     const el = audioRef.current;
     if (!el || !url) return;
@@ -108,6 +120,6 @@ export function useAudioPlayer(): AudioPlayerState {
 
   return {
     audioRef, url, duration, currentTime, playbackRate, isPlaying,
-    load, toggle, stop, seek, skip, setRate, setIsPlaying,
+    load, unload, toggle, stop, seek, skip, setRate, setIsPlaying,
   };
 }

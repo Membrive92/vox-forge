@@ -112,4 +112,87 @@ export const handlers = [
       headers: { "Content-Type": "audio/wav" },
     });
   }),
+
+  // Experimental cross-lingual — captures the speed param for assertions
+  http.post("/api/experimental/cross-lingual", async ({ request }) => {
+    const fd = await request.formData();
+    lastExperimentalCall = {
+      text: fd.get("text") as string,
+      language: fd.get("language") as string,
+      output_format: fd.get("output_format") as string,
+      speed: fd.get("speed") ? Number(fd.get("speed")) : null,
+      hasVoiceSample: fd.get("voice_sample") !== null,
+      castilianWarmup: fd.get("castilian_warmup") === "true",
+      useCastilianReference: fd.get("use_castilian_reference") === "true",
+    };
+    const fakeAudio = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
+    return new HttpResponse(fakeAudio, {
+      headers: {
+        "Content-Type": "audio/mp3",
+        "X-Audio-Duration": "1.5",
+      },
+    });
+  }),
+
+  // Multi-take candidates endpoint
+  http.post("/api/experimental/cross-lingual/candidates", async ({ request }) => {
+    const fd = await request.formData();
+    const count = Number(fd.get("candidates") ?? 1);
+    lastCandidatesCall = {
+      text: fd.get("text") as string,
+      candidates: count,
+      castilianWarmup: fd.get("castilian_warmup") === "true",
+      useCastilianReference: fd.get("use_castilian_reference") === "true",
+    };
+    return HttpResponse.json({
+      candidates: Array.from({ length: count }, (_, i) => ({
+        id: `take_${i}`,
+        path: `/fake/output/take_${i}.mp3`,
+        duration_s: 1.5,
+      })),
+      count,
+      language: (fd.get("language") as string) ?? "es",
+      castilian_warmup: fd.get("castilian_warmup") === "true",
+      castilian_reference: fd.get("use_castilian_reference") === "true",
+    });
+  }),
+
+  // Reference voice status
+  http.get("/api/experimental/reference-voice", () =>
+    HttpResponse.json({ configured: false }),
+  ),
 ];
+
+// ── Test helpers — inspect what the frontend sent ──────────────────
+export interface ExperimentalCall {
+  text: string;
+  language: string;
+  output_format: string;
+  speed: number | null;
+  hasVoiceSample: boolean;
+  castilianWarmup: boolean;
+  useCastilianReference: boolean;
+}
+
+export interface CandidatesCall {
+  text: string;
+  candidates: number;
+  castilianWarmup: boolean;
+  useCastilianReference: boolean;
+}
+
+let lastExperimentalCall: ExperimentalCall | null = null;
+let lastCandidatesCall: CandidatesCall | null = null;
+
+export function getLastExperimentalCall(): ExperimentalCall | null {
+  return lastExperimentalCall;
+}
+
+export function getLastCandidatesCall(): CandidatesCall | null {
+  return lastCandidatesCall;
+}
+
+export function resetExperimentalCalls(): void {
+  lastExperimentalCall = null;
+  lastCandidatesCall = null;
+}

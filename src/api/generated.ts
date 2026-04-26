@@ -354,8 +354,63 @@ export interface paths {
         /**
          * Cross-lingual voice cloning (experimental)
          * @description Synthesize text in one language using a voice sample from another.
+         *
+         *     Optional flags:
+         *       - ``castilian_warmup`` (B): prepend a Castilian-only phrase + silence
+         *         before synthesis, then trim it from the result. Helps anchor the
+         *         accent toward Castilian when ``language="es"``.
+         *       - ``use_castilian_reference`` (D1): replace the user's voice_sample
+         *         with the operator-configured reference voice in
+         *         ``data/voices/reference/``. Sacrifices timbre for guaranteed
+         *         Castilian accent. Returns 400 if no reference is configured.
          */
         post: operations["cross_lingual_synthesis_api_experimental_cross_lingual_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experimental/cross-lingual/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cross-lingual with N takes
+         * @description Generate N independent takes (C). Each take is saved under
+         *     OUTPUT_DIR and a JSON manifest is returned. The frontend serves
+         *     each take via the existing /studio/audio endpoint.
+         *
+         *     XTTS v2 is non-deterministic � each take comes out slightly
+         *     different. With cross-lingual, this means you can pick the take
+         *     with the best accent or fewest artefacts.
+         */
+        post: operations["cross_lingual_candidates_api_experimental_cross_lingual_candidates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experimental/reference-voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check if a Castilian reference voice is configured
+         * @description Tell the frontend whether the D1 toggle should be available.
+         */
+        get: operations["reference_voice_status_api_experimental_reference_voice_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1173,6 +1228,46 @@ export interface components {
             /** Sample */
             sample?: string | null;
         };
+        /** Body_cross_lingual_candidates_api_experimental_cross_lingual_candidates_post */
+        Body_cross_lingual_candidates_api_experimental_cross_lingual_candidates_post: {
+            /** Text */
+            text: string;
+            /**
+             * Voice Sample
+             * Format: binary
+             */
+            voice_sample: string;
+            /**
+             * Language
+             * @default es
+             */
+            language: string;
+            /**
+             * Output Format
+             * @default mp3
+             */
+            output_format: string;
+            /**
+             * Speed
+             * @default 100
+             */
+            speed: number;
+            /**
+             * Castilian Warmup
+             * @default false
+             */
+            castilian_warmup: boolean;
+            /**
+             * Use Castilian Reference
+             * @default false
+             */
+            use_castilian_reference: boolean;
+            /**
+             * Candidates
+             * @default 3
+             */
+            candidates: number;
+        };
         /** Body_cross_lingual_synthesis_api_experimental_cross_lingual_post */
         Body_cross_lingual_synthesis_api_experimental_cross_lingual_post: {
             /** Text */
@@ -1192,6 +1287,21 @@ export interface components {
              * @default mp3
              */
             output_format: string;
+            /**
+             * Speed
+             * @default 100
+             */
+            speed: number;
+            /**
+             * Castilian Warmup
+             * @default false
+             */
+            castilian_warmup: boolean;
+            /**
+             * Use Castilian Reference
+             * @default false
+             */
+            use_castilian_reference: boolean;
         };
         /** Body_mix_chapter_api_ambience_mix_chapter__chapter_id__post */
         Body_mix_chapter_api_ambience_mix_chapter__chapter_id__post: {
@@ -2691,6 +2801,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cross_lingual_candidates_api_experimental_cross_lingual_candidates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_cross_lingual_candidates_api_experimental_cross_lingual_candidates_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reference_voice_status_api_experimental_reference_voice_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

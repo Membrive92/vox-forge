@@ -15,6 +15,7 @@ import { useState } from "react";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
+import type { CreateProfileInput } from "@/api/profiles";
 import type { SynthSettings } from "../state";
 
 import { ExperimentalTab } from "./ExperimentalTab";
@@ -28,9 +29,10 @@ interface Props {
   setText: (v: string) => void;
   settings: SynthSettings;
   onToast: (msg: string) => void;
+  onCreateProfile?: (input: CreateProfileInput) => Promise<unknown>;
 }
 
-export function QuickSynthTab({ t, text, setText, settings, onToast }: Props) {
+export function QuickSynthTab({ t, text, setText, settings, onToast, onCreateProfile }: Props) {
   const [mode, setMode] = useState<Mode>("standard");
 
   return (
@@ -73,7 +75,11 @@ export function QuickSynthTab({ t, text, setText, settings, onToast }: Props) {
           onToast={onToast}
         />
       ) : (
-        <ExperimentalTab t={t} onToast={onToast} />
+        <ExperimentalTab
+          t={t}
+          onToast={onToast}
+          {...(onCreateProfile && { onCreateProfile })}
+        />
       )}
     </div>
   );

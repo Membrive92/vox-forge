@@ -254,6 +254,7 @@ class CloneEngine:
         temperature: float = 0.3,
         top_p: float = 0.7,
         repetition_penalty: float = 10.0,
+        speed: float = 1.0,
     ) -> None:
         """Direct XTTS v2 synthesis for experimental use.
 
@@ -267,18 +268,28 @@ class CloneEngine:
         self.load_model()
         assert self._model is not None  # noqa: S101
 
+        # Only forward ``speed`` when the user actually wants to deviate from
+        # the model's natural rate. Passing speed=1.0 takes a different
+        # internal code path in XTTS v2 that has been observed to nudge the
+        # Spanish output toward a Latin American accent — when the user
+        # supplied a non-Spanish speaker_wav, the cleanest restoration of the
+        # original "neutral / Castilian-leaning" behavior is to omit the kwarg
+        # entirely whenever it would be a no-op.
+        kwargs: dict = {
+            "text": text,
+            "speaker_wav": speaker_wav,
+            "language": language,
+            "file_path": str(output_path),
+            "temperature": temperature,
+            "top_p": top_p,
+            "repetition_penalty": repetition_penalty,
+        }
+        if abs(speed - 1.0) > 1e-6:
+            kwargs["speed"] = speed
+
         async with _gpu_semaphore:
             await asyncio.wait_for(
-                asyncio.to_thread(
-                    self._model.tts_to_file,
-                    text=text,
-                    speaker_wav=speaker_wav,
-                    language=language,
-                    file_path=str(output_path),
-                    temperature=temperature,
-                    top_p=top_p,
-                    repetition_penalty=repetition_penalty,
-                ),
+                asyncio.to_thread(self._model.tts_to_file, **kwargs),
                 timeout=_CHUNK_TIMEOUT_SECONDS,
             )
 

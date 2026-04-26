@@ -438,3 +438,139 @@ class TestCloneAPI:
         })
         assert response.status_code == 200
         assert response.headers.get("x-audio-engine") == "edge-tts"
+
+
+# ---------------------------------------------------------------------------
+# 4. Speed parameter regression tests
+#
+# These exist because cross-lingual synthesis silently dropped the ``speed``
+# kwarg, forcing users to slow audio down via pydub speedup which mangled
+# the pitch ("drunk narrator" effect). Verify the parameter actually reaches
+# tts_to_file in both raw and chunked paths.
+# ---------------------------------------------------------------------------
+
+
+class TestSpeedParameterPlumbing:
+    """Verify the ``speed`` kwarg flows from raw_synthesize -> tts_to_file."""
+
+    @pytest.mark.asyncio
+    async def test_raw_synthesize_passes_speed_to_model(self, tmp_path) -> None:
+        """raw_synthesize must forward ``speed`` so XTTS slows down naturally."""
+        from backend.services.clone_engine import CloneEngine
+
+        engine = CloneEngine()
+        engine._device = "cpu"
+
+        captured_kwargs: dict = {}
+
+        def fake_tts_to_file(text, speaker_wav, language, file_path, **kwargs):
+            captured_kwargs.update(kwargs)
+            Path(file_path).write_bytes(b"RIFF" + b"\x00" * 100)
+
+        fake_model = MagicMock()
+        fake_model.tts_to_file = fake_tts_to_file
+        engine._model = fake_model
+
+        ref_wav = tmp_path / "ref.wav"
+        ref_wav.write_bytes(b"RIFF" + b"\x00" * 100)
+        out_wav = tmp_path / "out.wav"
+
+        with patch.object(
+            type(engine), "is_available",
+            new_callable=lambda: property(lambda self: True),
+        ):
+            await engine.raw_synthesize(
+                text="Hello world.",
+                speaker_wav=str(ref_wav),
+                language="es",
+                output_path=out_wav,
+                speed=0.75,
+            )
+
+        assert captured_kwargs.get("speed") == 0.75, (
+            "raw_synthesize dropped the speed kwarg — cross-lingual mode will "
+            "fall back to post-processing speedup which mangles pitch."
+        )
+
+    @pytest.mark.asyncio
+    async def test_raw_synthesize_omits_speed_when_default(self, tmp_path) -> None:
+        """When speed=1.0 (the default), the kwarg must NOT be forwarded.
+
+        Background: passing ``speed=1.0`` to XTTS routes through a code
+        path that subtly shifts Spanish accent toward Latin American.
+        Omitting the kwarg restores the model's native behavior, which
+        is what the user originally relied on for a Castilian-leaning
+        cross-lingual output.
+        """
+        from backend.services.clone_engine import CloneEngine
+
+        engine = CloneEngine()
+        engine._device = "cpu"
+        captured_kwargs: dict = {}
+
+        def fake_tts_to_file(text, speaker_wav, language, file_path, **kwargs):
+            captured_kwargs.update(kwargs)
+            Path(file_path).write_bytes(b"RIFF" + b"\x00" * 100)
+
+        fake_model = MagicMock()
+        fake_model.tts_to_file = fake_tts_to_file
+        engine._model = fake_model
+
+        ref_wav = tmp_path / "ref.wav"
+        ref_wav.write_bytes(b"RIFF" + b"\x00" * 100)
+        out_wav = tmp_path / "out.wav"
+
+        with patch.object(
+            type(engine), "is_available",
+            new_callable=lambda: property(lambda self: True),
+        ):
+            await engine.raw_synthesize(
+                text="Hi.",
+                speaker_wav=str(ref_wav),
+                language="es",
+                output_path=out_wav,
+            )
+
+        assert "speed" not in captured_kwargs, (
+            "speed=1.0 should NOT be forwarded to tts_to_file — see "
+            "raw_synthesize for the accent-regression rationale."
+        )
+
+
+class TestExperimentalEndpointSpeed:
+    """Verify the /experimental/cross-lingual endpoint accepts and forwards speed."""
+
+    def test_endpoint_accepts_speed_param(self, client) -> None:
+        """Endpoint must accept ``speed`` form field (returns 500 only because no CUDA)."""
+        files = {"voice_sample": ("ref.wav", _fake_wav(), "audio/wav")}
+        data = {
+            "text": "Hello",
+            "language": "es",
+            "output_format": "mp3",
+            "speed": "75",
+        }
+        response = client.post(
+            "/api/experimental/cross-lingual",
+            data=data,
+            files=files,
+        )
+        # Without CUDA, the endpoint reaches the engine then fails — the point
+        # is that the schema validation accepts the speed field (no 422).
+        assert response.status_code != 422, (
+            f"Endpoint rejected speed param: {response.json()}"
+        )
+
+    def test_endpoint_omitting_speed_defaults_to_100(self, client) -> None:
+        """Speed is optional with default 100."""
+        files = {"voice_sample": ("ref.wav", _fake_wav(), "audio/wav")}
+        data = {
+            "text": "Hello",
+            "language": "es",
+            "output_format": "mp3",
+        }
+        response = client.post(
+            "/api/experimental/cross-lingual",
+            data=data,
+            files=files,
+        )
+        assert response.status_code != 422

@@ -140,6 +140,10 @@ export default function App() {
     setVolume(p.volume);
     setSelectedVoice(p.voiceId);
     setTab("voices");
+    // Scroll to editing section (upload card at top of voices section)
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 0);
   };
 
   const handleDeleteProfile = async (id: string): Promise<void> => {
@@ -172,7 +176,7 @@ export default function App() {
       <main className="vf-main-narrow" style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
         {visitedTabs.has("quick-synth") && (
           <TabHost active={tab === "quick-synth"}>
-            <QuickSynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} />
+            <QuickSynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} onCreateProfile={create} />
           </TabHost>
         )}
         {visitedTabs.has("workbench") && (

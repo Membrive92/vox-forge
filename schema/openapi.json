@@ -748,7 +748,7 @@
           "experimental"
         ],
         "summary": "Cross-lingual voice cloning (experimental)",
-        "description": "Synthesize text in one language using a voice sample from another.",
+        "description": "Synthesize text in one language using a voice sample from another.\n\nOptional flags:\n  - ``castilian_warmup`` (B): prepend a Castilian-only phrase + silence\n    before synthesis, then trim it from the result. Helps anchor the\n    accent toward Castilian when ``language=\"es\"``.\n  - ``use_castilian_reference`` (D1): replace the user's voice_sample\n    with the operator-configured reference voice in\n    ``data/voices/reference/``. Sacrifices timbre for guaranteed\n    Castilian accent. Returns 400 if no reference is configured.",
         "operationId": "cross_lingual_synthesis_api_experimental_cross_lingual_post",
         "requestBody": {
           "content": {
@@ -775,6 +775,74 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experimental/cross-lingual/candidates": {
+      "post": {
+        "tags": [
+          "experimental"
+        ],
+        "summary": "Cross-lingual with N takes",
+        "description": "Generate N independent takes (C). Each take is saved under\nOUTPUT_DIR and a JSON manifest is returned. The frontend serves\neach take via the existing /studio/audio endpoint.\n\nXTTS v2 is non-deterministic — each take comes out slightly\ndifferent. With cross-lingual, this means you can pick the take\nwith the best accent or fewest artefacts.",
+        "operationId": "cross_lingual_candidates_api_experimental_cross_lingual_candidates_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_cross_lingual_candidates_api_experimental_cross_lingual_candidates_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Cross Lingual Candidates Api Experimental Cross Lingual Candidates Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experimental/reference-voice": {
+      "get": {
+        "tags": [
+          "experimental"
+        ],
+        "summary": "Check if a Castilian reference voice is configured",
+        "description": "Tell the frontend whether the D1 toggle should be available.",
+        "operationId": "reference_voice_status_api_experimental_reference_voice_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Reference Voice Status Api Experimental Reference Voice Get"
                 }
               }
             }
@@ -2937,6 +3005,55 @@
         ],
         "title": "Body_create_profile_api_profiles_post"
       },
+      "Body_cross_lingual_candidates_api_experimental_cross_lingual_candidates_post": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "voice_sample": {
+            "type": "string",
+            "format": "binary",
+            "title": "Voice Sample"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "es"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format",
+            "default": "mp3"
+          },
+          "speed": {
+            "type": "integer",
+            "title": "Speed",
+            "default": 100
+          },
+          "castilian_warmup": {
+            "type": "boolean",
+            "title": "Castilian Warmup",
+            "default": false
+          },
+          "use_castilian_reference": {
+            "type": "boolean",
+            "title": "Use Castilian Reference",
+            "default": false
+          },
+          "candidates": {
+            "type": "integer",
+            "title": "Candidates",
+            "default": 3
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "voice_sample"
+        ],
+        "title": "Body_cross_lingual_candidates_api_experimental_cross_lingual_candidates_post"
+      },
       "Body_cross_lingual_synthesis_api_experimental_cross_lingual_post": {
         "properties": {
           "text": {
@@ -2957,6 +3074,21 @@
             "type": "string",
             "title": "Output Format",
             "default": "mp3"
+          },
+          "speed": {
+            "type": "integer",
+            "title": "Speed",
+            "default": 100
+          },
+          "castilian_warmup": {
+            "type": "boolean",
+            "title": "Castilian Warmup",
+            "default": false
+          },
+          "use_castilian_reference": {
+            "type": "boolean",
+            "title": "Use Castilian Reference",
+            "default": false
           }
         },
         "type": "object",
