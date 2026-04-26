@@ -5,6 +5,7 @@ import {
   type CandidateTake,
   crossLingualCandidates,
   crossLingualSynthesize,
+  fetchReferenceVoiceAudio,
   getReferenceVoiceStatus,
   type ReferenceVoiceStatus,
 } from "@/api/experimental";
@@ -42,7 +43,10 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
     configured: false,
   });
   const [isGenerating, setIsGenerating] = useState(false);
-  const [saveProfileOpen, setSaveProfileOpen] = useState(false);
+  // Two save flows share the PromptDialog: "sample" saves the user's
+  // uploaded/recorded voice, "reference" saves the operator-configured
+  // Castilian reference voice as a normal profile.
+  const [saveProfileMode, setSaveProfileMode] = useState<"sample" | "reference" | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const sampleInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -179,20 +183,34 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
 
   // Save the experimental sample as a reusable profile.
   const handleSaveAsProfile = async (name: string): Promise<void> => {
-    if (!sampleFile || !name.trim()) return;
+    const mode = saveProfileMode;
+    if (!mode || !name.trim()) return;
     setSavingProfile(true);
     try {
+      let fileToSave: File | null = null;
+      if (mode === "sample") {
+        if (!sampleFile) return;
+        fileToSave = sampleFile;
+      } else {
+        // mode === "reference": pull the reference voice from the backend
+        // and wrap it in a File so the standard create-profile flow works.
+        const { blob, filename } = await fetchReferenceVoiceAudio();
+        fileToSave = new File([blob], filename, {
+          type: blob.type || "audio/mpeg",
+        });
+      }
+      if (!fileToSave) return;
       await createProfile({
         name: name.trim(),
         voiceId: "",
-        language: language as Language,
+        language: "es" as Language, // reference is Castilian; sample inherits user's selection
         speed: 100,
         pitch: 0,
         volume: 80,
-        sampleFile,
+        sampleFile: fileToSave,
       });
       onToast(t.expSavedAsProfile.replace("{name}", name.trim()));
-      setSaveProfileOpen(false);
+      setSaveProfileMode(null);
     } catch (e) {
       onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
@@ -393,7 +411,7 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setSaveProfileOpen(true)}
+                onClick={() => setSaveProfileMode("sample")}
               >
                 {t.expSaveAsProfile}
               </Button>
@@ -461,6 +479,20 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
                   : t.expCastilianReferenceMissing
               }
             />
+
+            {/* Save the reference voice as a normal profile so it's
+                usable from any tab (Workbench, Voices, etc). */}
+            {referenceStatus.configured && (
+              <div style={{ paddingLeft: 24 }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSaveProfileMode("reference")}
+                >
+                  {t.expSaveReferenceAsProfile}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -542,14 +574,18 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
       </div>
 
       <PromptDialog
-        open={saveProfileOpen}
-        title={t.expSaveAsProfileTitle}
+        open={saveProfileMode !== null}
+        title={
+          saveProfileMode === "reference"
+            ? t.expSaveReferenceAsProfileTitle
+            : t.expSaveAsProfileTitle
+        }
         label={t.profileName}
         confirmText={savingProfile ? t.generating : t.saveProfile}
         cancelText={t.cancel}
         initialValue=""
         onConfirm={(name) => void handleSaveAsProfile(name)}
-        onCancel={() => setSaveProfileOpen(false)}
+        onCancel={() => setSaveProfileMode(null)}
       />
     </div>
   );

@@ -826,6 +826,26 @@
         }
       }
     },
+    "/api/experimental/reference-voice/audio": {
+      "get": {
+        "tags": [
+          "experimental"
+        ],
+        "summary": "Serve the configured reference voice file",
+        "description": "Stream the operator-configured Castilian reference voice as audio.\n\nUsed by the frontend's \"Save as profile\" action — it fetches the\nbytes here, wraps them in a File, and posts to /api/profiles to\nregister a normal profile with this audio as its sample.",
+        "operationId": "reference_voice_audio_api_experimental_reference_voice_audio_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/experimental/reference-voice": {
       "get": {
         "tags": [

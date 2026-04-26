@@ -125,6 +125,16 @@ export async function crossLingualCandidates(
   };
 }
 
+/** Fetch the configured reference voice as a Blob (for "save as profile"). */
+export async function fetchReferenceVoiceAudio(): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(`${API_BASE}/experimental/reference-voice/audio`);
+  if (!res.ok) throw new ApiError(res.status, "Reference voice not available");
+  const cd = res.headers.get("content-disposition") ?? "";
+  const match = cd.match(/filename="?([^";]+)"?/);
+  const filename = match?.[1] ?? "reference.mp3";
+  return { blob: await res.blob(), filename };
+}
+
 export function getReferenceVoiceStatus(): Promise<ReferenceVoiceStatus> {
   return getJson<{ configured: boolean; filename?: string; duration_s?: number }>(
     "/experimental/reference-voice",

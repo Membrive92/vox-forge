@@ -329,6 +329,26 @@ async def cross_lingual_candidates(
         user_sample.unlink(missing_ok=True)
 
 
+@router.get("/reference-voice/audio", summary="Serve the configured reference voice file")
+async def reference_voice_audio() -> FileResponse:
+    """Stream the operator-configured Castilian reference voice as audio.
+
+    Used by the frontend's "Save as profile" action — it fetches the
+    bytes here, wraps them in a File, and posts to /api/profiles to
+    register a normal profile with this audio as its sample.
+    """
+    ref = get_reference_voice()
+    if ref is None:
+        raise HTTPException(status_code=404, detail="No reference voice configured")
+    media_type = {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".flac": "audio/flac",
+        ".ogg": "audio/ogg",
+    }.get(ref.suffix.lower(), "application/octet-stream")
+    return FileResponse(path=str(ref), media_type=media_type, filename=ref.name)
+
+
 @router.get("/reference-voice", summary="Check if a Castilian reference voice is configured")
 async def reference_voice_status() -> dict:
     """Tell the frontend whether the D1 toggle should be available."""

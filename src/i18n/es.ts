@@ -133,6 +133,8 @@ export const es = {
   expCastilianReference: "Usar voz castellana de referencia",
   expCastilianReferenceHint: "Sustituye la muestra subida por «{file}». Garantiza acento castellano pero sacrifica el timbre de la voz original.",
   expCastilianReferenceMissing: "No hay voz de referencia configurada. Coloca un .wav en data/voices/reference/ para activarlo.",
+  expSaveReferenceAsProfile: "Guardar voz castellana como perfil",
+  expSaveReferenceAsProfileTitle: "Guardar voz castellana como perfil",
   expCandidatesLabel: "Versiones",
   expCandidatesHint: "Genera varias versiones y elige la que mejor suene. Útil cuando el acento o pronunciación varía entre intentos.",
   expCandidatesReady: "{n} versiones generadas",

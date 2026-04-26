@@ -397,6 +397,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/experimental/reference-voice/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Serve the configured reference voice file
+         * @description Stream the operator-configured Castilian reference voice as audio.
+         *
+         *     Used by the frontend's "Save as profile" action � it fetches the
+         *     bytes here, wraps them in a File, and posts to /api/profiles to
+         *     register a normal profile with this audio as its sample.
+         */
+        get: operations["reference_voice_audio_api_experimental_reference_voice_audio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/experimental/reference-voice": {
         parameters: {
             query?: never;
@@ -2836,6 +2860,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reference_voice_audio_api_experimental_reference_voice_audio_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
