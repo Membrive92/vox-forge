@@ -11,10 +11,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resetProfiles } from "./__tests__/mocks/handlers";
+import { resetExperimentalCalls, resetProfiles } from "./__tests__/mocks/handlers";
 import App from "./App";
 
-afterEach(() => resetProfiles());
+afterEach(() => {
+  resetProfiles();
+  resetExperimentalCalls();
+});
 
 function renderApp() {
   const user = userEvent.setup();
@@ -154,6 +157,38 @@ describe("App — profile CRUD", () => {
     await waitFor(() => {
       expect(screen.queryByText("Deletable")).not.toBeInTheDocument();
     });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────
+// Regression suite — covers bugs that previously slipped past tests
+// because they live at component boundaries, not inside one component.
+// ──────────────────────────────────────────────────────────────────
+
+describe("App — regressions: profile edit flow", () => {
+  it("clicking edit on a profile fills the form with its values", async () => {
+    // Bug: Edit button was wired but didn't scroll into view, leaving users
+    // confused that "nothing happened". Verify the form is populated.
+    const { user } = renderApp();
+    await user.click(screen.getByText("Voces"));
+
+    // Create a profile with distinctive values
+    await user.type(screen.getByPlaceholderText(/ej:/i), "Editable Voice");
+    await user.click(screen.getByText("Guardar perfil"));
+    await waitFor(() => expect(screen.getByText("Editable Voice")).toBeInTheDocument());
+
+    // Click the edit (pencil) icon — labelled via aria-label "Editar" (ES)
+    const editBtn = screen.getByLabelText(/^editar$|^edit$/i);
+    await user.click(editBtn);
+
+    // Form should be populated with the profile's name
+    await waitFor(() => {
+      const nameInput = screen.getByPlaceholderText(/ej:/i) as HTMLInputElement;
+      expect(nameInput.value).toBe("Editable Voice");
+    });
+
+    // Save button label should change to "Confirm" (editing mode)
+    expect(screen.getByText(/confirmar|confirm/i)).toBeInTheDocument();
   });
 });
 

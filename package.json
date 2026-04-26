@@ -11,6 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:ui": "playwright test --ui",
     "openapi:export": "python scripts/export_openapi.py",
     "openapi:gen": "openapi-typescript schema/openapi.json -o src/api/generated.ts",
     "openapi": "npm run openapi:export && npm run openapi:gen"
@@ -21,6 +24,7 @@
     "wavesurfer.js": "^7.12.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
