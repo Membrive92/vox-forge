@@ -40,28 +40,16 @@ _CHUNK_TIMEOUT_SECONDS = 180
 # Shared GPU semaphore — only one CUDA inference at a time across all engines.
 _gpu_semaphore = gpu_semaphore
 
-# XTTS v2 generation parameters.
-#
-# History: an earlier configuration used very restrictive sampling
-# (temperature=0.1, top_p=0.4, top_k=20) to minimize hallucinations,
-# but it also pushed the model toward its training-corpus default
-# accent (Latin American Spanish), overriding the speaker_wav's
-# Castilian articulation even when the reference was clean Castilian
-# audio. The experimental endpoint never had this problem because it
-# uses temp=0.3, top_p=0.7 — looser sampling that lets the model stay
-# closer to the speaker.
-#
-# We aligned production with experimental: temp=0.3, top_p=0.7, no
-# top_k clamp. The candidates+retry system in synthesize_chunk still
-# defends us against the rare bad take, so giving up some determinism
-# is a fair trade for keeping the speaker's accent intact.
+# XTTS v2 generation parameters optimized for maximum quality.
+# Trade-off: ~3-5x slower than defaults, but significantly fewer artifacts.
 _XTTS_QUALITY_PARAMS = {
-    # Looser temperature lets the model honor the speaker_wav's accent.
-    # XTTS default is 0.75; 0.3 is still well below that.
-    "temperature": 0.3,
-    # Wider sampling distribution so the model can reproduce phonemes
-    # specific to the speaker (e.g. /θ/ for ⟨c⟩+e/i in Castilian).
-    "top_p": 0.7,
+    # Lower temperature = more deterministic, fewer hallucinations.
+    # Default is 0.75; 0.1 is extremely conservative.
+    "temperature": 0.1,
+    # Very narrow sampling distribution.
+    "top_p": 0.4,
+    # Restrict token choices aggressively.
+    "top_k": 20,
     # High repetition penalty prevents loops and artifacts.
     "repetition_penalty": 10.0,
     # Greedy decoding. Beam search (num_beams>1) causes tensor shape
