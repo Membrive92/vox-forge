@@ -200,20 +200,25 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
         });
       }
       if (!fileToSave) return;
+      // Inherit the user's current intent for the new profile:
+      // - Saving the Castilian reference itself → always anchor on, so
+      //   production synthesis reinforces the Castilian phonemes despite
+      //   the restrictive XTTS sampling.
+      // - Saving your own uploaded sample → mirror whatever the user
+      //   has set for "Anclar acento castellano" in the experimental
+      //   panel. If they've been generating with anchor on, they almost
+      //   certainly want the saved profile to keep doing that.
+      const inheritedAnchor =
+        mode === "reference" ? true : castilianWarmup;
       await createProfile({
         name: name.trim(),
         voiceId: "",
-        language: "es" as Language, // reference is Castilian; sample inherits user's selection
+        language: "es" as Language,
         speed: 100,
         pitch: 0,
         volume: 80,
         sampleFile: fileToSave,
-        // When saving the Castilian reference itself as a profile, the
-        // anchor flag is redundant (the sample IS Castilian already), so
-        // off. When saving a user-provided sample, off too — they can
-        // toggle it from the profile card later if they want every
-        // synthesis to be anchored.
-        castilianAnchor: false,
+        castilianAnchor: inheritedAnchor,
       });
       onToast(t.expSavedAsProfile.replace("{name}", name.trim()));
       setSaveProfileMode(null);

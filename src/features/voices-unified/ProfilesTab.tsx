@@ -284,7 +284,10 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnc
         <input
           type="checkbox"
           checked={profile.castilianAnchor}
-          onChange={(e) => onToggleCastilianAnchor(e.target.checked)}
+          // Toggle from React state (not e.target.checked) so we don't
+          // depend on the DOM being in sync — under hot-reload or race
+          // conditions the DOM can lag the props by one frame.
+          onChange={() => onToggleCastilianAnchor(!profile.castilianAnchor)}
           aria-label={t.profileCastilianAnchor}
           style={{ accentColor: "#f59e0b", cursor: "pointer" }}
         />
