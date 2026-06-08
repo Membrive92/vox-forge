@@ -1183,6 +1183,70 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivityError */
+        ActivityError: {
+            /** Timestamp */
+            timestamp: string;
+            /** Message */
+            message: string;
+            /** Request Id */
+            request_id: string;
+        };
+        /** ActivityGeneration */
+        ActivityGeneration: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /** Engine */
+            engine: string;
+            /** Duration */
+            duration: number;
+            /** Chunks Total */
+            chunks_total: number;
+            /** Chunks Done */
+            chunks_done: number;
+            /** Error */
+            error?: string | null;
+            /** Created At */
+            created_at: string;
+            /** Output Format */
+            output_format: string;
+            /** Chapter Title */
+            chapter_title: string;
+            /** Project Name */
+            project_name: string;
+        };
+        /** ActivityResponse */
+        ActivityResponse: {
+            /** Generations */
+            generations: components["schemas"]["ActivityGeneration"][];
+            disk: components["schemas"]["DiskUsage"];
+            /** Errors */
+            errors: components["schemas"]["ActivityError"][];
+        };
+        /** AmbienceListResponse */
+        AmbienceListResponse: {
+            /** Tracks */
+            tracks: components["schemas"]["AmbienceTrackResponse"][];
+            /** Count */
+            count: number;
+        };
+        /** AmbienceTrackResponse */
+        AmbienceTrackResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Filename */
+            filename: string;
+            /** Duration S */
+            duration_s: number;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Tags */
+            tags: string[];
+        };
         /** Body_analyze_sample_api_analyze_sample_post */
         Body_analyze_sample_api_analyze_sample_post: {
             /**
@@ -1454,6 +1518,28 @@ export interface components {
             /** Profile Id */
             profile_id?: string | null;
         };
+        /** CandidateTake */
+        CandidateTake: {
+            /** Id */
+            id: string;
+            /** Path */
+            path: string;
+            /** Duration S */
+            duration_s: number;
+        };
+        /** CandidatesResponse */
+        CandidatesResponse: {
+            /** Candidates */
+            candidates: components["schemas"]["CandidateTake"][];
+            /** Count */
+            count: number;
+            /** Language */
+            language: string;
+            /** Castilian Warmup */
+            castilian_warmup: boolean;
+            /** Castilian Reference */
+            castilian_reference: boolean;
+        };
         /** CastSynthesisRequest */
         CastSynthesisRequest: {
             /** Text */
@@ -1596,6 +1682,25 @@ export interface components {
             status: string;
             /** Id */
             id: string;
+        };
+        /** DiskUsage */
+        DiskUsage: {
+            /** Total */
+            total: string;
+            /** Total Bytes */
+            total_bytes: number;
+            /** Output */
+            output: string;
+            /** Voices */
+            voices: string;
+            /** Logs */
+            logs: string;
+            /** Temp */
+            temp: string;
+            /** Jobs */
+            jobs: string;
+            /** Database */
+            database: string;
         };
         /** ExtractCharactersRequest */
         ExtractCharactersRequest: {
@@ -2065,6 +2170,33 @@ export interface components {
             end_s: number;
             /** Text */
             text: string;
+        };
+        /** StatsResponse */
+        StatsResponse: {
+            /** Period Hours */
+            period_hours: number;
+            /** Total Requests */
+            total_requests: number;
+            /** Synthesis Count */
+            synthesis_count: number;
+            /** Error Count */
+            error_count: number;
+            /** Warning Count */
+            warning_count: number;
+            /** Avg Request Ms */
+            avg_request_ms: number;
+            /** Slowest Request Ms */
+            slowest_request_ms: number;
+            /** Slowest Request Path */
+            slowest_request_path: string;
+            /** Top Endpoints */
+            top_endpoints: {
+                [key: string]: number;
+            };
+            /** Engines Used */
+            engines_used: {
+                [key: string]: number;
+            };
         };
         /**
          * StudioEditRequest
@@ -3048,9 +3180,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CandidatesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3759,9 +3889,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AmbienceListResponse"];
                 };
             };
         };
@@ -3785,9 +3913,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AmbienceTrackResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3818,9 +3944,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AmbienceTrackResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3851,9 +3975,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DeletedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3983,9 +4105,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ActivityResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4204,9 +4324,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["StatsResponse"];
                 };
             };
             /** @description Validation Error */

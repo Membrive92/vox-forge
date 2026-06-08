@@ -8,16 +8,30 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel
 
 from ..logging_config import APP_JSONL_FILE
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/stats", tags=["stats"])
 
+
+class StatsResponse(BaseModel):
+    period_hours: int
+    total_requests: int
+    synthesis_count: int
+    error_count: int
+    warning_count: int
+    avg_request_ms: float
+    slowest_request_ms: float
+    slowest_request_path: str
+    top_endpoints: dict[str, int]
+    engines_used: dict[str, int]
+
 _TAIL_BYTES = 1024 * 1024  # 1MB for stats scan
 
 
-@router.get("", summary="Usage statistics")
+@router.get("", summary="Usage statistics", response_model=StatsResponse)
 async def get_stats(
     hours: int = Query(default=24, ge=1, le=168),
 ) -> dict:

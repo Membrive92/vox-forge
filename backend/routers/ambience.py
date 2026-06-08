@@ -26,9 +26,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ambience", tags=["ambience"])
 
 
+class AmbienceTrackResponse(BaseModel):
+    id: str
+    name: str
+    filename: str
+    duration_s: float
+    size_bytes: int
+    tags: list[str]
+
+
+class AmbienceListResponse(BaseModel):
+    tracks: list[AmbienceTrackResponse]
+    count: int
+
+
+class DeletedResponse(BaseModel):
+    status: str
+    id: str
+
+
 # ── Library CRUD ─────────────────────────────────────────────────────
 
-@router.get("", summary="List ambient tracks")
+@router.get("", summary="List ambient tracks", response_model=AmbienceListResponse)
 async def list_ambience() -> dict:
     tracks = list_tracks()
     return {
@@ -37,7 +56,7 @@ async def list_ambience() -> dict:
     }
 
 
-@router.post("", summary="Upload an ambient track", status_code=201)
+@router.post("", summary="Upload an ambient track", status_code=201, response_model=AmbienceTrackResponse)
 async def upload_ambience(
     audio: UploadFile = File(...),
     name: str = Form(...),
@@ -56,7 +75,7 @@ async def upload_ambience(
     return track.to_dict()
 
 
-@router.get("/{track_id}", summary="Get ambient track metadata")
+@router.get("/{track_id}", summary="Get ambient track metadata", response_model=AmbienceTrackResponse)
 async def get_ambience(track_id: str) -> dict:
     track = get_track(track_id)
     if track is None:
@@ -64,7 +83,7 @@ async def get_ambience(track_id: str) -> dict:
     return track.to_dict()
 
 
-@router.delete("/{track_id}", summary="Delete an ambient track")
+@router.delete("/{track_id}", summary="Delete an ambient track", response_model=DeletedResponse)
 async def delete_ambience(track_id: str) -> dict:
     if not delete_track(track_id):
         raise HTTPException(404, "Ambient track not found")

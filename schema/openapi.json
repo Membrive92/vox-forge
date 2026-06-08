@@ -806,9 +806,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Cross Lingual Candidates Api Experimental Cross Lingual Candidates Post"
+                  "$ref": "#/components/schemas/CandidatesResponse"
                 }
               }
             }
@@ -1765,9 +1763,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response List Ambience Api Ambience Get"
+                  "$ref": "#/components/schemas/AmbienceListResponse"
                 }
               }
             }
@@ -1796,9 +1792,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Upload Ambience Api Ambience Post"
+                  "$ref": "#/components/schemas/AmbienceTrackResponse"
                 }
               }
             }
@@ -1840,9 +1834,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Ambience Api Ambience  Track Id  Get"
+                  "$ref": "#/components/schemas/AmbienceTrackResponse"
                 }
               }
             }
@@ -1882,9 +1874,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Delete Ambience Api Ambience  Track Id  Delete"
+                  "$ref": "#/components/schemas/DeletedResponse"
                 }
               }
             }
@@ -2061,9 +2051,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Activity Api Activity Get"
+                  "$ref": "#/components/schemas/ActivityResponse"
                 }
               }
             }
@@ -2432,9 +2420,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Stats Api Stats Get"
+                  "$ref": "#/components/schemas/StatsResponse"
                 }
               }
             }
@@ -2871,6 +2857,188 @@
   },
   "components": {
     "schemas": {
+      "ActivityError": {
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp",
+          "message",
+          "request_id"
+        ],
+        "title": "ActivityError"
+      },
+      "ActivityGeneration": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "chunks_total": {
+            "type": "integer",
+            "title": "Chunks Total"
+          },
+          "chunks_done": {
+            "type": "integer",
+            "title": "Chunks Done"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format"
+          },
+          "chapter_title": {
+            "type": "string",
+            "title": "Chapter Title"
+          },
+          "project_name": {
+            "type": "string",
+            "title": "Project Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "engine",
+          "duration",
+          "chunks_total",
+          "chunks_done",
+          "created_at",
+          "output_format",
+          "chapter_title",
+          "project_name"
+        ],
+        "title": "ActivityGeneration"
+      },
+      "ActivityResponse": {
+        "properties": {
+          "generations": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityGeneration"
+            },
+            "type": "array",
+            "title": "Generations"
+          },
+          "disk": {
+            "$ref": "#/components/schemas/DiskUsage"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityError"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generations",
+          "disk",
+          "errors"
+        ],
+        "title": "ActivityResponse"
+      },
+      "AmbienceListResponse": {
+        "properties": {
+          "tracks": {
+            "items": {
+              "$ref": "#/components/schemas/AmbienceTrackResponse"
+            },
+            "type": "array",
+            "title": "Tracks"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracks",
+          "count"
+        ],
+        "title": "AmbienceListResponse"
+      },
+      "AmbienceTrackResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "filename",
+          "duration_s",
+          "size_bytes",
+          "tags"
+        ],
+        "title": "AmbienceTrackResponse"
+      },
       "Body_analyze_sample_api_analyze_sample_post": {
         "properties": {
           "audio": {
@@ -3267,6 +3435,65 @@
           "sample"
         ],
         "title": "Body_upload_voice_sample_api_voices_upload_sample_post"
+      },
+      "CandidateTake": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "duration_s"
+        ],
+        "title": "CandidateTake"
+      },
+      "CandidatesResponse": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateTake"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "castilian_warmup": {
+            "type": "boolean",
+            "title": "Castilian Warmup"
+          },
+          "castilian_reference": {
+            "type": "boolean",
+            "title": "Castilian Reference"
+          }
+        },
+        "type": "object",
+        "required": [
+          "candidates",
+          "count",
+          "language",
+          "castilian_warmup",
+          "castilian_reference"
+        ],
+        "title": "CandidatesResponse"
       },
       "CastSynthesisRequest": {
         "properties": {
@@ -3678,6 +3905,54 @@
           "id"
         ],
         "title": "DeletedResponse"
+      },
+      "DiskUsage": {
+        "properties": {
+          "total": {
+            "type": "string",
+            "title": "Total"
+          },
+          "total_bytes": {
+            "type": "integer",
+            "title": "Total Bytes"
+          },
+          "output": {
+            "type": "string",
+            "title": "Output"
+          },
+          "voices": {
+            "type": "string",
+            "title": "Voices"
+          },
+          "logs": {
+            "type": "string",
+            "title": "Logs"
+          },
+          "temp": {
+            "type": "string",
+            "title": "Temp"
+          },
+          "jobs": {
+            "type": "string",
+            "title": "Jobs"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "total_bytes",
+          "output",
+          "voices",
+          "logs",
+          "temp",
+          "jobs",
+          "database"
+        ],
+        "title": "DiskUsage"
       },
       "ExtractCharactersRequest": {
         "properties": {
@@ -4946,6 +5221,70 @@
         ],
         "title": "SrtEntry",
         "description": "A single line in an SRT subtitle file."
+      },
+      "StatsResponse": {
+        "properties": {
+          "period_hours": {
+            "type": "integer",
+            "title": "Period Hours"
+          },
+          "total_requests": {
+            "type": "integer",
+            "title": "Total Requests"
+          },
+          "synthesis_count": {
+            "type": "integer",
+            "title": "Synthesis Count"
+          },
+          "error_count": {
+            "type": "integer",
+            "title": "Error Count"
+          },
+          "warning_count": {
+            "type": "integer",
+            "title": "Warning Count"
+          },
+          "avg_request_ms": {
+            "type": "number",
+            "title": "Avg Request Ms"
+          },
+          "slowest_request_ms": {
+            "type": "number",
+            "title": "Slowest Request Ms"
+          },
+          "slowest_request_path": {
+            "type": "string",
+            "title": "Slowest Request Path"
+          },
+          "top_endpoints": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Top Endpoints"
+          },
+          "engines_used": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Engines Used"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period_hours",
+          "total_requests",
+          "synthesis_count",
+          "error_count",
+          "warning_count",
+          "avg_request_ms",
+          "slowest_request_ms",
+          "slowest_request_path",
+          "top_endpoints",
+          "engines_used"
+        ],
+        "title": "StatsResponse"
       },
       "StudioEditRequest": {
         "properties": {

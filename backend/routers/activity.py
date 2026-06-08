@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel
 
 from ..database import get_db
 from ..logging_config import APP_JSONL_FILE
@@ -15,6 +16,43 @@ from ..paths import DATA_DIR, OUTPUT_DIR, TEMP_DIR
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/activity", tags=["activity"])
+
+
+class ActivityGeneration(BaseModel):
+    id: str
+    status: str
+    engine: str
+    duration: float
+    chunks_total: int
+    chunks_done: int
+    error: str | None = None
+    created_at: str
+    output_format: str
+    chapter_title: str
+    project_name: str
+
+
+class DiskUsage(BaseModel):
+    total: str
+    total_bytes: int
+    output: str
+    voices: str
+    logs: str
+    temp: str
+    jobs: str
+    database: str
+
+
+class ActivityError(BaseModel):
+    timestamp: str
+    message: str
+    request_id: str
+
+
+class ActivityResponse(BaseModel):
+    generations: list[ActivityGeneration]
+    disk: DiskUsage
+    errors: list[ActivityError]
 
 _ERROR_TRANSLATIONS: dict[str, str] = {
     "synthesis_failed": "Synthesis failed — the audio engine encountered an error",
@@ -27,7 +65,7 @@ _ERROR_TRANSLATIONS: dict[str, str] = {
 _TAIL_BYTES = 256 * 1024
 
 
-@router.get("", summary="User-facing activity feed")
+@router.get("", summary="User-facing activity feed", response_model=ActivityResponse)
 async def get_activity(
     limit: int = Query(default=20, ge=1, le=100),
 ) -> dict:

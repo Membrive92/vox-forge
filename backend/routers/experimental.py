@@ -12,6 +12,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from pydub import AudioSegment
 
 from ..catalogs import AUDIO_FORMATS
@@ -32,6 +33,20 @@ from ..utils import cleanup_old_files
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/experimental", tags=["experimental"])
+
+
+class CandidateTake(BaseModel):
+    id: str
+    path: str
+    duration_s: float
+
+
+class CandidatesResponse(BaseModel):
+    candidates: list[CandidateTake]
+    count: int
+    language: str
+    castilian_warmup: bool
+    castilian_reference: bool
 
 _ALLOWED_LANGUAGES = {"es", "en", "fr", "de", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh", "ja", "hu", "ko"}
 _MAX_CANDIDATES = 3
@@ -262,7 +277,7 @@ async def cross_lingual_synthesis(
             anchored_path.unlink(missing_ok=True)
 
 
-@router.post("/cross-lingual/candidates", summary="Cross-lingual with N takes")
+@router.post("/cross-lingual/candidates", summary="Cross-lingual with N takes", response_model=CandidatesResponse)
 async def cross_lingual_candidates(
     background_tasks: BackgroundTasks,
     text: str = Form(...),
