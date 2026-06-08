@@ -6,13 +6,15 @@ import {
   upsertPronunciation,
 } from "@/api/pronunciation";
 import { Button } from "@/components/Button";
+import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 interface Props {
+  t: Translations;
   onToast: (msg: string) => void;
 }
 
-export function PronunciationTab({ onToast }: Props) {
+export function PronunciationTab({ t, onToast }: Props) {
   const [entries, setEntries] = useState<Record<string, string>>({});
   const [word, setWord] = useState("");
   const [replacement, setReplacement] = useState("");
@@ -23,7 +25,7 @@ export function PronunciationTab({ onToast }: Props) {
       const data = await listPronunciations();
       setEntries(data.entries);
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     }
   };
 
@@ -40,21 +42,21 @@ export function PronunciationTab({ onToast }: Props) {
       setWord("");
       setReplacement("");
       await load();
-      onToast("Saved");
+      onToast(t.pronunciationSavedToast);
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (w: string): Promise<void> => {
-    if (!window.confirm(`Delete "${w}"?`)) return;
+    if (!window.confirm(t.pronunciationDeleteConfirm.replace("{word}", w))) return;
     try {
       await deletePronunciation(w);
       await load();
     } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : "Unknown"}`);
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     }
   };
 
@@ -72,24 +74,22 @@ export function PronunciationTab({ onToast }: Props) {
         margin: "0 auto",
       }}
     >
-      <h3 style={{ margin: "0 0 4px", fontSize: typography.size.lg, fontWeight: 700 }}>Pronunciation dictionary</h3>
+      <h3 style={{ margin: "0 0 4px", fontSize: typography.size.lg, fontWeight: 700 }}>{t.settingsPronunciation}</h3>
       <p style={{ margin: "0 0 20px", fontSize: typography.size.sm, color: colors.textDim }}>
-        Override how specific words are spoken. Useful for fantasy names, acronyms, or loanwords
-        the TTS engine mispronounces. Replacements are applied as whole-word, case-insensitive
-        substitutions before all other normalization.
+        {t.pronunciationDictDesc}
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <input
           value={word}
           onChange={(e) => setWord(e.target.value)}
-          placeholder="Word (e.g. Caelthir)"
+          placeholder={t.pronunciationWordPlaceholder}
           style={inputStyle}
         />
         <input
           value={replacement}
           onChange={(e) => setReplacement(e.target.value)}
-          placeholder="Phonetic spelling (e.g. Quelzir)"
+          placeholder={t.pronunciationReplacementPlaceholder}
           style={inputStyle}
         />
         <Button
@@ -98,14 +98,14 @@ export function PronunciationTab({ onToast }: Props) {
           disabled={!word.trim() || !replacement.trim()}
           onClick={() => void handleAdd()}
         >
-          Add
+          {t.pronunciationAdd}
         </Button>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {sortedEntries.length === 0 ? (
           <p style={{ fontSize: typography.size.sm, color: colors.textDim, textAlign: "center", padding: 20 }}>
-            No entries yet
+            {t.pronunciationEmpty}
           </p>
         ) : (
           sortedEntries.map(([w, r]) => (
@@ -127,7 +127,7 @@ export function PronunciationTab({ onToast }: Props) {
               <span style={{ flex: 1, color: colors.primaryLight }}>{r}</span>
               <button
                 onClick={() => void handleDelete(w)}
-                aria-label={`Delete ${w}`}
+                aria-label={`${t.actionDelete} ${w}`}
                 style={{
                   background: "none",
                   border: "none",

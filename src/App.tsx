@@ -185,7 +185,7 @@ export default function App() {
       <link href={fontsHref} rel="stylesheet" />
 
       <BackgroundTexture />
-      <Toast toasts={toast.toasts} onDismiss={toast.dismiss} />
+      <Toast toasts={toast.toasts} onDismiss={toast.dismiss} dismissLabel={t.toastDismiss} />
 
       <Header
         t={t}

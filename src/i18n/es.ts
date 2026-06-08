@@ -64,6 +64,7 @@ export const es = {
   errSplitText: "No se pudo dividir el texto",
   errUpdateChapter: "No se pudo actualizar el capítulo",
   errDeleteChapter: "No se pudo eliminar el capítulo",
+  toastDismiss: "Descartar notificación",
   sampleLoaded: "Muestra cargada",
   duration: "Duración",
   seconds: "segundos",
@@ -326,6 +327,13 @@ export const es = {
   pronunciationWord: "Palabra original",
   pronunciationReplacement: "Pronunciar como",
   pronunciationSaved: "Regla «{word}» guardada",
+  pronunciationDictDesc: "Define cómo se pronuncian palabras concretas. Útil para nombres de fantasía, siglas o extranjerismos que el TTS pronuncia mal. Se aplican como sustituciones de palabra completa, sin distinguir mayúsculas, antes de cualquier otra normalización.",
+  pronunciationWordPlaceholder: "Palabra (p. ej. Caelthir)",
+  pronunciationReplacementPlaceholder: "Pronunciación (p. ej. Quelzir)",
+  pronunciationAdd: "Añadir",
+  pronunciationEmpty: "Aún no hay entradas",
+  pronunciationSavedToast: "Pronunciación guardada",
+  pronunciationDeleteConfirm: "¿Eliminar «{word}»?",
 
   // Cancellation toasts (shared across tabs)
   synthesisCancelled: "Síntesis cancelada",

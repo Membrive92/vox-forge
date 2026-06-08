@@ -66,6 +66,7 @@ export const en: Record<TranslationKey, string> = {
   errSplitText: "Failed to split text",
   errUpdateChapter: "Failed to update chapter",
   errDeleteChapter: "Failed to delete chapter",
+  toastDismiss: "Dismiss notification",
   sampleLoaded: "Sample loaded",
   duration: "Duration",
   seconds: "seconds",
@@ -328,6 +329,13 @@ export const en: Record<TranslationKey, string> = {
   pronunciationWord: "Original word",
   pronunciationReplacement: "Pronounce as",
   pronunciationSaved: "Rule \"{word}\" saved",
+  pronunciationDictDesc: "Override how specific words are spoken. Useful for fantasy names, acronyms, or loanwords the TTS engine mispronounces. Replacements are applied as whole-word, case-insensitive substitutions before all other normalization.",
+  pronunciationWordPlaceholder: "Word (e.g. Caelthir)",
+  pronunciationReplacementPlaceholder: "Phonetic spelling (e.g. Quelzir)",
+  pronunciationAdd: "Add",
+  pronunciationEmpty: "No entries yet",
+  pronunciationSavedToast: "Pronunciation saved",
+  pronunciationDeleteConfirm: "Delete \"{word}\"?",
 
   // Cancellation toasts (shared across tabs)
   synthesisCancelled: "Synthesis cancelled",

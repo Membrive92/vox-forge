@@ -59,7 +59,7 @@ export function SettingsSection({ t, onToast }: Props) {
           </SubSection>
 
           <SubSection title={t.settingsPronunciation}>
-            <PronunciationTab onToast={onToast} />
+            <PronunciationTab t={t} onToast={onToast} />
           </SubSection>
         </div>
       )}

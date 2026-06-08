@@ -16,9 +16,10 @@ import { Check } from "./icons";
 interface ToastListProps {
   toasts: readonly ToastItem[];
   onDismiss: (id: string) => void;
+  dismissLabel?: string;
 }
 
-export function Toast({ toasts, onDismiss }: ToastListProps) {
+export function Toast({ toasts, onDismiss, dismissLabel = "Dismiss notification" }: ToastListProps) {
   return (
     <div
       role="status"
@@ -36,7 +37,7 @@ export function Toast({ toasts, onDismiss }: ToastListProps) {
       }}
     >
       {toasts.map((t) => (
-        <ToastRow key={t.id} toast={t} onDismiss={() => onDismiss(t.id)} />
+        <ToastRow key={t.id} toast={t} onDismiss={() => onDismiss(t.id)} dismissLabel={dismissLabel} />
       ))}
     </div>
   );
@@ -45,9 +46,10 @@ export function Toast({ toasts, onDismiss }: ToastListProps) {
 interface ToastRowProps {
   toast: ToastItem;
   onDismiss: () => void;
+  dismissLabel: string;
 }
 
-function ToastRow({ toast, onDismiss }: ToastRowProps) {
+function ToastRow({ toast, onDismiss, dismissLabel }: ToastRowProps) {
   const config = TYPE_CONFIG[toast.type];
 
   return (
@@ -86,7 +88,7 @@ function ToastRow({ toast, onDismiss }: ToastRowProps) {
       <span style={{ flex: 1, lineHeight: typography.leading.normal }}>{toast.message}</span>
       <button
         onClick={onDismiss}
-        aria-label="Dismiss notification"
+        aria-label={dismissLabel}
         style={{
           background: "none",
           border: "none",
