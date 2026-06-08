@@ -490,6 +490,40 @@ def test_build_ffmpeg_argv_escapes_title_text(client) -> None:
     assert r"Ep. 1\: Hello" in joined
 
 
+def test_run_command_passes_pipes_as_keyword_args(client, monkeypatch, tmp_path) -> None:
+    """Regression: ``_run_command`` must pass stdout/stderr as keyword
+    args. Forwarding ``subprocess.PIPE`` positionally lands it on Popen's
+    ``executable`` parameter (an int), raising
+    ``TypeError: expected str, bytes or os.PathLike object, not int``.
+    """
+    import asyncio
+    import subprocess as sp
+
+    from backend.services import video_renderer as vr
+
+    captured: dict[str, object] = {}
+
+    class _Result:
+        returncode = 0
+        stderr = b""
+
+    def fake_run(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return _Result()
+
+    monkeypatch.setattr(vr.subprocess, "run", fake_run)
+    monkeypatch.setattr(vr.shutil, "which", lambda _exe: "ffmpeg")
+
+    argv = ["ffmpeg", "-i", "in.wav", "out.mp4"]
+    asyncio.run(vr.VideoRenderer()._run_command(argv, tmp_path / "out.mp4"))
+
+    # argv is the ONLY positional arg; the pipes ride in as keywords.
+    assert captured["args"] == (argv,)
+    assert captured["kwargs"]["stdout"] is sp.PIPE
+    assert captured["kwargs"]["stderr"] is sp.PIPE
+
+
 def test_validate_options_rejects_bad_resolution(client) -> None:
     from backend.exceptions import InvalidSampleError
     from backend.schemas import VideoOptions

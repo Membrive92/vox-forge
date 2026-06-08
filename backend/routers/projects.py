@@ -61,19 +61,90 @@ class SplitRequest(BaseModel):
     delimiter: str = Field(default="heading", pattern="^(heading|separator)$")
 
 
+# Response models — mirror the SQLite rows (see backend/database.py) so the
+# contract lives in one place (Pydantic) and derives to the client via the
+# generated OpenAPI types. Without these the endpoints emit opaque
+# ``{ [key: string]: unknown }`` and a column rename slips past CI.
+
+class ProjectResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    language: str
+    voice_id: str
+    profile_id: Optional[str] = None
+    speed: int
+    pitch: int
+    volume: int
+    output_format: str
+    cover_path: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class ChapterResponse(BaseModel):
+    id: str
+    project_id: str
+    title: str
+    text: str
+    sort_order: int
+    voice_id: Optional[str] = None
+    profile_id: Optional[str] = None
+    active_generation_id: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class GenerationResponse(BaseModel):
+    id: str
+    chapter_id: str
+    voice_id: str
+    profile_id: Optional[str] = None
+    output_format: str
+    speed: int
+    pitch: int
+    volume: int
+    engine: str
+    duration: float
+    file_path: Optional[str] = None
+    chunks_total: int
+    chunks_done: int
+    status: str
+    error: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class TakeResponse(BaseModel):
+    id: str
+    generation_id: str
+    chunk_index: int
+    chunk_text: str
+    file_path: Optional[str] = None
+    duration: float
+    score: float
+    status: str
+    created_at: str
+
+
+class DeletedResponse(BaseModel):
+    status: str
+    id: str
+
+
 # ── Project endpoints ───────────────────────────────────────────────
 
-@router.get("")
+@router.get("", response_model=list[ProjectResponse])
 async def list_projects() -> list[dict[str, Any]]:
     return await pm.list_projects()
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=ProjectResponse)
 async def create_project(body: ProjectCreate) -> dict[str, Any]:
     return await pm.create_project(**body.model_dump())
 
 
-@router.get("/{project_id}")
+@router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(project_id: str) -> dict[str, Any]:
     p = await pm.get_project(project_id)
     if p is None:
@@ -81,7 +152,7 @@ async def get_project(project_id: str) -> dict[str, Any]:
     return p
 
 
-@router.patch("/{project_id}")
+@router.patch("/{project_id}", response_model=ProjectResponse)
 async def update_project(project_id: str, body: ProjectUpdate) -> dict[str, Any]:
     p = await pm.get_project(project_id)
     if p is None:
@@ -89,10 +160,14 @@ async def update_project(project_id: str, body: ProjectUpdate) -> dict[str, Any]
     # ``exclude_unset`` (not ``exclude_none``) so callers can explicitly
     # clear nullable fields like ``profile_id`` by sending null.
     result = await pm.update_project(project_id, **body.model_dump(exclude_unset=True))
-    return result  # type: ignore[return-value]
+    if result is None:
+        # Deleted concurrently between the check and the update (TOCTOU) —
+        # return a clean 404 instead of serializing None.
+        raise HTTPException(404, "Project not found")
+    return result
 
 
-@router.delete("/{project_id}")
+@router.delete("/{project_id}", response_model=DeletedResponse)
 async def delete_project(project_id: str) -> dict[str, str]:
     if not await pm.delete_project(project_id):
         raise HTTPException(404, "Project not found")
@@ -101,12 +176,12 @@ async def delete_project(project_id: str) -> dict[str, str]:
 
 # ── Chapter endpoints ───────────────────────────────────────────────
 
-@router.get("/{project_id}/chapters")
+@router.get("/{project_id}/chapters", response_model=list[ChapterResponse])
 async def list_chapters(project_id: str) -> list[dict[str, Any]]:
     return await pm.list_chapters(project_id)
 
 
-@router.post("/{project_id}/chapters", status_code=201)
+@router.post("/{project_id}/chapters", status_code=201, response_model=ChapterResponse)
 async def create_chapter(project_id: str, body: ChapterCreate) -> dict[str, Any]:
     p = await pm.get_project(project_id)
     if p is None:
@@ -114,7 +189,7 @@ async def create_chapter(project_id: str, body: ChapterCreate) -> dict[str, Any]
     return await pm.create_chapter(project_id, **body.model_dump())
 
 
-@router.patch("/chapters/{chapter_id}")
+@router.patch("/chapters/{chapter_id}", response_model=ChapterResponse)
 async def update_chapter(chapter_id: str, body: ChapterUpdate) -> dict[str, Any]:
     # ``exclude_unset`` so callers can null out ``voice_id`` /
     # ``profile_id`` to revert the chapter to the project's voice.
@@ -124,14 +199,14 @@ async def update_chapter(chapter_id: str, body: ChapterUpdate) -> dict[str, Any]
     return result
 
 
-@router.delete("/chapters/{chapter_id}")
+@router.delete("/chapters/{chapter_id}", response_model=DeletedResponse)
 async def delete_chapter(chapter_id: str) -> dict[str, str]:
     if not await pm.delete_chapter(chapter_id):
         raise HTTPException(404, "Chapter not found")
     return {"status": "deleted", "id": chapter_id}
 
 
-@router.post("/{project_id}/split", status_code=201)
+@router.post("/{project_id}/split", status_code=201, response_model=list[ChapterResponse])
 async def split_into_chapters(project_id: str, body: SplitRequest) -> list[dict[str, Any]]:
     """Split a long text into chapters by headings or `---` separators."""
     p = await pm.get_project(project_id)
@@ -142,11 +217,11 @@ async def split_into_chapters(project_id: str, body: SplitRequest) -> list[dict[
 
 # ── Generation history ──────────────────────────────────────────────
 
-@router.get("/chapters/{chapter_id}/generations")
+@router.get("/chapters/{chapter_id}/generations", response_model=list[GenerationResponse])
 async def list_generations(chapter_id: str) -> list[dict[str, Any]]:
     return await pm.list_generations(chapter_id)
 
 
-@router.get("/generations/{generation_id}/takes")
+@router.get("/generations/{generation_id}/takes", response_model=list[TakeResponse])
 async def list_takes(generation_id: str) -> list[dict[str, Any]]:
     return await pm.list_takes(generation_id)

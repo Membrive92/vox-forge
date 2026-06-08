@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from pydub import AudioSegment
 
-from ..paths import AMBIENCE_DIR, OUTPUT_DIR
+from ..paths import AMBIENCE_DIR, OUTPUT_DIR, is_within_allowed_roots
 from ..services.ambience import (
     AmbienceTrack,
     delete_track,
@@ -108,6 +108,10 @@ async def mix_audio(
     and fades in/out smoothly.
     """
     narration = Path(body.narration_path)
+    # narration_path is fully client-controlled — confine it to our media
+    # roots so ffmpeg can't be pointed at arbitrary files on disk.
+    if not is_within_allowed_roots(narration):
+        raise HTTPException(400, "Narration path is outside allowed directories")
     if not narration.exists():
         raise HTTPException(400, "Narration audio file not found — generate the chapter first")
 

@@ -12,6 +12,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -26,7 +27,7 @@ from ..catalogs import AUDIO_FORMATS
 from ..database import get_db
 from ..dependencies import get_transcriber, get_video_renderer
 from ..exceptions import InvalidSampleError, SampleNotFound, UnsupportedFormatError
-from ..paths import JOBS_DIR, OUTPUT_DIR, STUDIO_COVERS_DIR, STUDIO_DIR
+from ..paths import MEDIA_ROOTS, STUDIO_COVERS_DIR, is_within_allowed_roots
 from ..schemas import (
     CoverUploadResponse,
     GenerateImageRequest,
@@ -56,26 +57,26 @@ _MEDIA_TYPES: dict[str, str] = {
     "ogg": "audio/ogg", "flac": "audio/flac",
 }
 
-_ALLOWED_ROOTS: tuple[Path, ...] = (
-    OUTPUT_DIR.resolve(),
-    STUDIO_DIR.resolve(),
-    JOBS_DIR.resolve(),
-)
-
-
 def _is_within_allowed_roots(target: Path) -> bool:
-    """Return True if ``target`` resolves inside any allowed studio root."""
+    """Return True if ``target`` resolves inside an allowed media root.
+
+    Thin wrapper over the shared ``paths.is_within_allowed_roots`` so the
+    traversal guard lives in one place (used by Studio + ambience).
+    """
+    return is_within_allowed_roots(target, MEDIA_ROOTS)
+
+
+def _probe_duration_s(path: Path) -> float:
+    """Decode ``path`` and return its duration in seconds (0.0 on failure).
+
+    Blocking (pydub/ffmpeg) — call via ``asyncio.to_thread`` from handlers.
+    """
     try:
-        resolved = target.resolve()
-    except (OSError, RuntimeError):
-        return False
-    for root in _ALLOWED_ROOTS:
-        try:
-            resolved.relative_to(root)
-            return True
-        except ValueError:
-            continue
-    return False
+        from pydub import AudioSegment
+
+        return float(len(AudioSegment.from_file(str(path)))) / 1000.0
+    except Exception:  # noqa: BLE001
+        return 0.0
 
 
 @router.get(
@@ -162,15 +163,16 @@ async def edit_audio(request: StudioEditRequest) -> FileResponse:
         raise SampleNotFound("Source audio not found")
 
     ops = [EditOperation(type=op.type, params=dict(op.params)) for op in request.operations]
-    output = apply_operations(source, ops, output_format=request.output_format)
+    # apply_operations decodes + runs ffmpeg/pedalboard/noisereduce — all
+    # blocking. Run it off the event loop so a multi-minute edit doesn't
+    # freeze the whole server (progress polling, other tabs, health).
+    output = await asyncio.to_thread(
+        apply_operations, source, ops, output_format=request.output_format
+    )
 
     # Duration of the resulting audio so the Workbench can show "2.3s"
     # next to each edited version without a second HEAD request.
-    try:
-        from pydub import AudioSegment
-        duration_s = float(len(AudioSegment.from_file(str(output)))) / 1000.0
-    except Exception:  # noqa: BLE001
-        duration_s = 0.0
+    duration_s = await asyncio.to_thread(_probe_duration_s, output)
 
     # Only persist when the caller linked the edit to a chapter — free
     # ad-hoc edits (someone trimming an ambient sample) stay throwaway.

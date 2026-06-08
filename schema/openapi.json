@@ -884,8 +884,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/ProjectResponse"
                   },
                   "type": "array",
                   "title": "Response List Projects Api Projects Get"
@@ -917,9 +916,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Create Project Api Projects Post"
+                  "$ref": "#/components/schemas/ProjectResponse"
                 }
               }
             }
@@ -961,9 +958,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Project Api Projects  Project Id  Get"
+                  "$ref": "#/components/schemas/ProjectResponse"
                 }
               }
             }
@@ -1013,9 +1008,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Update Project Api Projects  Project Id  Patch"
+                  "$ref": "#/components/schemas/ProjectResponse"
                 }
               }
             }
@@ -1055,11 +1048,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Delete Project Api Projects  Project Id  Delete"
+                  "$ref": "#/components/schemas/DeletedResponse"
                 }
               }
             }
@@ -1103,8 +1092,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/ChapterResponse"
                   },
                   "title": "Response List Chapters Api Projects  Project Id  Chapters Get"
                 }
@@ -1156,9 +1144,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Create Chapter Api Projects  Project Id  Chapters Post"
+                  "$ref": "#/components/schemas/ChapterResponse"
                 }
               }
             }
@@ -1210,9 +1196,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Update Chapter Api Projects Chapters  Chapter Id  Patch"
+                  "$ref": "#/components/schemas/ChapterResponse"
                 }
               }
             }
@@ -1252,11 +1236,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Delete Chapter Api Projects Chapters  Chapter Id  Delete"
+                  "$ref": "#/components/schemas/DeletedResponse"
                 }
               }
             }
@@ -1311,8 +1291,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/ChapterResponse"
                   },
                   "title": "Response Split Into Chapters Api Projects  Project Id  Split Post"
                 }
@@ -1358,8 +1337,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/GenerationResponse"
                   },
                   "title": "Response List Generations Api Projects Chapters  Chapter Id  Generations Get"
                 }
@@ -1405,8 +1383,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/TakeResponse"
                   },
                   "title": "Response List Takes Api Projects Generations  Generation Id  Takes Get"
                 }
@@ -1541,9 +1518,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Chunk Map Api Chapters  Chapter Id  Chunks Get"
+                  "$ref": "#/components/schemas/ChunkMapResponse"
                 }
               }
             }
@@ -1596,9 +1571,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Upload Chapter Audio Api Chapters  Chapter Id  Upload Audio Post"
+                  "$ref": "#/components/schemas/UploadedChapterGenerationResponse"
                 }
               }
             }
@@ -1668,9 +1641,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object",
-                "title": "Body"
+                "$ref": "#/components/schemas/ExtractCharactersRequest"
               }
             }
           },
@@ -1682,9 +1653,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Extract Chars Api Character Synth Extract Characters Post"
+                  "$ref": "#/components/schemas/ExtractCharactersResponse"
                 }
               }
             }
@@ -1765,9 +1734,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Analyze Sample Api Analyze Sample Post"
+                  "$ref": "#/components/schemas/SampleAnalysisResponse"
                 }
               }
             }
@@ -3416,6 +3383,82 @@
         "type": "object",
         "title": "ChapterCreate"
       },
+      "ChapterResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          },
+          "voice_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voice Id"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "active_generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Generation Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "title",
+          "text",
+          "sort_order",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ChapterResponse"
+      },
       "ChapterUpdate": {
         "properties": {
           "title": {
@@ -3519,6 +3562,77 @@
         ],
         "title": "CharacterMapping"
       },
+      "ChunkInfo": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "take_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Take Id"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "text",
+          "status",
+          "duration"
+        ],
+        "title": "ChunkInfo"
+      },
+      "ChunkMapResponse": {
+        "properties": {
+          "generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Id"
+          },
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/ChunkInfo"
+            },
+            "type": "array",
+            "title": "Chunks"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chunks",
+          "total"
+        ],
+        "title": "ChunkMapResponse"
+      },
       "CoverUploadResponse": {
         "properties": {
           "filename": {
@@ -3564,6 +3678,36 @@
           "id"
         ],
         "title": "DeletedResponse"
+      },
+      "ExtractCharactersRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "ExtractCharactersRequest"
+      },
+      "ExtractCharactersResponse": {
+        "properties": {
+          "characters": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Characters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "characters"
+        ],
+        "title": "ExtractCharactersResponse"
       },
       "GenerateImageRequest": {
         "properties": {
@@ -3638,6 +3782,117 @@
           "size_kb"
         ],
         "title": "GenerateImageResponse"
+      },
+      "GenerationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "chapter_id": {
+            "type": "string",
+            "title": "Chapter Id"
+          },
+          "voice_id": {
+            "type": "string",
+            "title": "Voice Id"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format"
+          },
+          "speed": {
+            "type": "integer",
+            "title": "Speed"
+          },
+          "pitch": {
+            "type": "integer",
+            "title": "Pitch"
+          },
+          "volume": {
+            "type": "integer",
+            "title": "Volume"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          },
+          "chunks_total": {
+            "type": "integer",
+            "title": "Chunks Total"
+          },
+          "chunks_done": {
+            "type": "integer",
+            "title": "Chunks Done"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "chapter_id",
+          "voice_id",
+          "output_format",
+          "speed",
+          "pitch",
+          "volume",
+          "engine",
+          "duration",
+          "chunks_total",
+          "chunks_done",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "GenerationResponse"
       },
       "HTTPValidationError": {
         "properties": {
@@ -4186,6 +4441,91 @@
         ],
         "title": "ProjectCreate"
       },
+      "ProjectResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "voice_id": {
+            "type": "string",
+            "title": "Voice Id"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "speed": {
+            "type": "integer",
+            "title": "Speed"
+          },
+          "pitch": {
+            "type": "integer",
+            "title": "Pitch"
+          },
+          "volume": {
+            "type": "integer",
+            "title": "Volume"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format"
+          },
+          "cover_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Path"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "language",
+          "voice_id",
+          "speed",
+          "pitch",
+          "volume",
+          "output_format",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProjectResponse"
+      },
       "ProjectUpdate": {
         "properties": {
           "name": {
@@ -4428,6 +4768,74 @@
         ],
         "title": "RenderVideoRequest",
         "description": "Render a Studio source into an MP4.\n\nPass ``cover_path`` alone for a static cover (Phase B.2 behaviour).\nPass ``images`` (list) for a slideshow with one image per scene —\neach image's ``start_s`` anchors it to that moment in the audio,\nand successive images imply the previous one's end. ``cover_path``\nis optional when ``images`` is provided."
+      },
+      "SampleAnalysisResponse": {
+        "properties": {
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          },
+          "sample_rate": {
+            "type": "integer",
+            "title": "Sample Rate"
+          },
+          "channels": {
+            "type": "integer",
+            "title": "Channels"
+          },
+          "peak_dbfs": {
+            "type": "number",
+            "title": "Peak Dbfs"
+          },
+          "rms": {
+            "type": "number",
+            "title": "Rms"
+          },
+          "snr_db": {
+            "type": "number",
+            "title": "Snr Db"
+          },
+          "clip_ratio": {
+            "type": "number",
+            "title": "Clip Ratio"
+          },
+          "silence_ratio": {
+            "type": "number",
+            "title": "Silence Ratio"
+          },
+          "rating": {
+            "type": "string",
+            "enum": [
+              "excellent",
+              "good",
+              "fair",
+              "poor"
+            ],
+            "title": "Rating"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duration_s",
+          "sample_rate",
+          "channels",
+          "peak_dbfs",
+          "rms",
+          "snr_db",
+          "clip_ratio",
+          "silence_ratio",
+          "rating",
+          "issues"
+        ],
+        "title": "SampleAnalysisResponse",
+        "description": "Quality metrics for a voice sample (see ``_analyze_bytes``)."
       },
       "SampleUploadResponse": {
         "properties": {
@@ -4910,6 +5318,65 @@
         "title": "SynthesisRequest",
         "description": "Text-to-speech synthesis request."
       },
+      "TakeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "generation_id": {
+            "type": "string",
+            "title": "Generation Id"
+          },
+          "chunk_index": {
+            "type": "integer",
+            "title": "Chunk Index"
+          },
+          "chunk_text": {
+            "type": "string",
+            "title": "Chunk Text"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Path"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "generation_id",
+          "chunk_index",
+          "chunk_text",
+          "duration",
+          "score",
+          "status",
+          "created_at"
+        ],
+        "title": "TakeResponse"
+      },
       "TranscribeRequest": {
         "properties": {
           "source_path": {
@@ -4984,6 +5451,49 @@
         ],
         "title": "TranscribeResponse",
         "description": "Transcription result for a Studio source."
+      },
+      "UploadedChapterGenerationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "chapter_id": {
+            "type": "string",
+            "title": "Chapter Id"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "chapter_id",
+          "engine",
+          "status",
+          "duration",
+          "file_path",
+          "output_format"
+        ],
+        "title": "UploadedChapterGenerationResponse"
       },
       "ValidationError": {
         "properties": {

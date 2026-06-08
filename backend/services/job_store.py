@@ -17,20 +17,41 @@ from __future__ import annotations
 
 import json
 import logging
-import os
+import re
 import shutil
-import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..atomic_io import write_text_atomic
 from ..paths import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
 JOBS_DIR: Path = DATA_DIR / "jobs"
+
+# Job ids land directly in filesystem paths (record file + chunk dir), so
+# they must never contain path separators or "..". This allowlist permits
+# our generated ids (uuid4 prefix: hex + hyphen) while rejecting anything
+# that could traverse outside JOBS_DIR. The client controls the
+# ``X-Synthesis-Job-ID`` header, so this is a security boundary.
+_JOB_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+class InvalidJobId(ValueError):
+    """Raised when a job id contains characters that could escape JOBS_DIR."""
+
+
+def is_valid_job_id(job_id: str) -> bool:
+    return isinstance(job_id, str) and _JOB_ID_RE.fullmatch(job_id) is not None
+
+
+def validate_job_id(job_id: str) -> str:
+    if not is_valid_job_id(job_id):
+        raise InvalidJobId(f"Invalid job id: {job_id!r}")
+    return job_id
 
 
 @dataclass
@@ -42,6 +63,11 @@ class JobRecord:
     engine: str  # "edge-tts" | "xtts-v2"
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
+
+    def __post_init__(self) -> None:
+        # A record's job_id always becomes a filesystem path — reject any
+        # value that could traverse out of JOBS_DIR.
+        validate_job_id(self.job_id)
 
     @property
     def chunks_dir(self) -> Path:
@@ -75,25 +101,17 @@ def new_job_id() -> str:
     return str(uuid.uuid4())[:12]
 
 
-def _write_atomic(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(suffix=".tmp", prefix="job_", dir=str(path.parent))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(content)
-        os.replace(tmp, path)
-    except Exception:
-        Path(tmp).unlink(missing_ok=True)
-        raise
-
-
 def save_record(record: JobRecord) -> None:
     record.updated_at = time.time()
     record.chunks_dir.mkdir(parents=True, exist_ok=True)
-    _write_atomic(record.record_path, json.dumps(record.to_json(), ensure_ascii=False, indent=2))
+    write_text_atomic(
+        record.record_path, json.dumps(record.to_json(), ensure_ascii=False, indent=2)
+    )
 
 
 def load_record(job_id: str) -> JobRecord | None:
+    if not is_valid_job_id(job_id):
+        return None
     path = JOBS_DIR / f"{job_id}.json"
     if not path.exists():
         return None
@@ -121,6 +139,10 @@ def list_incomplete() -> list[JobRecord]:
 
 def cleanup_job(job_id: str) -> None:
     """Delete the record file and chunk directory for a completed/cancelled job."""
+    if not is_valid_job_id(job_id):
+        # Never run rmtree on an unvalidated, client-supplied path.
+        logger.warning("Refusing cleanup for invalid job id: %r", job_id)
+        return
     record_path = JOBS_DIR / f"{job_id}.json"
     chunks_dir = JOBS_DIR / job_id
     record_path.unlink(missing_ok=True)
@@ -130,4 +152,5 @@ def cleanup_job(job_id: str) -> None:
 
 def chunk_path(job_id: str, index: int, extension: str) -> Path:
     """Deterministic filename for chunk N of a job."""
+    validate_job_id(job_id)
     return JOBS_DIR / job_id / f"chunk_{index:04d}.{extension.lstrip('.')}"

@@ -1,6 +1,7 @@
 """Runtime directories. Created on import."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 
 from .config import settings
@@ -28,6 +29,32 @@ def ensure_dirs() -> None:
         AMBIENCE_DIR, STUDIO_DIR, STUDIO_SUBS_DIR, STUDIO_VIDEOS_DIR, STUDIO_COVERS_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
+
+
+# Roots that a user/client-supplied media path is allowed to point at.
+# Any endpoint that takes a filesystem path from the request (Studio
+# sources, ambience narration, video render inputs) must validate against
+# these so a request cannot pull arbitrary files off disk through ffmpeg.
+MEDIA_ROOTS: tuple[Path, ...] = (OUTPUT_DIR, STUDIO_DIR, JOBS_DIR)
+
+
+def is_within_allowed_roots(target: Path, roots: Iterable[Path] = MEDIA_ROOTS) -> bool:
+    """Return True if ``target`` resolves inside one of ``roots``.
+
+    Blocks path traversal: the path is fully resolved (symlinks + ``..``)
+    before the containment check, so ``data/output/../../etc/passwd`` fails.
+    """
+    try:
+        resolved = target.resolve()
+    except (OSError, RuntimeError):
+        return False
+    for root in roots:
+        try:
+            resolved.relative_to(root.resolve())
+            return True
+        except ValueError:
+            continue
+    return False
 
 
 ensure_dirs()

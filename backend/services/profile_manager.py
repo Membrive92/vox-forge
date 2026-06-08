@@ -8,10 +8,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 
+from ..atomic_io import write_text_atomic
 from ..exceptions import ProfileNotFound
 from ..paths import VOICES_DIR
 from ..schemas import ProfileUpdate, VoiceProfile
@@ -43,12 +43,9 @@ class ProfileManager:
 
     def _write_atomic(self) -> None:
         data = {k: v.model_dump() for k, v in self._profiles.items()}
-        tmp = self._filepath.with_suffix(self._filepath.suffix + ".tmp")
-        tmp.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False),
-            encoding="utf-8",
+        write_text_atomic(
+            self._filepath, json.dumps(data, indent=2, ensure_ascii=False)
         )
-        os.replace(tmp, self._filepath)
 
     # -- public API ------------------------------------------------------------
 

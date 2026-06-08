@@ -24,8 +24,16 @@ class Settings(BaseSettings):
     base_dir: Path = Path(__file__).parent.parent
     data_subdir: str = "data"
 
-    # CORS (restrict in production)
-    cors_origins: list[str] = ["*"]
+    # CORS — local-first: only the local dev frontends may call the API
+    # cross-origin. The app itself talks to the backend through Vite's
+    # same-origin proxy, so this allowlist doesn't affect normal use; it
+    # just stops arbitrary websites from scripting the local API. Override
+    # via VOXFORGE_CORS_ORIGINS='["http://host:port", ...]' if needed.
+    cors_origins: list[str] = [
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "http://localhost:3001", "http://127.0.0.1:3001",
+        "http://localhost:5173", "http://127.0.0.1:5173",
+    ]
 
     # Synthesis limits
     max_text_length: int = 500_000

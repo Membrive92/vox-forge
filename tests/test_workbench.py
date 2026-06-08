@@ -2,6 +2,14 @@
 character casting, pronunciation, activity, stats, and the B7 regression."""
 from __future__ import annotations
 
+import io
+
+
+def _fake_wav() -> io.BytesIO:
+    buf = io.BytesIO(b"RIFF" + b"\x00" * 40)
+    buf.name = "sample.wav"
+    return buf
+
 
 # ── Projects CRUD ────────────────────────────────────────────────────
 
@@ -166,6 +174,86 @@ def test_chapter_regenerate_chunk(client) -> None:
 
     out_of_range = client.post(f"/api/chapters/{cid}/regenerate-chunk/999")
     assert out_of_range.status_code == 400
+
+
+def test_chapter_regenerate_chunk_routes_through_engine_for_cloned_profile(
+    client,
+) -> None:
+    """Regression: regenerate-chunk used to call edge_tts.Communicate
+    directly, ignoring whether the chapter was generated with a cloned
+    voice (XTTS profile). That broke the user's narrator voice on
+    regen. The fix routes through TTSEngine.synthesize() so:
+      - a cloned profile -> clone engine (errors out with no CUDA in
+        tests, surfacing as 500; that's the right path)
+      - no profile / no sample -> edge-tts (still 200)
+
+    Here we create a generation that points at a profile WITH a sample.
+    The pre-fix code would have happily called edge-tts and returned
+    200, silently losing the cloned voice. With the fix, it must NOT
+    return 200 — it routes through the engine which can't synthesize
+    without CUDA in the test stub.
+    """
+    import asyncio
+
+    from backend.services import project_manager as pm
+
+    # Create a profile with an attached sample (triggers the clone path)
+    profile = client.post(
+        "/api/profiles",
+        data={
+            "name": "Cloned narrator",
+            "voice_id": "es-ES-AlvaroNeural",
+            "language": "es",
+            "speed": 100, "pitch": 0, "volume": 80,
+        },
+        files={"sample": ("voice.wav", _fake_wav(), "audio/wav")},
+    ).json()
+    assert profile["sample_filename"] is not None
+
+    project = _create_project(client)
+    pid = project["id"]
+    chapter = client.post(
+        f"/api/projects/{pid}/chapters",
+        json={"title": "C1", "text": "Texto corto.", "sort_order": 0},
+    ).json()
+    cid = chapter["id"]
+
+    # Manually insert a generation as if it had been synthesized with
+    # the cloned profile. We can't go through /synthesize because
+    # there's no CUDA in tests, but the BD shape is what matters for
+    # the regenerate path.
+    loop = asyncio.new_event_loop()
+    try:
+        gen = loop.run_until_complete(pm.create_generation(
+            chapter_id=cid,
+            voice_id="es-ES-AlvaroNeural",
+            profile_id=profile["id"],
+            output_format="mp3",
+            speed=100, pitch=0, volume=80,
+            engine="xtts-v2",
+            chunks_total=1,
+        ))
+        # Mark the generation as done so regen can find it
+        loop.run_until_complete(pm.update_generation(
+            gen["id"], status="done", output_path="/fake/output.mp3",
+        ))
+    finally:
+        loop.close()
+
+    # Now regenerate. Without the fix, this would return 200 (edge-tts).
+    # With the fix, it routes to the clone engine which raises because
+    # there's no CUDA — surfaced as 500 by the global error handler.
+    regen = client.post(f"/api/chapters/{cid}/regenerate-chunk/0")
+    assert regen.status_code != 200, (
+        "regenerate-chunk silently fell back to edge-tts for a cloned "
+        "profile — this is the regression we're guarding against."
+    )
+    # Specifically, it should be a CUDA-related synthesis error
+    body = regen.json()
+    technical = body.get("technical", body.get("detail", ""))
+    assert "CUDA" in technical or "synthesis" in technical.lower(), (
+        f"unexpected error shape: {body}"
+    )
 
 
 def test_chapter_synthesize_nonexistent_404(client) -> None:
@@ -336,6 +424,102 @@ def test_invalid_profile_id_no_ghost_job(client) -> None:
 
     after = client.get("/api/synthesize/incomplete").json()["count"]
     assert after == before, "Invalid profile_id must not create a ghost job"
+
+
+def test_regenerate_chunk_resplices_edge_chapter(client, _session_env) -> None:
+    """Edge-TTS regen must rebuild generation.file_path and report respliced.
+
+    Guards the 'false success' regression: previously regen updated only
+    the take and left the chapter audio stale while reporting 200.
+    """
+    import asyncio
+
+    from backend.paths import OUTPUT_DIR
+    from backend.services import job_store
+    from backend.services import project_manager as pm
+
+    project = _create_project(client, "Resplice")
+    chapter = client.post(
+        f"/api/projects/{project['id']}/chapters",
+        json={"title": "C1", "text": "Texto corto.", "sort_order": 0},
+    ).json()
+    cid = chapter["id"]
+
+    chapter_audio = OUTPUT_DIR / "chapter_resplice.mp3"
+    chapter_audio.write_bytes(b"OLD CHAPTER AUDIO")
+
+    loop = asyncio.new_event_loop()
+    try:
+        gen = loop.run_until_complete(pm.create_generation(
+            chapter_id=cid, voice_id="es-ES-AlvaroNeural", profile_id=None,
+            output_format="mp3", speed=100, pitch=0, volume=80,
+            engine="edge-tts", chunks_total=1,
+        ))
+        loop.run_until_complete(pm.update_generation(
+            gen["id"], status="done", file_path=str(chapter_audio), duration=1.0,
+        ))
+        loop.run_until_complete(pm.create_take(
+            generation_id=gen["id"], chunk_index=0, chunk_text="Texto corto.", status="done",
+        ))
+    finally:
+        loop.close()
+
+    # The original Edge synthesis would have left chunk_0000.mp3 in the job dir.
+    job_chunk = job_store.chunk_path(gen["id"], 0, "mp3")
+    job_chunk.parent.mkdir(parents=True, exist_ok=True)
+    job_chunk.write_bytes(b"chunk0")
+
+    resp = client.post(f"/api/chapters/{cid}/regenerate-chunk/0")
+    assert resp.status_code == 200, resp.text
+    assert resp.headers.get("X-Chapter-Respliced") == "true"
+    # The chapter audio must have been rewritten (no longer the stale bytes).
+    assert chapter_audio.read_bytes() != b"OLD CHAPTER AUDIO"
+
+
+def test_regenerate_chunk_without_persisted_chunks_reports_not_respliced(
+    client, _session_env,
+) -> None:
+    """A multi-chunk chapter whose other chunks aren't on disk can't be
+    re-spliced — regen updates only the take, reports respliced=false, and
+    leaves the chapter audio untouched (no corruption)."""
+    import asyncio
+
+    from backend.paths import OUTPUT_DIR
+    from backend.services import project_manager as pm
+    from backend.services.tts_engine import split_into_chunks
+
+    # Long enough to split into 2+ chunks (chunk_max_chars defaults to 3000).
+    long_text = "Una frase de prueba. " * 300
+    assert len(split_into_chunks(long_text)) >= 2
+
+    project = _create_project(client, "NoResplice")
+    chapter = client.post(
+        f"/api/projects/{project['id']}/chapters",
+        json={"title": "C1", "text": long_text, "sort_order": 0},
+    ).json()
+    cid = chapter["id"]
+
+    chapter_audio = OUTPUT_DIR / "chapter_no_resplice.mp3"
+    chapter_audio.write_bytes(b"KEEP ME")
+
+    loop = asyncio.new_event_loop()
+    try:
+        gen = loop.run_until_complete(pm.create_generation(
+            chapter_id=cid, voice_id="es-ES-AlvaroNeural", profile_id=None,
+            output_format="mp3", speed=100, pitch=0, volume=80,
+            engine="edge-tts", chunks_total=2,
+        ))
+        loop.run_until_complete(pm.update_generation(
+            gen["id"], status="done", file_path=str(chapter_audio), duration=1.0,
+        ))
+    finally:
+        loop.close()
+
+    # Only chunk 0 gets written by regen; the other chunk's audio is absent.
+    resp = client.post(f"/api/chapters/{cid}/regenerate-chunk/0")
+    assert resp.status_code == 200, resp.text
+    assert resp.headers.get("X-Chapter-Respliced") == "false"
+    assert chapter_audio.read_bytes() == b"KEEP ME", "chapter audio must be untouched"
 
 
 def test_invalid_format_no_ghost_job(client) -> None:

@@ -8,6 +8,7 @@ to skip real encoding.
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import re
 import shutil
@@ -476,14 +477,18 @@ class VideoRenderer:
 
         logger.info("Rendering video: %s", output_path.name)
         # Run ffmpeg in a thread pool to avoid blocking the event loop.
+        # ``run_in_executor`` only forwards positional args, so bind the
+        # stdout/stderr kwargs with ``partial`` — passing them positionally
+        # would land subprocess.PIPE on Popen's ``executable`` parameter.
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None,
-            subprocess.run,
-            argv,
-            None,
-            subprocess.PIPE,
-            subprocess.PIPE,
+            functools.partial(
+                subprocess.run,
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            ),
         )
         if result.returncode != 0:
             tail = result.stderr.decode(errors="replace")[-2000:]

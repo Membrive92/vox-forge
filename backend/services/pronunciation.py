@@ -13,11 +13,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
-import tempfile
 from pathlib import Path
 
+from ..atomic_io import write_text_atomic
 from ..paths import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -51,17 +50,9 @@ class PronunciationManager:
             self._entries = {}
 
     def _write_atomic(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(
-            suffix=".tmp", prefix="pron_", dir=str(self._path.parent),
+        write_text_atomic(
+            self._path, json.dumps(self._entries, ensure_ascii=False, indent=2)
         )
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                json.dump(self._entries, fh, ensure_ascii=False, indent=2)
-            os.replace(tmp, self._path)
-        except Exception:
-            Path(tmp).unlink(missing_ok=True)
-            raise
 
     def list_entries(self) -> dict[str, str]:
         return dict(self._entries)

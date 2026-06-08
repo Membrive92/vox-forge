@@ -147,3 +147,91 @@ async def test_cleanup_removes_old_files(client, _session_env) -> None:
     assert not old_file.exists()
     assert recent_file.exists()
     recent_file.unlink()
+
+
+def test_cleanup_preserves_db_referenced_generation(client, _session_env) -> None:
+    """Old OUTPUT audio referenced by a 'done' generation must survive cleanup."""
+    import asyncio
+    import os
+    import time
+
+    from backend.paths import OUTPUT_DIR
+    from backend.services import project_manager as pm
+    from backend.utils import cleanup_old_files
+
+    old = time.time() - (25 * 3600)
+    referenced = OUTPUT_DIR / "referenced_chapter.mp3"
+    referenced.write_bytes(b"keep me")
+    orphan = OUTPUT_DIR / "orphan_output.mp3"
+    orphan.write_bytes(b"delete me")
+    for f in (referenced, orphan):
+        os.utime(f, (old, old))
+
+    project = client.post(
+        "/api/projects",
+        json={"name": "Cleanup", "language": "es", "voice_id": "es-ES-AlvaroNeural"},
+    ).json()
+    chapter = client.post(
+        f"/api/projects/{project['id']}/chapters",
+        json={"title": "C1", "text": "x", "sort_order": 0},
+    ).json()
+
+    loop = asyncio.new_event_loop()
+    try:
+        gen = loop.run_until_complete(
+            pm.create_generation(
+                chapter_id=chapter["id"], voice_id="es-ES-AlvaroNeural",
+                profile_id=None, output_format="mp3", speed=100, pitch=0,
+                volume=80, engine="edge-tts", chunks_total=1,
+            )
+        )
+        loop.run_until_complete(
+            pm.update_generation(gen["id"], status="done", file_path=str(referenced))
+        )
+        loop.run_until_complete(cleanup_old_files(max_age_hours=24))
+    finally:
+        loop.close()
+
+    assert referenced.exists(), "DB-referenced generation audio was deleted by cleanup"
+    assert not orphan.exists(), "unreferenced old file should have been cleaned"
+    referenced.unlink(missing_ok=True)
+
+
+def test_delete_project_unlinks_generation_audio(client, _session_env) -> None:
+    """Deleting a project must remove its generations' audio from disk."""
+    import asyncio
+
+    from backend.paths import OUTPUT_DIR
+    from backend.services import project_manager as pm
+
+    audio = OUTPUT_DIR / "to_delete_with_project.mp3"
+    audio.write_bytes(b"audio bytes")
+
+    project = client.post(
+        "/api/projects",
+        json={"name": "DelProj", "language": "es", "voice_id": "es-ES-AlvaroNeural"},
+    ).json()
+    chapter = client.post(
+        f"/api/projects/{project['id']}/chapters",
+        json={"title": "C1", "text": "x", "sort_order": 0},
+    ).json()
+
+    loop = asyncio.new_event_loop()
+    try:
+        gen = loop.run_until_complete(
+            pm.create_generation(
+                chapter_id=chapter["id"], voice_id="es-ES-AlvaroNeural",
+                profile_id=None, output_format="mp3", speed=100, pitch=0,
+                volume=80, engine="edge-tts", chunks_total=1,
+            )
+        )
+        loop.run_until_complete(
+            pm.update_generation(gen["id"], status="done", file_path=str(audio))
+        )
+        assert audio.exists()
+        deleted = loop.run_until_complete(pm.delete_project(project["id"]))
+    finally:
+        loop.close()
+
+    assert deleted
+    assert not audio.exists(), "project delete left the generation audio on disk"

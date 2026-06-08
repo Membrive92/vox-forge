@@ -1,6 +1,7 @@
 """Batch export: synthesize all chapters of a project into a ZIP file."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 import zipfile
@@ -26,6 +27,30 @@ router = APIRouter(prefix="/export", tags=["export"])
 
 def _safe_title(raw: str) -> str:
     return "".join(c if c.isalnum() or c in " _-" else "_" for c in raw)
+
+
+def _build_zip(
+    zip_path: Path,
+    resolved: list[tuple[dict, Path]],
+    project_videos: list[dict],
+    default_fmt: str,
+) -> None:
+    """Write all chapter audio + project videos into ``zip_path``.
+
+    Blocking (DEFLATE + disk I/O) — call via ``asyncio.to_thread`` so the
+    event loop isn't frozen for the whole (potentially large) zip. Audio is
+    already compressed, so STORED avoids wasted CPU for no size win.
+    """
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
+        for idx, (ch, fp) in enumerate(resolved):
+            ext = fp.suffix.lstrip(".") or default_fmt
+            arcname = f"audio/{idx + 1:02d}_{_safe_title(ch['title'])}.{ext}"
+            zf.write(fp, arcname)
+        for video in project_videos:
+            vpath = Path(video["output_path"])
+            if not vpath.exists():
+                continue
+            zf.write(vpath, f"videos/{vpath.name}")
 
 
 @router.post("/{project_id}", summary="Export all chapters as ZIP")
@@ -131,18 +156,7 @@ async def batch_export(
         videos = await studio_store.list_renders(kind="video", limit=200)
         project_videos = [v for v in videos if v.get("project_id") == project_id]
 
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for idx, (ch, fp) in enumerate(resolved):
-                # The chapter's output extension now comes from the
-                # resolved file (studio edits may be different format).
-                ext = fp.suffix.lstrip(".") or fmt
-                arcname = f"audio/{idx + 1:02d}_{_safe_title(ch['title'])}.{ext}"
-                zf.write(fp, arcname)
-            for video in project_videos:
-                vpath = Path(video["output_path"])
-                if not vpath.exists():
-                    continue
-                zf.write(vpath, f"videos/{vpath.name}")
+        await asyncio.to_thread(_build_zip, zip_path, resolved, project_videos, fmt)
 
         background_tasks.add_task(cleanup_old_files)
 
@@ -153,5 +167,6 @@ async def batch_export(
         )
 
     finally:
+        cancel_token.finish()
         for fp in temp_files:
             fp.unlink(missing_ok=True)

@@ -52,7 +52,14 @@ async def synthesize_text(
         raise ProfileNotFound(f"Profile not found: {request.profile_id}")
 
     cancel_token = create_cancellation_token(http_request)
-    job_id = http_request.headers.get("x-synthesis-job-id") or job_store.new_job_id()
+    # The job id becomes a filesystem path; never trust the client header
+    # verbatim. Use it only if it passes the allowlist, else mint a fresh id.
+    header_job_id = http_request.headers.get("x-synthesis-job-id")
+    job_id = (
+        header_job_id
+        if header_job_id and job_store.is_valid_job_id(header_job_id)
+        else job_store.new_job_id()
+    )
     progress_registry.start(job_id, chunks_total=0, step="starting")
 
     record = job_store.JobRecord(
@@ -68,6 +75,8 @@ async def synthesize_text(
         progress_registry.finish(job_id, status="error", error=str(exc))
         # Leave the record + chunks_dir on disk so /incomplete can list it
         raise
+    finally:
+        cancel_token.finish()
     progress_registry.finish(job_id, status="done")
     # Success: tear down the job record and its chunk dir.
     job_store.cleanup_job(job_id)
@@ -172,6 +181,8 @@ async def resume_job(
     except Exception as exc:
         progress_registry.finish(job_id, status="error", error=str(exc))
         raise
+    finally:
+        cancel_token.finish()
 
     try:
         audio = AudioSegment.from_file(str(result.path))

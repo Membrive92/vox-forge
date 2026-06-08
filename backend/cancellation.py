@@ -23,6 +23,7 @@ class CancellationToken:
 
     def __init__(self) -> None:
         self._cancelled = False
+        self._task: asyncio.Task | None = None
 
     @property
     def is_cancelled(self) -> bool:
@@ -36,6 +37,15 @@ class CancellationToken:
         if self._cancelled:
             logger.info("Operation cancelled: client disconnected")
             raise CancelledError()
+
+    def finish(self) -> None:
+        """Stop the disconnect monitor. Handlers MUST call this when the
+        operation ends (success or error) so the polling task doesn't
+        outlive the request and pin it alive forever."""
+        task = self._task
+        self._task = None
+        if task is not None and not task.done():
+            task.cancel()
 
 
 class CancelledError(Exception):
@@ -51,12 +61,18 @@ def create_cancellation_token(request: Request) -> CancellationToken:
     token = CancellationToken()
 
     async def _monitor() -> None:
-        while not token.is_cancelled:
-            if await request.is_disconnected():
-                token.cancel()
-                logger.info("Client disconnected, cancelling operation")
-                return
-            await asyncio.sleep(2)
+        try:
+            while not token.is_cancelled:
+                if await request.is_disconnected():
+                    token.cancel()
+                    logger.info("Client disconnected, cancelling operation")
+                    return
+                await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            pass  # operation finished and stopped the monitor
 
-    asyncio.create_task(_monitor())
+    # Keep a strong reference: a bare create_task is only weakly held by the
+    # loop and can be garbage-collected mid-flight, silently disabling
+    # disconnect detection. The handler stops it via ``token.finish()``.
+    token._task = asyncio.create_task(_monitor())
     return token

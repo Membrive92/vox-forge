@@ -42,10 +42,23 @@ class CastSynthesisRequest(BaseModel):
     artist: Optional[str] = None
 
 
-@router.post("/extract-characters", summary="List character names found in text")
-async def extract_chars(body: dict) -> dict:
-    text = body.get("text", "")
-    return {"characters": extract_characters(text)}
+class ExtractCharactersRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+
+
+class ExtractCharactersResponse(BaseModel):
+    characters: list[str]
+
+
+@router.post(
+    "/extract-characters",
+    summary="List character names found in text",
+    response_model=ExtractCharactersResponse,
+)
+async def extract_chars(body: ExtractCharactersRequest) -> dict:
+    # Validated input — a non-string ``text`` now fails at the boundary
+    # with a clean 422 instead of crashing the parser with AttributeError.
+    return {"characters": extract_characters(body.text)}
 
 
 @router.post("/synthesize", summary="Synthesize text with character-cast voices")
@@ -149,5 +162,6 @@ async def cast_synthesize(
             },
         )
     finally:
+        cancel_token.finish()
         for tf in temp_files:
             tf.unlink(missing_ok=True)

@@ -19,6 +19,23 @@ logger = logging.getLogger(__name__)
 
 DB_PATH: Path = DATA_DIR / "voxforge.db"
 
+# Bump when the schema changes; stamped into ``PRAGMA user_version`` after
+# migrations run so future versions can branch on it.
+SCHEMA_VERSION = 2
+
+# Single source of truth for every column added *after* the initial schema.
+# ``CREATE TABLE IF NOT EXISTS`` is a no-op on a pre-existing table, so any
+# later column only materialises on old databases if it's listed here.
+# SQLite has no ``ADD COLUMN IF NOT EXISTS`` — we swallow the duplicate
+# error. NOT NULL columns must carry a DEFAULT (SQLite requirement).
+_MIGRATION_COLUMNS: tuple[str, ...] = (
+    "ALTER TABLE projects ADD COLUMN cover_path TEXT DEFAULT NULL",
+    "ALTER TABLE chapters ADD COLUMN voice_id TEXT DEFAULT NULL",
+    "ALTER TABLE chapters ADD COLUMN profile_id TEXT DEFAULT NULL",
+    "ALTER TABLE chapters ADD COLUMN active_generation_id TEXT DEFAULT NULL",
+    "ALTER TABLE generations ADD COLUMN engine TEXT NOT NULL DEFAULT 'edge-tts'",
+)
+
 _SCHEMA_SQL = """
 -- Projects (stories / audiobooks)
 CREATE TABLE IF NOT EXISTS projects (
@@ -122,22 +139,22 @@ async def init_db() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await db.executescript(_SCHEMA_SQL)
-        # In-place migration: add columns introduced after a DB was
-        # first created. SQLite has no ``ADD COLUMN IF NOT EXISTS``, so
-        # we try/except on the duplicate-column error.
-        for column_def in (
-            "ALTER TABLE projects ADD COLUMN cover_path TEXT DEFAULT NULL",
-            "ALTER TABLE chapters ADD COLUMN voice_id TEXT DEFAULT NULL",
-            "ALTER TABLE chapters ADD COLUMN profile_id TEXT DEFAULT NULL",
-            "ALTER TABLE chapters ADD COLUMN active_generation_id TEXT DEFAULT NULL",
-        ):
+        # In-place migration: add columns introduced after a DB was first
+        # created. See ``_MIGRATION_COLUMNS`` — it must list every post-v1
+        # column or old databases break (e.g. a missing ``generations.engine``
+        # makes every chapter synthesis raise "no such column").
+        for column_def in _MIGRATION_COLUMNS:
             try:
                 await db.execute(column_def)
             except aiosqlite.OperationalError as exc:  # noqa: PERF203
                 if "duplicate column" not in str(exc).lower():
                     raise
+        await db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        # WAL is a persistent property of the database file — set it once
+        # here instead of on every get_db() connection.
+        await db.execute("PRAGMA journal_mode=WAL")
         await db.commit()
-    logger.info("Database initialized at %s", DB_PATH)
+    logger.info("Database initialized at %s (schema v%d)", DB_PATH, SCHEMA_VERSION)
 
 
 @asynccontextmanager
@@ -145,7 +162,8 @@ async def get_db() -> AsyncIterator[aiosqlite.Connection]:
     """Yield an aiosqlite connection with WAL mode and foreign keys enabled."""
     db = await aiosqlite.connect(str(DB_PATH))
     db.row_factory = aiosqlite.Row
-    await db.execute("PRAGMA journal_mode=WAL")
+    # journal_mode=WAL is persisted on the file by init_db(); only the
+    # per-connection foreign_keys pragma needs setting on each connect.
     await db.execute("PRAGMA foreign_keys=ON")
     try:
         yield db

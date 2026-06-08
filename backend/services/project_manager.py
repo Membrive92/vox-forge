@@ -4,13 +4,19 @@ All methods use `get_db()` for async SQLite access. IDs are short UUIDs.
 """
 from __future__ import annotations
 
+import logging
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import aiosqlite
 
 from ..database import get_db
+from ..paths import is_within_allowed_roots
+
+logger = logging.getLogger(__name__)
 
 
 def _new_id() -> str:
@@ -23,6 +29,38 @@ def _now() -> str:
 
 def _row_to_dict(row: aiosqlite.Row) -> dict[str, Any]:
     return dict(row)
+
+
+async def _collect_paths(
+    db: aiosqlite.Connection, queries: list[tuple[str, tuple[Any, ...]]]
+) -> list[str]:
+    """Run each (sql, params) and gather the non-empty first column.
+
+    Used to capture the on-disk audio paths of rows that are about to be
+    deleted (generations/takes/renders) so the files can be unlinked once
+    the DB rows are gone — deleting a row otherwise leaks its audio.
+    """
+    out: list[str] = []
+    for sql, params in queries:
+        cursor = await db.execute(sql, params)
+        for row in await cursor.fetchall():
+            value = row[0]
+            if value:
+                out.append(value)
+    return out
+
+
+def _unlink_audio_files(paths: Iterable[str]) -> None:
+    """Best-effort delete of audio files, confined to our media roots."""
+    for raw in paths:
+        path = Path(raw)
+        if not is_within_allowed_roots(path):
+            # Never unlink something outside data/output|studio|jobs.
+            continue
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as exc:  # noqa: PERF203
+            logger.warning("Could not delete audio file %s: %s", path, exc)
 
 
 # ── Projects ────────────────────────────────────────────────────────
@@ -97,9 +135,23 @@ async def update_project(project_id: str, **fields: Any) -> dict[str, Any] | Non
 
 async def delete_project(project_id: str) -> bool:
     async with get_db() as db:
+        paths = await _collect_paths(db, [
+            ("SELECT g.file_path FROM generations g "
+             "JOIN chapters c ON c.id = g.chapter_id WHERE c.project_id = ?", (project_id,)),
+            ("SELECT t.file_path FROM takes t "
+             "JOIN generations g ON g.id = t.generation_id "
+             "JOIN chapters c ON c.id = g.chapter_id WHERE c.project_id = ?", (project_id,)),
+            ("SELECT output_path FROM studio_renders WHERE project_id = ?", (project_id,)),
+        ])
         cursor = await db.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+        # studio_renders has no FK (renders outlive chapters), so cascade
+        # won't touch them — delete this project's renders explicitly.
+        await db.execute("DELETE FROM studio_renders WHERE project_id = ?", (project_id,))
         await db.commit()
-        return cursor.rowcount > 0
+        deleted = cursor.rowcount > 0
+    if deleted:
+        _unlink_audio_files(paths)
+    return deleted
 
 
 # ── Chapters ────────────────────────────────────────────────────────
@@ -170,9 +222,19 @@ async def update_chapter(chapter_id: str, **fields: Any) -> dict[str, Any] | Non
 
 async def delete_chapter(chapter_id: str) -> bool:
     async with get_db() as db:
+        paths = await _collect_paths(db, [
+            ("SELECT file_path FROM generations WHERE chapter_id = ?", (chapter_id,)),
+            ("SELECT t.file_path FROM takes t "
+             "JOIN generations g ON g.id = t.generation_id WHERE g.chapter_id = ?", (chapter_id,)),
+            ("SELECT output_path FROM studio_renders WHERE chapter_id = ?", (chapter_id,)),
+        ])
         cursor = await db.execute("DELETE FROM chapters WHERE id = ?", (chapter_id,))
+        await db.execute("DELETE FROM studio_renders WHERE chapter_id = ?", (chapter_id,))
         await db.commit()
-        return cursor.rowcount > 0
+        deleted = cursor.rowcount > 0
+    if deleted:
+        _unlink_audio_files(paths)
+    return deleted
 
 
 async def split_text_into_chapters(
@@ -207,10 +269,21 @@ async def split_text_into_chapters(
         if not chapters_raw:
             chapters_raw = [("Chapter 1", full_text.strip())]
 
-        # Delete existing chapters
+        # Delete existing chapters — and the audio/renders they own, so
+        # re-splitting doesn't leave orphaned files behind.
         async with get_db() as db:
+            paths = await _collect_paths(db, [
+                ("SELECT g.file_path FROM generations g "
+                 "JOIN chapters c ON c.id = g.chapter_id WHERE c.project_id = ?", (project_id,)),
+                ("SELECT t.file_path FROM takes t "
+                 "JOIN generations g ON g.id = t.generation_id "
+                 "JOIN chapters c ON c.id = g.chapter_id WHERE c.project_id = ?", (project_id,)),
+                ("SELECT output_path FROM studio_renders WHERE project_id = ?", (project_id,)),
+            ])
             await db.execute("DELETE FROM chapters WHERE project_id = ?", (project_id,))
+            await db.execute("DELETE FROM studio_renders WHERE project_id = ?", (project_id,))
             await db.commit()
+        _unlink_audio_files(paths)
 
         result: list[dict[str, Any]] = []
         for idx, (title, body) in enumerate(chapters_raw):
@@ -302,9 +375,16 @@ async def update_generation(gen_id: str, **fields: Any) -> None:
 
 async def delete_generation(gen_id: str) -> bool:
     async with get_db() as db:
+        paths = await _collect_paths(db, [
+            ("SELECT file_path FROM generations WHERE id = ?", (gen_id,)),
+            ("SELECT file_path FROM takes WHERE generation_id = ?", (gen_id,)),
+        ])
         cursor = await db.execute("DELETE FROM generations WHERE id = ?", (gen_id,))
         await db.commit()
-        return cursor.rowcount > 0
+        deleted = cursor.rowcount > 0
+    if deleted:
+        _unlink_audio_files(paths)
+    return deleted
 
 
 # ── Takes ───────────────────────────────────────────────────────────
@@ -343,6 +423,42 @@ async def create_take(
         cursor = await db.execute("SELECT * FROM takes WHERE id = ?", (tid,))
         row = await cursor.fetchone()
         return _row_to_dict(row) if row else {}
+
+
+async def create_takes(generation_id: str, takes: list[dict[str, Any]]) -> None:
+    """Batch-insert chunk takes in a single transaction.
+
+    Each item may carry: chunk_index, chunk_text, file_path, duration,
+    score, status (with defaults). Avoids the per-take connection churn of
+    calling ``create_take`` in a loop (which also opened a 2nd connection
+    just to read the row back).
+    """
+    if not takes:
+        return
+    now = _now()
+    rows = [
+        (
+            _new_id(),
+            generation_id,
+            int(t["chunk_index"]),
+            str(t.get("chunk_text", "")),
+            t.get("file_path"),
+            float(t.get("duration", 0)),
+            float(t.get("score", 0)),
+            str(t.get("status", "pending")),
+            now,
+        )
+        for t in takes
+    ]
+    async with get_db() as db:
+        await db.executemany(
+            """INSERT INTO takes
+               (id, generation_id, chunk_index, chunk_text, file_path,
+                duration, score, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            rows,
+        )
+        await db.commit()
 
 
 async def update_take(take_id: str, **fields: Any) -> None:
