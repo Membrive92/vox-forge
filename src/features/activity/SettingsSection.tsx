@@ -55,7 +55,7 @@ export function SettingsSection({ t, onToast }: Props) {
       {open && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 12 }}>
           <SubSection title={t.settingsExportDefaults}>
-            <ExportDefaultsForm />
+            <ExportDefaultsForm t={t} />
           </SubSection>
 
           <SubSection title={t.settingsPronunciation}>
@@ -88,7 +88,7 @@ function SubSection({ title, children }: { title: string; children: React.ReactN
   );
 }
 
-function ExportDefaultsForm() {
+function ExportDefaultsForm({ t }: { t: Translations }) {
   const { settings, update, renderFilename } = useExportSettings();
 
   return (
@@ -108,32 +108,30 @@ function ExportDefaultsForm() {
           lineHeight: 1.5,
         }}
       >
-        These values are embedded in every exported audio file as ID3 tags
-        and used as the default filename. They apply to Quick Synth and the
-        Workbench.
+        {t.exportDefaultsDesc}
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field
-          label="Title"
+          label={t.exportFieldTitle}
           value={settings.storyTitle}
           onChange={(v) => update({ storyTitle: v })}
-          placeholder="The Tower of Kael"
+          placeholder={t.exportTitlePlaceholder}
         />
         <Field
-          label="Artist"
+          label={t.exportFieldArtist}
           value={settings.artist}
           onChange={(v) => update({ artist: v })}
-          placeholder="Narrator"
+          placeholder={t.exportArtistPlaceholder}
         />
         <Field
-          label="Album"
+          label={t.exportFieldAlbum}
           value={settings.album}
           onChange={(v) => update({ album: v })}
-          placeholder="Chronicles Vol. 1"
+          placeholder={t.exportAlbumPlaceholder}
         />
         <Field
-          label="Track"
+          label={t.exportFieldTrack}
           type="number"
           value={String(settings.trackNumber)}
           onChange={(v) => update({ trackNumber: Math.max(1, Number(v) || 1) })}
@@ -142,7 +140,7 @@ function ExportDefaultsForm() {
 
       <div style={{ marginTop: 12 }}>
         <Field
-          label="Filename pattern"
+          label={t.exportFieldFilename}
           value={settings.filenamePattern}
           onChange={(v) => update({ filenamePattern: v })}
           placeholder="{story}_{track}_{date}.{fmt}"
@@ -155,7 +153,7 @@ function ExportDefaultsForm() {
             fontFamily: fonts.mono,
           }}
         >
-          Tokens: {"{story}"} {"{artist}"} {"{track}"} {"{date}"} {"{time}"} {"{fmt}"}
+          {t.exportTokensLabel} {"{story}"} {"{artist}"} {"{track}"} {"{date}"} {"{time}"} {"{fmt}"}
         </p>
         <p
           style={{
