@@ -17,8 +17,8 @@ import { Button } from "@/components/Button";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
+import { useSharedProfiles } from "@/hooks/profilesContext";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
-import { useProfiles } from "@/hooks/useProfiles";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
@@ -35,7 +35,7 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
   const [scanning, setScanning] = useState(false);
   const [generating, setGenerating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const { profiles } = useProfiles();
+  const { profiles } = useSharedProfiles();
   const player = useAudioPlayer();
 
   useEffect(() => () => {

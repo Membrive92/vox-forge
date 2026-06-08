@@ -11,6 +11,7 @@ import type {
 } from "@/api/studio";
 import { Button } from "@/components/Button";
 import * as Icons from "@/components/icons";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
@@ -418,6 +419,7 @@ export function VideoRenderPanel({
           <video
             src={videoUrl}
             controls
+            aria-label={t.studioVideoResult}
             style={{ width: "100%", borderRadius: radii.sm, background: "#000" }}
           />
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -667,6 +669,8 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [aspect, setAspect] = useState<ImageAspectRatio>("16:9");
   const [seedText, setSeedText] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusTrap(formRef, true);
 
   const submit = (): void => {
     const trimmed = prompt.trim();
@@ -680,6 +684,7 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="imagegen-title"
       onClick={onCancel}
       style={{
         position: "fixed",
@@ -693,6 +698,7 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
       }}
     >
       <form
+        ref={formRef}
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -708,7 +714,7 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
           boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
         }}
       >
-        <h3 style={{ margin: "0 0 12px", fontSize: typography.size.lg, fontWeight: 700 }}>
+        <h3 id="imagegen-title" style={{ margin: "0 0 12px", fontSize: typography.size.lg, fontWeight: 700 }}>
           {t.studioScenesGenDialogTitle}
         </h3>
 

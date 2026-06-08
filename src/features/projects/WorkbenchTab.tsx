@@ -26,12 +26,14 @@ import {
 } from "@/api/studio";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Button } from "@/components/Button";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { EmptyState } from "@/components/EmptyState";
 import { IconButton } from "@/components/IconButton";
 import { Skeleton } from "@/components/Skeleton";
 import * as Icons from "@/components/icons";
 import { ALL_VOICES, VOICES } from "@/constants/voices";
-import { useProfiles } from "@/hooks/useProfiles";
+import { useSharedProfiles } from "@/hooks/profilesContext";
+import { activateOnKey } from "@/utils/a11y";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, space, transitions, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
@@ -97,6 +99,7 @@ function detectCharacters(text: string): string[] {
 }
 
 function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToast, onOpenStudioWithSource }: ChapterCardProps) {
+  const confirm = useConfirm();
   const [collapsed, setCollapsed] = useState(false);
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [renders, setRenders] = useState<StudioRender[]>([]);
@@ -303,17 +306,13 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
           {text.length} chars · ~{estimateDuration(text)}
         </span>
 
-        {/* Toolbar — 4 tool toggles */}
+        {/* Toolbar — Chunks (synth + audio) is now always visible below.
+            Preview / Cast / Ambient remain opt-in toggles. */}
         <div style={{ display: "flex", gap: space[1], flexShrink: 0 }}>
           <ToolToggle
             label={t.chapterPreview}
             active={activePanel === "preview"}
             onClick={() => togglePanel("preview")}
-          />
-          <ToolToggle
-            label={t.chapterChunks}
-            active={activePanel === "chunks"}
-            onClick={() => togglePanel("chunks")}
           />
           <ToolToggle
             label={t.chapterCast}
@@ -328,10 +327,22 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
         </div>
 
         <IconButton
-          aria-label={`Delete chapter ${chapter.title}`}
+          aria-label={`${t.actionDelete} ${chapter.title}`}
           variant="ghost"
           size="sm"
-          onClick={() => onDelete(chapter.id)}
+          onClick={async () => {
+            if (
+              await confirm({
+                title: t.confirmDeleteTitle,
+                message: t.confirmDeleteChapter.replace("{name}", chapter.title),
+                confirmText: t.actionDelete,
+                cancelText: t.cancel,
+                confirmVariant: "danger",
+              })
+            ) {
+              onDelete(chapter.id);
+            }
+          }}
         >
           <Icons.Trash />
         </IconButton>
@@ -610,17 +621,19 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
               />
             </div>
           )}
-          {activePanel === "chunks" && (
-            <div style={{ marginTop: space[3] }}>
-              <ChunkMap
-                t={t}
-                chapterId={chapter.id}
-                chapterTitle={chapter.title}
-                onToast={onToast}
-                onOpenStudioWithSource={onOpenStudioWithSource}
-              />
-            </div>
-          )}
+          {/* ChunkMap (synthesize + per-chunk regen + chapter audio
+              player + download) is the primary action surface for a
+              chapter and is now always visible — no longer behind a
+              "Mapa de chunks" sub-tab toggle. */}
+          <div style={{ marginTop: space[3] }}>
+            <ChunkMap
+              t={t}
+              chapterId={chapter.id}
+              chapterTitle={chapter.title}
+              onToast={onToast}
+              onOpenStudioWithSource={onOpenStudioWithSource}
+            />
+          </div>
           {activePanel === "cast" && (
             <div style={{ marginTop: space[3] }}>
               <CharacterCasting
@@ -710,9 +723,13 @@ interface WorkbenchTabProps {
   onToast: (msg: string) => void;
   onOpenStudioWithSource: (generationId: string) => void;
   onNavigateToQuickSynth: () => void;
+  /** Notifies the parent (App) which project is currently open so it
+   * can render context in the global header. Called with `null` when
+   * no project is selected. */
+  onActiveProjectChange?: (name: string | null) => void;
 }
 
-export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQuickSynth }: WorkbenchTabProps) {
+export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQuickSynth, onActiveProjectChange }: WorkbenchTabProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -722,7 +739,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
   const [incompleteCount, setIncompleteCount] = useState(0);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const bulkTextRef = useRef<HTMLTextAreaElement>(null);
-  const { profiles } = useProfiles();
+  const { profiles } = useSharedProfiles();
 
   // Surface interrupted synthesis jobs as a small banner so the user
   // can resume from the Workbench instead of remembering to go to Quick
@@ -762,6 +779,14 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
   useEffect(() => {
     if (selected) setProjectName(selected.name);
   }, [selected]);
+
+  // Push the active project name up to App so the global header can
+  // show it. Cleanup when this tab unmounts (rare — visited tabs stay
+  // mounted) or when the user deselects.
+  useEffect(() => {
+    onActiveProjectChange?.(selected?.name ?? null);
+    return () => onActiveProjectChange?.(null);
+  }, [selected, onActiveProjectChange]);
 
   const handleNewProject = useCallback(async () => {
     try {
@@ -1285,20 +1310,6 @@ interface TakeSelectorProps {
   onChange: (genId: string | null) => Promise<void> | void;
 }
 
-function relativeWhen(iso: string): string {
-  const d = new Date(iso).getTime();
-  const now = Date.now();
-  const diffMs = now - d;
-  const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return "ahora";
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return new Date(iso).toLocaleDateString();
-}
-
 function TakeSelector({ t, generations, activeId, onChange }: TakeSelectorProps) {
   const engineLabel = (engine: string): string => {
     if (engine === "upload") return t.chapterTakeEngineUpload;
@@ -1336,7 +1347,7 @@ function TakeSelector({ t, generations, activeId, onChange }: TakeSelectorProps)
           const dur = g.duration ? `${g.duration.toFixed(1)}s` : "—";
           const label = t.chapterTakeLabel
             .replace("{engine}", engineLabel(g.engine))
-            .replace("{when}", relativeWhen(g.created_at))
+            .replace("{when}", relativeTime(g.created_at, t))
             .replace("{dur}", dur);
           return (
             <option key={g.id} value={g.id}>
@@ -1666,9 +1677,15 @@ function ProjectCoverPicker({ t, project, onPickCover, onClearCover }: CoverPick
 
 function SidebarProjectRow({ t, project, active, onSelect, onDelete }: ProjectRowProps) {
   const [hover, setHover] = useState(false);
+  const confirm = useConfirm();
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={project.name}
+      aria-current={active ? "true" : undefined}
       onClick={onSelect}
+      onKeyDown={activateOnKey(onSelect)}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
@@ -1710,8 +1727,21 @@ function SidebarProjectRow({ t, project, active, onSelect, onDelete }: ProjectRo
       </div>
       {(hover || active) && (
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          aria-label={`Delete project ${project.name}`}
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (
+              await confirm({
+                title: t.confirmDeleteTitle,
+                message: t.confirmDeleteProject.replace("{name}", project.name),
+                confirmText: t.actionDelete,
+                cancelText: t.cancel,
+                confirmVariant: "danger",
+              })
+            ) {
+              onDelete();
+            }
+          }}
+          aria-label={`${t.actionDelete} ${project.name}`}
           style={{
             background: "none",
             border: "none",

@@ -5,8 +5,9 @@
  * - ESC or Cancel button cancels, Confirm button confirms
  * - Background click cancels
  */
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { colors, radii, typography } from "@/theme/tokens";
 
 import { Button } from "./Button";
@@ -32,6 +33,9 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent): void => {
@@ -47,6 +51,8 @@ export function ConfirmDialog({
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-message"
       onClick={onCancel}
       style={{
         position: "fixed",
@@ -60,6 +66,8 @@ export function ConfirmDialog({
       }}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: colors.surface,
@@ -69,13 +77,14 @@ export function ConfirmDialog({
           width: "90%",
           maxWidth: 400,
           boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          outline: "none",
         }}
       >
-        <h2 style={{ margin: "0 0 12px", fontSize: typography.size.lg, fontWeight: 700 }}>
+        <h2 id="confirm-title" style={{ margin: "0 0 12px", fontSize: typography.size.lg, fontWeight: 700 }}>
           {title}
         </h2>
 
-        <p style={{ margin: "0 0 20px", fontSize: typography.size.sm, color: colors.text }}>
+        <p id="confirm-message" style={{ margin: "0 0 20px", fontSize: typography.size.sm, color: colors.text }}>
           {message}
         </p>
 

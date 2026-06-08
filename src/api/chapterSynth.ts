@@ -51,11 +51,21 @@ export function getChunkMap(chapterId: string): Promise<ChunkMapResponse> {
   return getJson<ChunkMapResponse>(`/chapters/${chapterId}/chunks`);
 }
 
+export interface RegenChunkResult {
+  /** Audio of the regenerated chunk (for auditioning). */
+  blob: Blob;
+  /** True if the whole-chapter audio was rebuilt so the player/export
+   * reflect the change; false means only this chunk's take was updated
+   * (e.g. cloned voices don't persist per-chunk audio yet). */
+  respliced: boolean;
+  engine: string;
+}
+
 export async function regenerateChunk(
   chapterId: string,
   chunkIndex: number,
   signal?: AbortSignal,
-): Promise<Blob> {
+): Promise<RegenChunkResult> {
   const init: RequestInit = { method: "POST" };
   if (signal) init.signal = signal;
   const res = await fetch(
@@ -70,7 +80,10 @@ export async function regenerateChunk(
     } catch { /* ignore */ }
     throw new ApiError(res.status, detail);
   }
-  return res.blob();
+  const respliced = res.headers.get("X-Chapter-Respliced") === "true";
+  const engine = res.headers.get("X-Audio-Engine") ?? "edge-tts";
+  const blob = await res.blob();
+  return { blob, respliced, engine };
 }
 
 export interface UploadedChapterGeneration {

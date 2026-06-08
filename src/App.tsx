@@ -6,11 +6,11 @@ import { VOICES } from "@/constants/voices";
 import { ActivityTab } from "@/features/activity/ActivityTab";
 import { AudioToolsTab } from "@/features/audio-tools/AudioToolsTab";
 import { WorkbenchTab } from "@/features/projects/WorkbenchTab";
-import { QuickSynthTab } from "@/features/quick-synth/QuickSynthTab";
 import { StudioTab } from "@/features/studio/StudioTab";
-import { VoicesUnifiedTab } from "@/features/voices-unified/VoicesUnifiedTab";
+import { VoicesPlusLab } from "@/features/voices-unified/VoicesPlusLab";
 import { useErrorBadge } from "@/hooks/useErrorBadge";
 import type { ProfileDraft, SynthSettings } from "@/features/state";
+import { ProfilesContext } from "@/hooks/profilesContext";
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useToast } from "@/hooks/useToast";
@@ -63,10 +63,15 @@ export default function App() {
   const [editingProfile, setEditingProfile] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
+  // Name of the currently-open project, surfaced into the global header
+  // so the user always knows what they're editing.
+  const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
+
   const toast = useToast();
   const errorBadge = useErrorBadge();
   useDraftPersistence({ key: "voxforge.draft.synth", value: text, onRestore: setText });
-  const { profiles, create, update, remove } = useProfiles();
+  const profilesState = useProfiles();
+  const { profiles, create, update, remove } = profilesState;
   const voicePreview = useVoicePreview();
   const samplePlayer = useSamplePlayer();
   const t = getTranslations(lang);
@@ -129,7 +134,10 @@ export default function App() {
     setVolume(p.volume);
     setLang(p.lang);
     setActiveProfileId(p.id);
-    setTab("quick-synth");
+    // Quick Synth no longer has its own nav entry; it's rendered inside
+    // the "voices" tab as the lab section. Stay on the same tab so the
+    // user sees the profile becomes the active one in the lab below.
+    setTab("voices");
   };
 
   const handleEditProfile = (p: Profile): void => {
@@ -163,6 +171,7 @@ export default function App() {
   };
 
   return (
+    <ProfilesContext.Provider value={profilesState}>
     <div
       style={{
         minHeight: "100vh",
@@ -178,28 +187,33 @@ export default function App() {
       <BackgroundTexture />
       <Toast toasts={toast.toasts} onDismiss={toast.dismiss} />
 
-      <Header t={t} lang={lang} onToggleLang={handleToggleLang} />
+      <Header
+        t={t}
+        lang={lang}
+        onToggleLang={handleToggleLang}
+        activeProjectName={tab === "workbench" ? activeProjectName : null}
+      />
       <TabsNav t={t} tab={tab} setTab={setTab} errorCount={errorBadge} />
 
       <main className="vf-main-narrow" style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
-        {visitedTabs.has("quick-synth") && (
-          <TabHost active={tab === "quick-synth"}>
-            <QuickSynthTab t={t} text={text} setText={setText} settings={settings} onToast={toast.show} onCreateProfile={create} />
-          </TabHost>
-        )}
         {visitedTabs.has("workbench") && (
           <TabHost active={tab === "workbench"}>
             <WorkbenchTab
               t={t}
               onToast={toast.show}
               onOpenStudioWithSource={openStudioWithSource}
-              onNavigateToQuickSynth={() => setTab("quick-synth")}
+              // Sprint A: Quick Synth was absorbed into the Voices tab
+              // (gallery + lab). The incomplete-jobs banner now lands
+              // there; the lab section below picks up the in-flight
+              // jobs as before.
+              onNavigateToQuickSynth={() => setTab("voices")}
+              onActiveProjectChange={setActiveProjectName}
             />
           </TabHost>
         )}
         {visitedTabs.has("voices") && (
           <TabHost active={tab === "voices"}>
-            <VoicesUnifiedTab
+            <VoicesPlusLab
               t={t}
               settings={settings}
               draft={draft}
@@ -214,6 +228,9 @@ export default function App() {
               onToast={toast.show}
               voicePreview={voicePreview}
               samplePlayer={samplePlayer}
+              text={text}
+              setText={setText}
+              onCreateProfile={create}
             />
           </TabHost>
         )}
@@ -239,6 +256,7 @@ export default function App() {
         )}
       </main>
     </div>
+    </ProfilesContext.Provider>
   );
 }
 
@@ -299,9 +317,13 @@ interface HeaderProps {
   t: ReturnType<typeof getTranslations>;
   lang: Language;
   onToggleLang: () => void;
+  /** When a project is open in the Workbench tab, its name is shown
+   * in the header so the user knows what they're editing without
+   * having to glance at the sidebar. Null hides the badge. */
+  activeProjectName: string | null;
 }
 
-function Header({ t, lang, onToggleLang }: HeaderProps) {
+function Header({ t, lang, onToggleLang, activeProjectName }: HeaderProps) {
   return (
     <header
       style={{
@@ -359,6 +381,49 @@ function Header({ t, lang, onToggleLang }: HeaderProps) {
         </div>
       </div>
 
+      {activeProjectName && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 14px",
+            background: "rgba(59,130,246,0.08)",
+            border: "1px solid rgba(59,130,246,0.25)",
+            borderRadius: 8,
+            fontSize: typography.size.sm,
+            color: colors.text,
+            fontFamily: fonts.sans,
+            maxWidth: 360,
+            overflow: "hidden",
+          }}
+        >
+          <Icons.Book />
+          <span
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.textDim,
+              textTransform: "uppercase",
+              letterSpacing: "1.5px",
+              fontWeight: 600,
+            }}
+          >
+            {t.headerEditing}
+          </span>
+          <span
+            style={{
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              minWidth: 0,
+            }}
+          >
+            {activeProjectName}
+          </span>
+        </div>
+      )}
+
       <button
         onClick={onToggleLang}
         aria-label={t.language}
@@ -394,15 +459,14 @@ interface TabsNavProps {
 }
 
 function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
-  // Audio Tools (Convert + Lab) is deliberately excluded from the top
-  // nav — it's standalone file-processing that doesn't fit the
-  // audiobook production flow. The component is still reachable via
-  // ``tab === "audio-tools"`` (legacy links) but nothing surfaces it.
+  // Visible destinations: Workbench, Voices, Audio Tools, Activity. Quick
+  // Synth lives inside Voices (the lab section) and Studio opens as a panel
+  // from a chapter, so neither needs its own nav entry. Audio Tools (Change
+  // Voice + Effects), however, is only reachable from here.
   const tabs: readonly { id: Tab; icon: JSX.Element; label: string }[] = [
     { id: "workbench", icon: <Icons.Book />, label: t.tabWorkbench },
-    { id: "quick-synth", icon: <Icons.Zap />, label: t.tabQuickSynth },
     { id: "voices", icon: <Icons.Mic2 />, label: t.tabVoices },
-    { id: "studio", icon: <Icons.Scissors />, label: t.tabStudio },
+    { id: "audio-tools", icon: <Icons.SlidersIcon />, label: t.tabAudioTools },
     { id: "activity", icon: <Icons.Clock />, label: errorCount > 0 ? `${t.tabActivity} (${errorCount})` : t.tabActivity },
   ];
   return (

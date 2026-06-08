@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { PromptDialog } from "@/components/PromptDialog";
 import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
+import { activateOnKey } from "@/utils/a11y";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useCustomLabPresets } from "@/hooks/useCustomLabPresets";
@@ -317,7 +318,12 @@ export function LabTab({ t, onToast }: LabTabProps) {
             return (
               <div
                 key={preset.name}
+                role="button"
+                tabIndex={0}
+                aria-label={preset.name}
+                aria-pressed={isActive}
                 onClick={() => applyPreset(preset)}
+                onKeyDown={activateOnKey(() => applyPreset(preset))}
                 style={{
                   textAlign: "left", padding: "12px 14px", borderRadius: radii.md,
                   background: isActive ? "rgba(16,185,129,0.1)" : colors.surfaceSubtle,

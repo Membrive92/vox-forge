@@ -14,7 +14,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: process.env.VITE_API_TARGET ?? "http://localhost:8000",
         changeOrigin: true,
         // Long timeouts for voice cloning / conversion (can take minutes)
         timeout: 600_000,

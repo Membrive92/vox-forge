@@ -91,8 +91,11 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
     regenAbortRef.current = controller;
     setRegenIndex(index);
     try {
-      await regenerateChunk(chapterId, index, controller.signal);
-      onToast(`Chunk ${index + 1} regenerated`);
+      const result = await regenerateChunk(chapterId, index, controller.signal);
+      onToast(
+        (result.respliced ? t.chunkRegeneratedApplied : t.chunkRegeneratedPreview)
+          .replace("{n}", String(index + 1)),
+      );
       await loadMap();
     } catch (e) {
       if (isAbortError(e)) {
@@ -195,6 +198,24 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
             style={{ display: "none" }}
           />
           <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} />
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Icons.Download />}
+              onClick={() => {
+                if (!player.url) return;
+                const a = document.createElement("a");
+                a.href = player.url;
+                a.download = `${chapterTitle.replace(/[^\w\s.-]/g, "_")}.mp3`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+              }}
+            >
+              {t.download}
+            </Button>
+          </div>
         </div>
       )}
 

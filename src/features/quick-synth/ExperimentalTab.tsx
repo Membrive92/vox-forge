@@ -16,7 +16,7 @@ import { Button } from "@/components/Button";
 import { PromptDialog } from "@/components/PromptDialog";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
-import { useProfiles } from "@/hooks/useProfiles";
+import { useSharedProfiles } from "@/hooks/profilesContext";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Language, Profile } from "@/types/domain";
@@ -51,7 +51,7 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
   const sampleInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
-  const { profiles, create: defaultCreateProfile } = useProfiles();
+  const { profiles, create: defaultCreateProfile } = useSharedProfiles();
   const createProfile = onCreateProfile || defaultCreateProfile;
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 

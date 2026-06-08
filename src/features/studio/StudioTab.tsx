@@ -35,23 +35,47 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
   // Cross-tab navigation: when the Workbench fires "Edit in Studio" we
   // receive a generation id via props. Find the matching source, select
   // it, then tell the parent we're done so the intent doesn't re-fire.
+  //
+  // StudioTab stays mounted once visited and only loads sources on mount,
+  // so the cached list is usually stale by the time the user clicks "Edit
+  // in Studio" on a freshly-generated take. If the id isn't in the current
+  // list, refresh once before giving up — otherwise a valid link silently
+  // does nothing (which looked like "Edit in Studio is broken").
+  const pendingRefreshRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!pendingSourceId) return;
+    if (!pendingSourceId) {
+      pendingRefreshRef.current = null;
+      return;
+    }
     const match = session.sources.find((s) => s.id === pendingSourceId);
     if (match) {
       studio.selectSource(match);
+      pendingRefreshRef.current = null;
       onPendingSourceConsumed();
-    } else if (!session.loadingSources && session.sources.length > 0) {
-      // Sources loaded but the id isn't there — stale link. Clear so
-      // the user isn't stuck.
-      onPendingSourceConsumed();
+      return;
     }
+    if (session.loadingSources) return;
+    if (pendingRefreshRef.current !== pendingSourceId) {
+      // Cached list may be stale — pull a fresh one before deciding.
+      pendingRefreshRef.current = pendingSourceId;
+      void studio.refreshSources();
+      return;
+    }
+    // Refreshed and still absent — the take genuinely isn't an editable
+    // source (e.g. a non-active take). Surface it instead of failing
+    // silently, and clear so the user isn't stuck.
+    pendingRefreshRef.current = null;
+    onPendingSourceConsumed();
+    onToast(t.studioSourceUnavailable);
   }, [
     pendingSourceId,
     session.sources,
     session.loadingSources,
     studio.selectSource,
+    studio.refreshSources,
     onPendingSourceConsumed,
+    onToast,
+    t.studioSourceUnavailable,
   ]);
 
   useEffect(() => {
@@ -166,6 +190,7 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <audio
                   controls
+                  aria-label={t.studioResultTitle}
                   src={session.resultUrl}
                   style={{ flex: 1, minWidth: 0 }}
                 />
@@ -218,7 +243,8 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
             onPickCover={(file) => void studio.setCover(file)}
             onClearCover={studio.clearCover}
             onRender={(options, images) => {
-              void studio.renderCurrent(options, images).then(() => {
+              void studio.renderCurrent(options, images).then((ok) => {
+                if (!ok) return;
                 onToast(t.studioVideoRenderSuccess);
                 void studio.refreshRenders();
               });

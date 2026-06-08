@@ -69,7 +69,7 @@ export interface StudioSessionApi {
   renderCurrent: (
     options: Partial<VideoOptions>,
     images?: VideoImage[],
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   cancelRender: () => void;
   downloadVideo: (filenameHint?: string) => void;
   clearVideo: () => void;
@@ -342,11 +342,11 @@ export function useStudioSession(): StudioSessionApi {
   const clearCover = useCallback(() => setCoverState(null), []);
 
   const renderCurrent = useCallback(
-    async (options: Partial<VideoOptions>, images?: VideoImage[]) => {
-      if (!selected) return;
+    async (options: Partial<VideoOptions>, images?: VideoImage[]): Promise<boolean> => {
+      if (!selected) return false;
       // Slideshow mode needs no cover; single-cover mode needs it.
       const slideshow = images && images.length > 0;
-      if (!slideshow && !cover) return;
+      if (!slideshow && !cover) return false;
       const controller = new AbortController();
       renderAbortRef.current = controller;
       setIsRendering(true);
@@ -372,6 +372,7 @@ export function useStudioSession(): StudioSessionApi {
           sizeBytes: result.sizeBytes,
           resolution: result.resolution,
         });
+        return true;
       } catch (err) {
         if (isAbortError(err)) {
           logger.info("Studio: render cancelled");
@@ -380,6 +381,7 @@ export function useStudioSession(): StudioSessionApi {
           setError(msg);
           logger.error("Studio: render failed", { error: msg });
         }
+        return false;
       } finally {
         setIsRendering(false);
         if (renderAbortRef.current === controller) renderAbortRef.current = null;

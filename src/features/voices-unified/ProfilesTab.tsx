@@ -1,4 +1,5 @@
 import { Button } from "@/components/Button";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
 import { ALL_VOICES } from "@/constants/voices";
@@ -96,6 +97,7 @@ interface ProfileCardProps {
 }
 
 function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnchor, samplePlayer, voicePreview }: ProfileCardProps) {
+  const confirm = useConfirm();
   const voice = ALL_VOICES.find((v) => v.id === profile.voiceId);
   const params = [
     { label: t.speed, value: `${profile.speed}%` },
@@ -310,7 +312,24 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnc
         <IconButton aria-label={t.editProfile} variant="secondary" size="md" onClick={onEdit}>
           <Icons.Edit />
         </IconButton>
-        <IconButton aria-label={t.deleteProfile} variant="danger" size="md" onClick={onDelete}>
+        <IconButton
+          aria-label={t.deleteProfile}
+          variant="danger"
+          size="md"
+          onClick={async () => {
+            if (
+              await confirm({
+                title: t.confirmDeleteTitle,
+                message: t.confirmDeleteProfile.replace("{name}", profile.name),
+                confirmText: t.actionDelete,
+                cancelText: t.cancel,
+                confirmVariant: "danger",
+              })
+            ) {
+              onDelete();
+            }
+          }}
+        >
           <Icons.Trash />
         </IconButton>
       </div>

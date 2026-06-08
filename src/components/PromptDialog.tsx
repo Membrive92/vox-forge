@@ -12,6 +12,7 @@
  */
 import { forwardRef, useEffect, useRef, useState } from "react";
 
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 import { Button } from "./Button";
@@ -44,6 +45,8 @@ export function PromptDialog({
   const [value, setValue] = useState(initialValue);
   const [secondary, setSecondary] = useState(initialSecondary);
   const firstInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusTrap(formRef, open);
 
   useEffect(() => {
     if (open) {
@@ -90,6 +93,7 @@ export function PromptDialog({
       }}
     >
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
         style={{

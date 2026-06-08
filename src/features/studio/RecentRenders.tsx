@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { API_BASE } from "@/api/client";
 import type { StudioRender } from "@/api/studio";
 import { Button } from "@/components/Button";
+import { useConfirm } from "@/components/ConfirmProvider";
 import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
 import type { Translations } from "@/i18n";
@@ -41,6 +42,7 @@ function formatSize(bytes: number): string {
 }
 
 export function RecentRenders({ t, renders, loading, currentChapterId, onRefresh, onDelete }: Props) {
+  const confirm = useConfirm();
   const [filter, setFilter] = useState<Filter>("all");
   const [scopeToChapter, setScopeToChapter] = useState(false);
 
@@ -241,7 +243,19 @@ export function RecentRenders({ t, renders, loading, currentChapterId, onRefresh
                   aria-label={t.studioRecentDelete}
                   variant="danger"
                   size="sm"
-                  onClick={() => onDelete(r.id)}
+                  onClick={async () => {
+                    if (
+                      await confirm({
+                        title: t.confirmDeleteTitle,
+                        message: t.confirmDeleteRender,
+                        confirmText: t.actionDelete,
+                        cancelText: t.cancel,
+                        confirmVariant: "danger",
+                      })
+                    ) {
+                      onDelete(r.id);
+                    }
+                  }}
                 >
                   <Icons.Trash />
                 </IconButton>

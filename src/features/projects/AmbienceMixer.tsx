@@ -22,6 +22,7 @@ import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+import { activateOnKey } from "@/utils/a11y";
 
 interface Props {
   t: Translations;
@@ -190,7 +191,12 @@ export function AmbienceMixer({ t, chapterId, onToast }: Props) {
             return (
               <div
                 key={track.id}
+                role="button"
+                tabIndex={0}
+                aria-label={track.name}
+                aria-pressed={active}
                 onClick={() => setSelectedId(track.id)}
+                onKeyDown={activateOnKey(() => setSelectedId(track.id))}
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "8px 12px", borderRadius: radii.sm, cursor: "pointer",

@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { installGlobalErrorHandlers, logger } from "@/logging/logger";
 
@@ -16,7 +17,9 @@ if (!root) throw new Error("Root element not found");
 createRoot(root).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <ConfirmProvider>
+        <App />
+      </ConfirmProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

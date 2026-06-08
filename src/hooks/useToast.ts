@@ -33,14 +33,21 @@ export interface ToastState {
 const DEFAULT_DURATION_MS = 4000;
 const ERROR_DURATION_MS = 6000;
 
+// Keyword heuristics in both languages. The app is Spanish-first, so
+// without the Spanish markers every translated toast fell through to the
+// neutral "info" style (an error or success looked like a plain notice).
+// Callers that care can still pass an explicit type to `show`.
+const ERROR_MARKERS = ["error", "failed", "could not", "no se pudo", "fallo", "no se ha"];
+const SUCCESS_MARKERS = [
+  "saved", "ready", "done",
+  "correctamente", "guardad", "aplicad", "actualizad", "eliminad",
+  "añadid", "generad", "completad", "listo", "lista",
+];
+
 function inferType(message: string): ToastType {
   const lower = message.toLowerCase();
-  if (lower.startsWith("error") || lower.startsWith("failed") || lower.includes("could not")) {
-    return "error";
-  }
-  if (lower.includes("saved") || lower.includes("ready") || lower.includes("done")) {
-    return "success";
-  }
+  if (ERROR_MARKERS.some((w) => lower.includes(w))) return "error";
+  if (SUCCESS_MARKERS.some((w) => lower.includes(w))) return "success";
   return "info";
 }
 
