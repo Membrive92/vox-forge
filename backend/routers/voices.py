@@ -16,7 +16,7 @@ from ..paths import VOICES_DIR
 from ..schemas import SampleUploadResponse
 from ..services.profile_manager import ProfileManager
 from ..services.tts_engine import TTSEngine
-from ..upload_utils import read_upload_safely, validate_audio_upload
+from ..upload_utils import read_upload_safely, validate_audio_bytes, validate_audio_upload
 
 router = APIRouter(prefix="/voices", tags=["voices"])
 
@@ -54,6 +54,7 @@ async def upload_voice_sample(
     filepath = VOICES_DIR / filename
 
     content = await read_upload_safely(sample)
+    validate_audio_bytes(content)
     filepath.write_bytes(content)
 
     duration: float | None = None

@@ -117,7 +117,7 @@ async def synthesize_text(
 @router.get("/synthesize/progress/{job_id}", response_model=JobProgressResponse)
 async def get_progress(job_id: str) -> JobProgressResponse:
     """Return the current progress snapshot for a running synthesis job."""
-    job = progress_registry.get(job_id)
+    job = progress_registry.snapshot(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return JobProgressResponse(

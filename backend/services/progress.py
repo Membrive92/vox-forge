@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,16 @@ class ProgressRegistry:
     def get(self, job_id: str) -> JobProgress | None:
         with self._lock:
             return self._jobs.get(job_id)
+
+    def snapshot(self, job_id: str) -> JobProgress | None:
+        """Return a copy of the job taken under the lock.
+
+        ``get`` hands out the live object, so a caller that then reads its
+        fields races ``update``/``finish`` mutating them. Use this when you
+        need a consistent read (e.g. the progress endpoint)."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            return replace(job) if job is not None else None
 
     def _sweep_locked(self) -> None:
         """Drop stale entries. Caller must hold the lock."""

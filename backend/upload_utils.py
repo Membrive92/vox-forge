@@ -80,6 +80,53 @@ def validate_document_upload(upload: UploadFile) -> None:
             )
 
 
+def _looks_like_audio(content: bytes) -> bool:
+    """True if the leading bytes match a known audio container."""
+    if len(content) < 12:
+        return False
+    head = content[:12]
+    if head[:4] == b"RIFF" and content[8:12] == b"WAVE":
+        return True  # WAV
+    if head[:4] in (b"OggS", b"fLaC", b"FORM"):
+        return True  # Ogg / FLAC / AIFF
+    if head[:3] == b"ID3":
+        return True  # MP3 with ID3 tag
+    if head[0] == 0xFF and (head[1] & 0xE0) == 0xE0:
+        return True  # MPEG audio frame sync
+    if content[4:8] == b"ftyp":
+        return True  # MP4 / M4A
+    if head[:4] == b"\x1aE\xdf\xa3":
+        return True  # EBML (WebM / Matroska)
+    return False
+
+
+def _looks_like_text_or_executable(content: bytes) -> bool:
+    """True if the head clearly looks like markup/script/PDF/executable."""
+    head = content[:64].lstrip()
+    if not head:
+        return False
+    return (
+        head[:1] in (b"<", b"{", b"[")
+        or head[:2] in (b"#!", b"//", b"MZ")
+        or head[:4] == b"\x7fELF"
+        or head[:5].upper() == b"%PDF-"
+    )
+
+
+def validate_audio_bytes(content: bytes) -> None:
+    """Defence-in-depth: reject payloads that are clearly not audio.
+
+    The declared content-type/extension is trivially spoofable, so we also
+    sniff the bytes. Intentionally permissive — only rejects when the bytes
+    don't match a known audio container *and* look like text/markup/an
+    executable, so unusual-but-valid audio isn't false-rejected (ffmpeg
+    downstream is the final gate)."""
+    if not _looks_like_audio(content) and _looks_like_text_or_executable(content):
+        raise InvalidSampleError(
+            "Uploaded file does not look like audio (content check failed)."
+        )
+
+
 async def read_upload_safely(upload: UploadFile, max_bytes: int = MAX_UPLOAD_BYTES) -> bytes:
     """Read an upload in chunks, aborting if it exceeds max_bytes.
 

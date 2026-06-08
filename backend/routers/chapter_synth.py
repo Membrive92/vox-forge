@@ -29,7 +29,7 @@ from ..services import project_manager as pm
 from ..services.metadata import AudioMetadata, embed_metadata
 from ..services.progress import registry as progress_registry
 from ..services.tts_engine import TTSEngine, split_into_chunks
-from ..upload_utils import read_upload_safely, validate_audio_upload
+from ..upload_utils import read_upload_safely, validate_audio_bytes, validate_audio_upload
 from ..utils import cleanup_old_files
 
 logger = logging.getLogger(__name__)
@@ -397,6 +397,7 @@ async def upload_chapter_audio(
     filepath = OUTPUT_DIR / filename
 
     content = await read_upload_safely(audio)
+    validate_audio_bytes(content)
     filepath.write_bytes(content)
 
     # Best-effort duration; if ffmpeg can't decode, record 0.

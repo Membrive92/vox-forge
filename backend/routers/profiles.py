@@ -13,7 +13,7 @@ from ..exceptions import ProfileNotFound
 from ..paths import VOICES_DIR
 from ..schemas import DeletedResponse, ProfileUpdate, VoiceProfile
 from ..services.profile_manager import ProfileManager
-from ..upload_utils import read_upload_safely, validate_audio_upload
+from ..upload_utils import read_upload_safely, validate_audio_bytes, validate_audio_upload
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -59,6 +59,7 @@ async def create_profile(
         sample_filename = f"{str(uuid.uuid4())[:8]}{ext}"
         sample_path = VOICES_DIR / sample_filename
         content = await read_upload_safely(sample)
+        validate_audio_bytes(content)
         sample_path.write_bytes(content)
 
         try:

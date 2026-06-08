@@ -19,7 +19,7 @@ from ..services.ambience import (
     mix_narration_with_ambient,
     save_track,
 )
-from ..upload_utils import read_upload_safely, validate_audio_upload
+from ..upload_utils import read_upload_safely, validate_audio_bytes, validate_audio_upload
 from ..utils import cleanup_old_files
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ async def upload_ambience(
 ) -> dict:
     validate_audio_upload(audio)
     content = await read_upload_safely(audio)
+    validate_audio_bytes(content)
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
     track = save_track(
         name=name,

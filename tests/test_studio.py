@@ -452,8 +452,9 @@ def test_build_ffmpeg_argv_with_burn_subs(client) -> None:
         options=VideoOptions(subtitles_mode="burn"),
     )
     joined = " ".join(argv)
-    # Backslashes must be converted to forward slashes for ffmpeg
-    assert "C:/data/studio/subs/x.srt" in joined
+    # Backslashes become forward slashes AND the drive-letter colon is
+    # escaped so it can't terminate the subtitles filter option.
+    assert r"C\:/data/studio/subs/x.srt" in joined
     assert "subtitles=" in joined
 
 

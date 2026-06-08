@@ -77,6 +77,17 @@ def _escape_drawtext(text: str) -> str:
     return out
 
 
+def _escape_subtitles_path(path: Path) -> str:
+    """Escape a filesystem path for ffmpeg's ``subtitles`` filter.
+
+    Forward slashes (the filter chokes on backslashes), then escape the
+    colon and quote so a Windows drive letter (``C:``) or a quote in the
+    path can't terminate the filter option / inject extra options.
+    """
+    s = str(path).replace("\\", "/")
+    return s.replace(":", r"\:").replace("'", r"\'")
+
+
 def _build_filter_complex(
     *,
     width: int,
@@ -122,7 +133,7 @@ def _build_filter_complex(
     if burn_subs_path is not None:
         # Forward slashes even on Windows — ffmpeg's 'subtitles' filter
         # does its own parsing and chokes on backslashes.
-        sub = str(burn_subs_path).replace("\\", "/")
+        sub = _escape_subtitles_path(burn_subs_path)
         parts.append(
             f"[{current}]subtitles={sub}:"
             f"force_style='FontName=Arial,FontSize=28'[vout]"
@@ -291,7 +302,7 @@ def _build_slideshow_filter(
 
     # 5. Burned subtitles if present.
     if burn_subs_path is not None:
-        sub = str(burn_subs_path).replace("\\", "/")
+        sub = _escape_subtitles_path(burn_subs_path)
         parts.append(
             f"[{current}]subtitles={sub}:"
             f"force_style='FontName=Arial,FontSize=28'[vout]"

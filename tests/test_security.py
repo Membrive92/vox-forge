@@ -73,3 +73,63 @@ def test_chunk_path_rejects_unsafe_id() -> None:
 
     with pytest.raises(job_store.InvalidJobId):
         job_store.chunk_path("../../oops", 0, "mp3")
+
+
+# ── Upload content sniffing ─────────────────────────────────────────
+
+def test_validate_audio_bytes_accepts_known_audio() -> None:
+    from backend.upload_utils import validate_audio_bytes
+
+    # WAV (RIFF....WAVE) and MP3 (ID3) headers must pass.
+    validate_audio_bytes(b"RIFF\x00\x00\x00\x00WAVEfmt ")
+    validate_audio_bytes(b"ID3\x04\x00\x00\x00\x00\x00\x00\x00")
+    # Ambiguous binary (no known magic, not texty) is allowed — ffmpeg decides.
+    validate_audio_bytes(b"\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"<!DOCTYPE html><html><body>hi</body></html>",
+        b"<svg xmlns='http://www.w3.org/2000/svg'></svg>",
+        b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00",  # PE executable
+        b"%PDF-1.7\n%...",
+        b"#!/bin/sh\nrm -rf /\n",
+    ],
+)
+def test_validate_audio_bytes_rejects_non_audio(payload: bytes) -> None:
+    from backend.exceptions import InvalidSampleError
+    from backend.upload_utils import validate_audio_bytes
+
+    with pytest.raises(InvalidSampleError):
+        validate_audio_bytes(payload)
+
+
+def test_escape_subtitles_path_escapes_drive_colon() -> None:
+    from pathlib import Path
+
+    from backend.services.video_renderer import _escape_subtitles_path
+
+    out = _escape_subtitles_path(Path(r"C:\data\studio\subs\x.srt"))
+    assert out == r"C\:/data/studio/subs/x.srt"
+
+
+def test_progress_snapshot_is_isolated_from_mutation() -> None:
+    from backend.services.progress import ProgressRegistry
+
+    reg = ProgressRegistry()
+    reg.start("abc", chunks_total=10)
+    snap = reg.snapshot("abc")
+    assert snap is not None
+    reg.update("abc", chunks_done=5)
+    # The snapshot was a copy — later mutations must not change it.
+    assert snap.chunks_done == 0
+
+
+def test_normalizer_keeps_common_uppercase_words() -> None:
+    from backend.services.text_normalizer import _spell_unknown_siglas
+
+    # Real words in caps must NOT be spelled out letter by letter.
+    assert "ene o" not in _spell_unknown_siglas("¡NO puede ser!")
+    # Genuine unknown acronyms still get spelled.
+    assert _spell_unknown_siglas("la XYZ") != "la XYZ"

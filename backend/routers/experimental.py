@@ -258,6 +258,8 @@ async def cross_lingual_synthesis(
         )
     finally:
         user_sample.unlink(missing_ok=True)
+        if anchored_path is not None:
+            anchored_path.unlink(missing_ok=True)
 
 
 @router.post("/cross-lingual/candidates", summary="Cross-lingual with N takes")
@@ -291,11 +293,14 @@ async def cross_lingual_candidates(
     validate_audio_upload(voice_sample)
 
     user_sample = await _persist_sample(voice_sample)
+    anchored_path: Path | None = None
 
     try:
         plan = _resolve_speaker_plan(
             user_sample, use_castilian_reference, castilian_warmup,
         )
+        if plan.speaker_wav != user_sample and plan.speaker_wav.parent == TEMP_DIR:
+            anchored_path = plan.speaker_wav  # temp anchored wav — clean up later
         takes: list[_Take] = []
         for _ in range(candidates):
             take = await _generate_take(
@@ -327,6 +332,8 @@ async def cross_lingual_candidates(
         }
     finally:
         user_sample.unlink(missing_ok=True)
+        if anchored_path is not None:
+            anchored_path.unlink(missing_ok=True)
 
 
 @router.get("/reference-voice/audio", summary="Serve the configured reference voice file")

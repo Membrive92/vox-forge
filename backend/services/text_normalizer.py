@@ -167,6 +167,17 @@ def _expand_siglas(text: str) -> str:
     return text
 
 
+# Short ALL-CAPS tokens that are real words (often emphasis), not acronyms —
+# these must NOT be spelled out letter by letter ("NO" -> "ene o").
+_COMMON_UPPER_WORDS = frozenset({
+    "NO", "SI", "SÍ", "YA", "FIN", "VS", "SU", "TU", "MI", "EL", "EN",
+    "ES", "UN", "UNA", "DE", "LA", "LO", "LE", "SE", "TE", "ME", "VE",
+    "DA", "VA", "HA", "HE", "OH", "AH", "EH", "OS", "AL", "POR", "QUE",
+    "CON", "SIN", "MÁS", "PERO", "SOL", "MAR", "PAZ", "REY", "DIOS",
+    "AQUÍ", "ALLÍ", "HOY", "AYER", "BIEN", "MAL", "DOS", "TRES", "SEIS",
+})
+
+
 def _spell_unknown_siglas(text: str) -> str:
     """Spell out remaining ALL-CAPS words (2-5 letters) letter by letter."""
     _LETTER_NAMES = {
@@ -179,8 +190,9 @@ def _spell_unknown_siglas(text: str) -> str:
 
     def _spell(m: re.Match) -> str:
         word = m.group(0)
-        if len(word) > 5:
-            # Likely a real word in caps, title-case it
+        if len(word) > 5 or word in _COMMON_UPPER_WORDS:
+            # Real word in caps (long, or a known common word) — title-case it
+            # so the TTS reads it as a word, not letter by letter.
             return word[0] + word[1:].lower()
         letters = [_LETTER_NAMES.get(c, c) for c in word]
         return " ".join(letters)
