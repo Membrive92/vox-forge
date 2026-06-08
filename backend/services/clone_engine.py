@@ -230,20 +230,30 @@ class CloneEngine:
         output_path: Path,
         speed: float = 1.0,
     ) -> None:
-        """Generate a single audio file (one attempt)."""
+        """Generate a single audio file (one attempt).
+
+        Holds the shared GPU semaphore only for THIS one inference, so other
+        GPU work (a second chapter, /convert, experimental) can interleave
+        between candidates instead of waiting behind the whole
+        8-candidates × retries loop + CPU scoring.
+        """
         assert self._model is not None  # noqa: S101
-        await asyncio.wait_for(
-            asyncio.to_thread(
-                self._model.tts_to_file,
-                text=text,
-                speaker_wav=speaker_wav,
-                language=language,
-                file_path=str(output_path),
-                speed=speed,
-                **_XTTS_QUALITY_PARAMS,
-            ),
-            timeout=_CHUNK_TIMEOUT_SECONDS,
-        )
+        async with _gpu_semaphore:
+            self._generation_count += 1
+            if self._generation_count % 10 == 0:
+                self._clear_cuda_cache()
+            await asyncio.wait_for(
+                asyncio.to_thread(
+                    self._model.tts_to_file,
+                    text=text,
+                    speaker_wav=speaker_wav,
+                    language=language,
+                    file_path=str(output_path),
+                    speed=speed,
+                    **_XTTS_QUALITY_PARAMS,
+                ),
+                timeout=_CHUNK_TIMEOUT_SECONDS,
+            )
 
     async def raw_synthesize(
         self,
@@ -344,42 +354,37 @@ class CloneEngine:
         all_candidates: list[Path] = []
 
         try:
-            async with _gpu_semaphore:
-                self._generation_count += 1
-                if self._generation_count % 10 == 0:
-                    self._clear_cuda_cache()
-                    logger.debug("CUDA cache cleared (generation %d)", self._generation_count)
+            # The GPU semaphore is now held per-inference inside
+            # _generate_one, so it's released between candidates and rounds.
+            # Scoring is CPU-only — run it off the event loop (to_thread) and
+            # outside any GPU lock so it can't block other work.
+            candidates = await self._generate_candidates(
+                text, str(speaker_wav), xtts_lang, file_id, _CANDIDATES_PER_CHUNK,
+                cancel_token=cancel_token, speed=speed,
+            )
+            all_candidates.extend(candidates)
 
-                # First round of candidates
-                candidates = await self._generate_candidates(
-                    text, str(speaker_wav), xtts_lang, file_id, _CANDIDATES_PER_CHUNK,
+            scored = [(c, await asyncio.to_thread(self._score_audio, c)) for c in all_candidates]
+            scored.sort(key=lambda x: x[1])
+            best_score = scored[0][1]
+
+            # Retry if best candidate is below quality threshold
+            retry = 0
+            while best_score > _QUALITY_THRESHOLD and retry < _MAX_RETRIES:
+                retry += 1
+                logger.info(
+                    "Best score %.2f exceeds threshold %.1f, retry %d/%d",
+                    best_score, _QUALITY_THRESHOLD, retry, _MAX_RETRIES,
+                )
+                extra = await self._generate_candidates(
+                    text, str(speaker_wav), xtts_lang, file_id,
+                    _CANDIDATES_PER_CHUNK, offset=len(all_candidates),
                     cancel_token=cancel_token, speed=speed,
                 )
-                all_candidates.extend(candidates)
-
-                # Score and check quality threshold
-                scored = [(c, self._score_audio(c)) for c in all_candidates]
+                all_candidates.extend(extra)
+                scored = [(c, await asyncio.to_thread(self._score_audio, c)) for c in all_candidates]
                 scored.sort(key=lambda x: x[1])
                 best_score = scored[0][1]
-
-                # Retry if best candidate is below quality threshold
-                retry = 0
-                while best_score > _QUALITY_THRESHOLD and retry < _MAX_RETRIES:
-                    retry += 1
-                    logger.info(
-                        "Best score %.2f exceeds threshold %.1f, retry %d/%d",
-                        best_score, _QUALITY_THRESHOLD, retry, _MAX_RETRIES,
-                    )
-                    self._clear_cuda_cache()
-                    extra = await self._generate_candidates(
-                        text, str(speaker_wav), xtts_lang, file_id,
-                        _CANDIDATES_PER_CHUNK, offset=len(all_candidates),
-                        cancel_token=cancel_token, speed=speed,
-                    )
-                    all_candidates.extend(extra)
-                    scored = [(c, self._score_audio(c)) for c in all_candidates]
-                    scored.sort(key=lambda x: x[1])
-                    best_score = scored[0][1]
 
             best = scored[0][0]
             logger.info(

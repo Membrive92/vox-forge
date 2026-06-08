@@ -574,3 +574,29 @@ class TestExperimentalEndpointSpeed:
             files=files,
         )
         assert response.status_code != 422
+
+
+async def test_generate_one_holds_gpu_semaphore_per_inference(tmp_path) -> None:
+    """The GPU semaphore is held during the inference and released after.
+
+    Guards the refactor that moved the lock from the whole candidate loop
+    down to each single inference (so other GPU work can interleave).
+    """
+    from pathlib import Path
+
+    from backend.services import clone_engine
+
+    engine = clone_engine.CloneEngine()
+    observed = {"locked_during": None}
+
+    class _Model:
+        @staticmethod
+        def tts_to_file(**kwargs: object) -> None:
+            observed["locked_during"] = clone_engine._gpu_semaphore.locked()
+            Path(str(kwargs["file_path"])).write_bytes(b"\x00")
+
+    engine._model = _Model()  # type: ignore[assignment]
+    await engine._generate_one("hola", "ref.wav", "es", tmp_path / "o.wav")
+
+    assert observed["locked_during"] is True, "semaphore not held during inference"
+    assert clone_engine._gpu_semaphore.locked() is False, "semaphore not released"
