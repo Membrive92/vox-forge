@@ -757,7 +757,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
     try {
       const list = await listProjects();
       setProjects(list.sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
-    } catch { onToast("Failed to load projects"); } finally {
+    } catch { onToast(t.errLoadProjects); } finally {
       setProjectsLoading(false);
     }
   }, [onToast]);
@@ -766,7 +766,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
     try {
       const list = await listChapters(pid);
       setChapters(list.sort((a, b) => a.sort_order - b.sort_order));
-    } catch { onToast("Failed to load chapters"); }
+    } catch { onToast(t.errLoadChapters); }
   }, [onToast]);
 
   useEffect(() => { void loadProjects(); }, [loadProjects]);
@@ -802,7 +802,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
       setSelectedId(p.id);
       setRenaming(true);
       setTimeout(() => nameInputRef.current?.select(), 50);
-    } catch { onToast("Failed to create project"); }
+    } catch { onToast(t.errCreateProject); }
   }, [onToast, t.workbenchDefaultProjectName]);
 
   const handleDeleteProject = useCallback(async (id: string) => {
@@ -810,7 +810,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
       await deleteProject(id);
       setProjects((prev) => prev.filter((p) => p.id !== id));
       if (selectedId === id) setSelectedId(null);
-    } catch { onToast("Failed to delete project"); }
+    } catch { onToast(t.errDeleteProject); }
   }, [onToast, selectedId]);
 
   const handleRenameProject = useCallback(async () => {
@@ -819,7 +819,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
     try {
       const updated = await updateProject(selected.id, { name: projectName });
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    } catch { onToast("Failed to rename project"); }
+    } catch { onToast(t.errRenameProject); }
   }, [selected, projectName, onToast]);
 
   const handleChangeVoice = useCallback(
@@ -835,7 +835,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
         });
         setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       } catch {
-        onToast("Failed to update voice");
+        onToast(t.errUpdateVoice);
       }
     },
     [selected, onToast],
@@ -862,7 +862,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
       const updated = await updateProject(selected.id, { cover_path: null });
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } catch {
-      onToast("Failed to clear cover");
+      onToast(t.errClearCover);
     }
   }, [selected, onToast]);
 
@@ -874,7 +874,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
         sort_order: chapters.length,
       });
       setChapters((prev) => [...prev, ch]);
-    } catch { onToast("Failed to add chapter"); }
+    } catch { onToast(t.errAddChapter); }
   }, [selectedId, chapters.length, onToast, t.workbenchDefaultChapterName]);
 
   const handleSplitPaste = useCallback(async () => {
@@ -888,7 +888,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
       const chs = await splitIntoChapters(selectedId, text);
       setChapters(chs.sort((a, b) => a.sort_order - b.sort_order));
       onToast(t.workbenchSplitDone.replace("{n}", String(chs.length)));
-    } catch { onToast("Failed to split text"); }
+    } catch { onToast(t.errSplitText); }
   }, [selectedId, onToast, t.workbenchPasteFirst, t.workbenchSplitDone]);
 
   const handleSplitPrompt = useCallback(async () => {
@@ -901,21 +901,21 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
       const chs = await splitIntoChapters(selectedId, text);
       setChapters(chs.sort((a, b) => a.sort_order - b.sort_order));
       onToast(t.workbenchSplitDone.replace("{n}", String(chs.length)));
-    } catch { onToast("Failed to split text"); }
+    } catch { onToast(t.errSplitText); }
   }, [selectedId, onToast, t.workbenchPastePrompt, t.workbenchSplitDone]);
 
   const handleUpdateChapter = useCallback(async (id: string, data: Partial<Chapter>) => {
     try {
       const updated = await updateChapter(id, data);
       setChapters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    } catch { onToast("Failed to update chapter"); }
+    } catch { onToast(t.errUpdateChapter); }
   }, [onToast]);
 
   const handleDeleteChapter = useCallback(async (id: string) => {
     try {
       await deleteChapter(id);
       setChapters((prev) => prev.filter((c) => c.id !== id));
-    } catch { onToast("Failed to delete chapter"); }
+    } catch { onToast(t.errDeleteChapter); }
   }, [onToast]);
 
   const handleExportAll = (): void => {

@@ -68,7 +68,12 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
       const result: ChapterSynthResult = await synthesizeChapter(chapterId, controller.signal);
       player.load(result.blob, result.duration);
       setGenId(result.generationId);
-      onToast(`${chapterTitle} synthesized (${result.chunks} chunks, ${result.engine})`);
+      onToast(
+        t.chapterSynthesizedToast
+          .replace("{title}", chapterTitle)
+          .replace("{chunks}", String(result.chunks))
+          .replace("{engine}", result.engine),
+      );
       await loadMap();
     } catch (e) {
       if (isAbortError(e)) {
