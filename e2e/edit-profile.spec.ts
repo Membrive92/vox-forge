@@ -18,7 +18,7 @@ test.describe("Edit profile — scroll + populate", () => {
     await page.goto("/");
 
     // Open Voices tab
-    await page.getByRole("button", { name: /^voces$/i }).click();
+    await page.getByRole("button", { name: /^mis voces$/i }).click();
 
     // Create a profile
     await page.getByPlaceholder(/ej:/i).fill("Voz para editar");

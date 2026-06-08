@@ -1,18 +1,19 @@
 /**
- * Unified Voices tab (Phase 1).
+ * Unified Voices tab.
  *
- * Replaces the separate Voices, Profiles, and Compare tabs. Three sections:
- * 1. System voices (built-in Edge-TTS voices)
- * 2. My profiles (custom profiles + upload new)
- * 3. Compare (collapsible A/B + quick preview)
+ * Two sections:
+ * 1. System voices + upload card (built-in Edge-TTS voices on the
+ *    left, profile-creation form on the right; quality analyzer
+ *    runs inline when a sample is uploaded).
+ * 2. My profiles — saved cloned-voice cards.
  *
- * Inline quality analyzer runs when a sample is uploaded, giving the user
- * immediate feedback on whether the sample is usable for cloning.
+ * The Compare panel was removed in Sprint C — undiscoverable, mostly
+ * unused, and overlapped with the per-card preview buttons. Quick
+ * cross-voice trials happen in the Lab section (VoicesPlusLab).
  */
 import { useState } from "react";
 
 import { analyzeSample, type SampleAnalysis } from "@/api/analyze";
-import * as Icons from "@/components/icons";
 import type { SamplePlayerState } from "@/hooks/useSamplePlayer";
 import type { VoicePreviewState } from "@/hooks/useVoicePreview";
 import type { Translations } from "@/i18n";
@@ -21,7 +22,6 @@ import type { Profile, UploadedSample } from "@/types/domain";
 
 import type { ProfileDraft, SynthSettings } from "../state";
 
-import { CompareTab } from "./CompareTab";
 import { ProfilesTab } from "./ProfilesTab";
 import { VoicesTab } from "./VoicesTab";
 
@@ -48,7 +48,6 @@ export function VoicesUnifiedTab({
   onToggleCastilianAnchor,
   onToast, voicePreview, samplePlayer,
 }: Props) {
-  const [showCompare, setShowCompare] = useState(false);
   const [analysis, setAnalysis] = useState<SampleAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -114,41 +113,10 @@ export function VoicesUnifiedTab({
         />
       </Section>
 
-      {/* ── Compare (collapsible) ── */}
-      <div>
-        <button
-          onClick={() => setShowCompare((v) => !v)}
-          style={{
-            width: "100%",
-            padding: "14px 20px",
-            background: colors.surface,
-            border: `1px solid ${colors.border}`,
-            borderRadius: radii.xl,
-            color: colors.text,
-            fontFamily: fonts.sans,
-            fontSize: typography.size.base,
-            fontWeight: 700,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span>{t.sectionCompare}</span>
-          <span style={{
-            transform: showCompare ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.2s",
-            color: colors.textDim,
-          }}>
-            <Icons.ChevDown />
-          </span>
-        </button>
-        {showCompare && (
-          <div style={{ marginTop: 12 }}>
-            <CompareTab t={t} profiles={profiles} onToast={onToast} />
-          </div>
-        )}
-      </div>
+      {/* Compare (A/B) panel removed — it was collapsed by default,
+          undiscoverable, and overlapped with the per-card preview
+          buttons. The lab section in VoicesPlusLab covers the
+          "try a voice quickly" need. */}
     </div>
   );
 }

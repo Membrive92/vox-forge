@@ -11,7 +11,12 @@ function formatTime(seconds: number): string {
   return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
-const PLAYBACK_RATES: readonly number[] = [0.75, 1, 1.25, 1.5, 2];
+// Range of playback rates supported by HTMLAudioElement reliably.
+// Below 0.5 the audio gets choppy in most browsers; above 2 the
+// pitch shift makes the voice unintelligible.
+const PLAYBACK_RATE_MIN = 0.5;
+const PLAYBACK_RATE_MAX = 2;
+const PLAYBACK_RATE_STEP = 0.05;
 
 interface Props {
   player: AudioPlayerState;
@@ -93,27 +98,53 @@ export function InteractivePlayer({
           {formatTime(player.currentTime)} / {formatTime(player.duration)}
         </span>
 
-        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-          {PLAYBACK_RATES.map((r) => {
-            const active = Math.abs(player.playbackRate - r) < 0.01;
-            return (
-              <Button
-                key={r}
-                variant={active ? "primary" : "ghost"}
-                size="sm"
-                disabled={!ready}
-                onClick={() => player.setRate(r)}
-                aria-label={`Playback rate ${r}x`}
-                style={{
-                  fontFamily: fonts.mono,
-                  minHeight: 26,
-                  padding: "4px 10px",
-                }}
-              >
-                {r === 1 ? "1×" : `${r}×`}
-              </Button>
-            );
-          })}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginLeft: "auto",
+            minWidth: 200,
+          }}
+        >
+          <input
+            type="range"
+            min={PLAYBACK_RATE_MIN}
+            max={PLAYBACK_RATE_MAX}
+            step={PLAYBACK_RATE_STEP}
+            value={player.playbackRate}
+            disabled={!ready}
+            onChange={(e) => player.setRate(Number(e.target.value))}
+            aria-label="Playback rate"
+            style={{
+              flex: 1,
+              accentColor: colors.primary,
+              cursor: ready ? "pointer" : "default",
+            }}
+          />
+          <button
+            type="button"
+            disabled={!ready}
+            onClick={() => player.setRate(1)}
+            aria-label="Reset playback rate to 1×"
+            title="Reset to 1×"
+            style={{
+              fontFamily: fonts.mono,
+              fontSize: typography.size.xs,
+              minWidth: 48,
+              padding: "4px 8px",
+              borderRadius: 4,
+              background: Math.abs(player.playbackRate - 1) < 0.01
+                ? colors.surfaceAlt
+                : "transparent",
+              border: `1px solid ${colors.borderSubtle}`,
+              color: colors.text,
+              cursor: ready ? "pointer" : "default",
+              textAlign: "center",
+            }}
+          >
+            {player.playbackRate.toFixed(2)}×
+          </button>
         </div>
       </div>
 

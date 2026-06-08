@@ -25,50 +25,62 @@ function renderApp() {
   return { user };
 }
 
-async function openQuickSynth(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  // Default tab is now Workbench; navigate to Quick Synth (ES label = "Síntesis rápida")
-  await user.click(screen.getByText(/síntesis rápida/i));
+async function openVoices(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  // After Sprint A, the Voices tab is labeled "Mis voces" and contains
+  // the lab section (formerly the standalone Quick Synth tab) below the
+  // gallery. The standalone Quick Synth tab no longer exists.
+  await user.click(screen.getByText(/^mis voces$/i));
 }
 
 describe("App — navigation", () => {
   it("renders header and Workbench tab by default", () => {
     renderApp();
     expect(screen.getByText("VoxForge")).toBeInTheDocument();
-    // Workbench is the default — sidebar "+ Nuevo proyecto" button is visible (Spanish)
+    // Workbench (now "Mis libros") is the default — sidebar "+ Nuevo proyecto" CTA visible
     expect(screen.getByText("+ Nuevo proyecto")).toBeInTheDocument();
   });
 
-  it("navigates to Quick Synth and shows the textarea", async () => {
+  it("nav exposes only the three Sprint A destinations", () => {
+    renderApp();
+    expect(screen.getByText(/^mis libros$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^mis voces$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^actividad$/i)).toBeInTheDocument();
+    // Quick Synth as a standalone tab is gone — its content lives inside Mis voces
+    expect(screen.queryByText(/^síntesis rápida$/i)).toBeNull();
+    // Studio as a top-level destination is gone too (still reachable via intent)
+    expect(screen.queryByText(/^estudio$/i)).toBeNull();
+  });
+
+  it("navigates to Voices tab and shows the lab textarea", async () => {
     const { user } = renderApp();
-    await openQuickSynth(user);
+    await openVoices(user);
     expect(screen.getByPlaceholderText(/escribe o pega/i)).toBeInTheDocument();
   });
 
   it("navigates to Voices tab and shows empty profiles state", async () => {
     const { user } = renderApp();
-    await user.click(screen.getByText("Voces"));
-    // Voices tab now contains the profiles section with empty state
+    await openVoices(user);
     expect(screen.getByText(/no hay perfiles/i)).toBeInTheDocument();
   });
 
   it("navigates to Voices tab and shows upload zone", async () => {
     const { user } = renderApp();
-    await user.click(screen.getByText("Voces"));
+    await openVoices(user);
     expect(screen.getByText(/subir muestra de voz/i)).toBeInTheDocument();
   });
 });
 
-describe("App — audio synthesis", () => {
+describe("App — audio synthesis (lab section)", () => {
   it("Generate button is disabled without text", async () => {
     const { user } = renderApp();
-    await openQuickSynth(user);
+    await openVoices(user);
     const btn = screen.getByText("Generar Audio");
     expect(btn).toBeDisabled();
   });
 
   it("generates audio and shows playback controls", async () => {
     const { user } = renderApp();
-    await openQuickSynth(user);
+    await openVoices(user);
     const textarea = screen.getByPlaceholderText(/escribe o pega/i);
     await user.type(textarea, "Hello world");
 
@@ -87,7 +99,7 @@ describe("App — audio synthesis", () => {
 
   it("shows EDGE-TTS engine badge after generation", async () => {
     const { user } = renderApp();
-    await openQuickSynth(user);
+    await openVoices(user);
     const textarea = screen.getByPlaceholderText(/escribe o pega/i);
     await user.type(textarea, "Test");
     await user.click(screen.getByText("Generar Audio"));
@@ -102,7 +114,7 @@ describe("App — audio synthesis", () => {
 
   it("shows engine label in toast after generation", async () => {
     const { user } = renderApp();
-    await openQuickSynth(user);
+    await openVoices(user);
     const textarea = screen.getByPlaceholderText(/escribe o pega/i);
     await user.type(textarea, "Test toast");
     await user.click(screen.getByText("Generar Audio"));
@@ -120,7 +132,7 @@ describe("App — audio synthesis", () => {
 describe("App — profile CRUD", () => {
   it("creates a profile from the Voices tab", async () => {
     const { user } = renderApp();
-    await user.click(screen.getByText("Voces"));
+    await openVoices(user);
 
     const nameInput = screen.getByPlaceholderText(/ej:/i);
     await user.type(nameInput, "My voice");
@@ -143,7 +155,7 @@ describe("App — profile CRUD", () => {
     const { user } = renderApp();
 
     // Create first
-    await user.click(screen.getByText("Voces"));
+    await openVoices(user);
     await user.type(screen.getByPlaceholderText(/ej:/i), "Deletable");
     await user.click(screen.getByText("Guardar perfil"));
     await waitFor(() => expect(screen.getByText(/perfil guardado/i)).toBeInTheDocument());
@@ -170,7 +182,7 @@ describe("App — regressions: profile edit flow", () => {
     // Bug: Edit button was wired but didn't scroll into view, leaving users
     // confused that "nothing happened". Verify the form is populated.
     const { user } = renderApp();
-    await user.click(screen.getByText("Voces"));
+    await openVoices(user);
 
     // Create a profile with distinctive values
     await user.type(screen.getByPlaceholderText(/ej:/i), "Editable Voice");
@@ -204,8 +216,8 @@ describe("App — language switch", () => {
       expect(screen.getByText("EN")).toBeInTheDocument();
     });
 
-    // Navigate to Quick Synth (now labelled in English) and verify textarea
-    await user.click(screen.getByText(/quick synth/i));
+    // Navigate to "My voices" (lab section now lives there in EN too)
+    await user.click(screen.getByText(/^my voices$/i));
     expect(screen.getByPlaceholderText(/type or paste/i)).toBeInTheDocument();
   });
 });

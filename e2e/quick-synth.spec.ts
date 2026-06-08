@@ -14,7 +14,7 @@ test.describe("Quick Synth — standard flow", () => {
     await page.goto("/");
 
     // Default tab is Workbench — switch to Quick Synth
-    await page.getByText(/síntesis rápida/i).click();
+    await page.getByText(/^mis voces$/i).click();
 
     const textarea = page.getByPlaceholder(/escribe o pega/i);
     await textarea.fill("Hola mundo desde el e2e.");
@@ -33,7 +33,7 @@ test.describe("Quick Synth — standard flow", () => {
   test("Generate button is disabled with empty text", async ({ page }) => {
     await installApiMocks(page);
     await page.goto("/");
-    await page.getByText(/síntesis rápida/i).click();
+    await page.getByText(/^mis voces$/i).click();
 
     const generate = page.getByRole("button", { name: /generar audio/i });
     await expect(generate).toBeDisabled();
