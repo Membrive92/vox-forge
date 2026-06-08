@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+import { formatClock } from "@/utils/format";
 
 export interface ChunkRegion {
   index: number;
@@ -105,12 +106,6 @@ export function WaveformEditor({
     }, 50);
   };
 
-  const formatTime = (s: number): string => {
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${String(sec).padStart(2, "0")}`;
-  };
-
   return (
     <div style={{ background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: radii.xl, padding: 16 }}>
       {/* Waveform */}
@@ -123,7 +118,7 @@ export function WaveformEditor({
         </button>
         <button onClick={handleStop} style={ctrlBtn}>Stop</button>
         <span style={{ fontSize: typography.size.xs, fontFamily: fonts.mono, color: colors.textDim, minWidth: 80 }}>
-          {formatTime(currentTime)} / {formatTime(duration)}
+          {formatClock(currentTime)} / {formatClock(duration)}
         </span>
         <label style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", fontSize: typography.size.xs, color: colors.textDim }}>
           Zoom

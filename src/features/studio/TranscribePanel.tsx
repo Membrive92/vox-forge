@@ -4,6 +4,7 @@ import type { SrtEntry, TranscribeResult } from "@/api/studio";
 import { Button } from "@/components/Button";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+import { formatClock } from "@/utils/format";
 
 interface Props {
   t: Translations;
@@ -13,13 +14,6 @@ interface Props {
   onTranscribe: (language?: string) => void;
   onCancel: () => void;
   onEntryClick?: (entry: SrtEntry) => void;
-}
-
-function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const sec = Math.floor(seconds % 60);
-  return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
 export function TranscribePanel({
@@ -147,7 +141,7 @@ export function TranscribePanel({
                       flexShrink: 0,
                     }}
                   >
-                    {formatTime(entry.start_s)}
+                    {formatClock(entry.start_s)}
                   </span>
                   <span style={{ flex: 1, minWidth: 0 }}>{entry.text}</span>
                 </button>

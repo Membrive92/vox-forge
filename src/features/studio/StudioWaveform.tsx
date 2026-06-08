@@ -13,6 +13,7 @@ import RegionsPlugin, { type Region } from "wavesurfer.js/dist/plugins/regions.j
 import { Button } from "@/components/Button";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+import { formatClock } from "@/utils/format";
 
 export interface StudioRegion {
   startMs: number;
@@ -30,13 +31,6 @@ export interface StudioWaveformHandle {
   clearRegion: () => void;
   getRegion: () => StudioRegion | null;
   getDurationMs: () => number;
-}
-
-function formatTime(s: number): string {
-  if (!Number.isFinite(s) || s < 0) return "0:00";
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
 export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
@@ -201,7 +195,7 @@ export const StudioWaveform = forwardRef<StudioWaveformHandle, Props>(
               minWidth: 90,
             }}
           >
-            {formatTime(currentTime)} / {formatTime(duration)}
+            {formatClock(currentTime)} / {formatClock(duration)}
           </span>
         </div>
 

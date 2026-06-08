@@ -12,6 +12,7 @@ import type {
 import { Button } from "@/components/Button";
 import * as Icons from "@/components/icons";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { formatClock } from "@/utils/format";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
@@ -452,12 +453,6 @@ const selectStyle: React.CSSProperties = {
 
 // ── SceneManager ─────────────────────────────────────────────────────
 
-function formatMmSs(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
 interface SceneManagerProps {
   t: Translations;
   scenes: readonly Scene[];
@@ -562,7 +557,7 @@ function SceneManager({
                     minWidth: 56,
                   }}
                 >
-                  {formatMmSs(sc.start_s)}
+                  {formatClock(sc.start_s)}
                 </span>
                 <span
                   style={{

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+import { formatClock } from "@/utils/format";
 
 import * as Icons from "./icons";
 
@@ -58,12 +59,6 @@ export function AudioRecorder({ onRecorded, labelRecord, labelStop, labelRecordi
     }
   }, [isRecording]);
 
-  const formatTime = (s: number): string => {
-    const min = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${min}:${String(sec).padStart(2, "0")}`;
-  };
-
   return (
     <button
       onClick={isRecording ? stopRecording : () => void startRecording()}
@@ -102,7 +97,7 @@ export function AudioRecorder({ onRecorded, labelRecord, labelStop, labelRecordi
               animation: "pulse 1s infinite",
             }}
           />
-          {labelStop} · {formatTime(seconds)}
+          {labelStop} · {formatClock(seconds)}
           <style>{`@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }`}</style>
         </>
       ) : (
