@@ -179,16 +179,18 @@ export function useStudioSession(): StudioSessionApi {
 
   const clearOperations = useCallback(() => setOperations([]), []);
 
-  const apply = useCallback(
-    async (outputFormat: string) => {
+  // apply() and applyPreview() differ only in the isPreviewMode flag, so
+  // they share one implementation.
+  const runApply = useCallback(
+    async (outputFormat: string, preview: boolean) => {
       if (!selected || operations.length === 0) return;
       const controller = new AbortController();
       applyAbortRef.current = controller;
       setIsProcessing(true);
       setError(null);
-      setIsPreviewMode(false);
+      if (!preview) setIsPreviewMode(false);
       try {
-        logger.info("Studio: applying edit", {
+        logger.info(preview ? "Studio: applying edit preview" : "Studio: applying edit", {
           source: selected.source_path,
           ops: operations.length,
           format: outputFormat,
@@ -205,13 +207,14 @@ export function useStudioSession(): StudioSessionApi {
         lastUrlRef.current = url;
         setResultBlob(result.blob);
         setResultUrl(url);
+        if (preview) setIsPreviewMode(true);
       } catch (err) {
         if (isAbortError(err)) {
-          logger.info("Studio: apply cancelled");
+          logger.info(preview ? "Studio: apply preview cancelled" : "Studio: apply cancelled");
         } else {
           const msg = err instanceof Error ? err.message : String(err);
           setError(msg);
-          logger.error("Studio: apply failed", { error: msg });
+          logger.error(preview ? "Studio: apply preview failed" : "Studio: apply failed", { error: msg });
         }
       } finally {
         setIsProcessing(false);
@@ -221,47 +224,8 @@ export function useStudioSession(): StudioSessionApi {
     [selected, operations],
   );
 
-  const applyPreview = useCallback(
-    async (outputFormat: string) => {
-      if (!selected || operations.length === 0) return;
-      const controller = new AbortController();
-      applyAbortRef.current = controller;
-      setIsProcessing(true);
-      setError(null);
-      try {
-        logger.info("Studio: applying edit preview", {
-          source: selected.source_path,
-          ops: operations.length,
-          format: outputFormat,
-        });
-        const result = await applyEdit(
-          selected.source_path,
-          operations,
-          outputFormat,
-          { projectId: selected.project_id, chapterId: selected.chapter_id },
-          controller.signal,
-        );
-        if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
-        const url = URL.createObjectURL(result.blob);
-        lastUrlRef.current = url;
-        setResultBlob(result.blob);
-        setResultUrl(url);
-        setIsPreviewMode(true);
-      } catch (err) {
-        if (isAbortError(err)) {
-          logger.info("Studio: apply preview cancelled");
-        } else {
-          const msg = err instanceof Error ? err.message : String(err);
-          setError(msg);
-          logger.error("Studio: apply preview failed", { error: msg });
-        }
-      } finally {
-        setIsProcessing(false);
-        if (applyAbortRef.current === controller) applyAbortRef.current = null;
-      }
-    },
-    [selected, operations],
-  );
+  const apply = useCallback((outputFormat: string) => runApply(outputFormat, false), [runApply]);
+  const applyPreview = useCallback((outputFormat: string) => runApply(outputFormat, true), [runApply]);
 
   const cancelApply = useCallback(() => {
     applyAbortRef.current?.abort();
