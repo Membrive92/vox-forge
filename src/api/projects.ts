@@ -1,67 +1,15 @@
 /** Projects & chapters API client. */
 
 import { deleteResource, getJson, patchJson, postJson } from "./client";
+import type { components } from "./generated";
 
-export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  language: string;
-  voice_id: string;
-  profile_id: string | null;
-  speed: number;
-  pitch: number;
-  volume: number;
-  output_format: string;
-  cover_path: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Chapter {
-  id: string;
-  project_id: string;
-  title: string;
-  text: string;
-  sort_order: number;
-  voice_id: string | null;
-  profile_id: string | null;
-  active_generation_id: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Generation {
-  id: string;
-  chapter_id: string;
-  voice_id: string;
-  profile_id: string | null;
-  output_format: string;
-  speed: number;
-  pitch: number;
-  volume: number;
-  engine: string;
-  duration: number;
-  file_path: string | null;
-  chunks_total: number;
-  chunks_done: number;
-  status: string;
-  error: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Take {
-  id: string;
-  generation_id: string;
-  chunk_index: number;
-  chunk_text: string;
-  file_path: string | null;
-  duration: number;
-  score: number;
-  status: string;
-  created_at: string;
-}
+// Derived from the backend's Pydantic response models (single source of
+// truth) — a column rename/type change now fails `npm run openapi` + tsc
+// instead of silently handing the UI undefined fields.
+export type Project = components["schemas"]["ProjectResponse"];
+export type Chapter = components["schemas"]["ChapterResponse"];
+export type Generation = components["schemas"]["GenerationResponse"];
+export type Take = components["schemas"]["TakeResponse"];
 
 // ── Projects ────────────────────────────────────────────────────────
 

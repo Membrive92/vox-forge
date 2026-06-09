@@ -66,18 +66,22 @@ class SplitRequest(BaseModel):
 # generated OpenAPI types. Without these the endpoints emit opaque
 # ``{ [key: string]: unknown }`` and a column rename slips past CI.
 
+# Nullable fields are declared required-but-nullable (``Optional[str]``
+# without a default) so the generated TS types are `field: string | null`
+# rather than optional `field?:` — the rows always carry every column.
+
 class ProjectResponse(BaseModel):
     id: str
     name: str
     description: str
     language: str
     voice_id: str
-    profile_id: Optional[str] = None
+    profile_id: Optional[str]
     speed: int
     pitch: int
     volume: int
     output_format: str
-    cover_path: Optional[str] = None
+    cover_path: Optional[str]
     created_at: str
     updated_at: str
 
@@ -88,9 +92,9 @@ class ChapterResponse(BaseModel):
     title: str
     text: str
     sort_order: int
-    voice_id: Optional[str] = None
-    profile_id: Optional[str] = None
-    active_generation_id: Optional[str] = None
+    voice_id: Optional[str]
+    profile_id: Optional[str]
+    active_generation_id: Optional[str]
     created_at: str
     updated_at: str
 
@@ -99,18 +103,18 @@ class GenerationResponse(BaseModel):
     id: str
     chapter_id: str
     voice_id: str
-    profile_id: Optional[str] = None
+    profile_id: Optional[str]
     output_format: str
     speed: int
     pitch: int
     volume: int
     engine: str
     duration: float
-    file_path: Optional[str] = None
+    file_path: Optional[str]
     chunks_total: int
     chunks_done: int
     status: str
-    error: Optional[str] = None
+    error: Optional[str]
     created_at: str
     updated_at: str
 
@@ -120,7 +124,7 @@ class TakeResponse(BaseModel):
     generation_id: str
     chunk_index: int
     chunk_text: str
-    file_path: Optional[str] = None
+    file_path: Optional[str]
     duration: float
     score: float
     status: str

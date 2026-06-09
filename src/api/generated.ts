@@ -1606,11 +1606,11 @@ export interface components {
             /** Sort Order */
             sort_order: number;
             /** Voice Id */
-            voice_id?: string | null;
+            voice_id: string | null;
             /** Profile Id */
-            profile_id?: string | null;
+            profile_id: string | null;
             /** Active Generation Id */
-            active_generation_id?: string | null;
+            active_generation_id: string | null;
             /** Created At */
             created_at: string;
             /** Updated At */
@@ -1755,7 +1755,7 @@ export interface components {
             /** Voice Id */
             voice_id: string;
             /** Profile Id */
-            profile_id?: string | null;
+            profile_id: string | null;
             /** Output Format */
             output_format: string;
             /** Speed */
@@ -1769,7 +1769,7 @@ export interface components {
             /** Duration */
             duration: number;
             /** File Path */
-            file_path?: string | null;
+            file_path: string | null;
             /** Chunks Total */
             chunks_total: number;
             /** Chunks Done */
@@ -1777,7 +1777,7 @@ export interface components {
             /** Status */
             status: string;
             /** Error */
-            error?: string | null;
+            error: string | null;
             /** Created At */
             created_at: string;
             /** Updated At */
@@ -2018,7 +2018,7 @@ export interface components {
             /** Voice Id */
             voice_id: string;
             /** Profile Id */
-            profile_id?: string | null;
+            profile_id: string | null;
             /** Speed */
             speed: number;
             /** Pitch */
@@ -2028,7 +2028,7 @@ export interface components {
             /** Output Format */
             output_format: string;
             /** Cover Path */
-            cover_path?: string | null;
+            cover_path: string | null;
             /** Created At */
             created_at: string;
             /** Updated At */
@@ -2362,7 +2362,7 @@ export interface components {
             /** Chunk Text */
             chunk_text: string;
             /** File Path */
-            file_path?: string | null;
+            file_path: string | null;
             /** Duration */
             duration: number;
             /** Score */
