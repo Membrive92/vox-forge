@@ -34,6 +34,7 @@ import * as Icons from "@/components/icons";
 import { ALL_VOICES, VOICES } from "@/constants/voices";
 import { useSharedProfiles } from "@/hooks/profilesContext";
 import { activateOnKey } from "@/utils/a11y";
+import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, space, transitions, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
@@ -921,12 +922,7 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
   const handleExportAll = (): void => {
     if (!selectedId) return;
     const url = `${API_BASE}/export/${selectedId}`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${projectName || "project"}_export.zip`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    downloadUrl(url, `${projectName || "project"}_export.zip`);
     onToast(t.workbenchExportStarted);
   };
 

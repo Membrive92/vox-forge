@@ -75,6 +75,7 @@ export const es = {
   exportArtistPlaceholder: "Narrador",
   exportAlbumPlaceholder: "Crónicas Vol. 1",
   exportTokensLabel: "Tokens:",
+  mainNavLabel: "Navegación principal",
   sampleLoaded: "Muestra cargada",
   duration: "Duración",
   seconds: "segundos",

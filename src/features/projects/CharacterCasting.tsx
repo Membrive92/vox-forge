@@ -19,6 +19,7 @@ import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
 import { useSharedProfiles } from "@/hooks/profilesContext";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
@@ -110,12 +111,7 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
 
   const handleDownload = (): void => {
     if (!player.url) return;
-    const a = document.createElement("a");
-    a.href = player.url;
-    a.download = `cast_${chapterTitle.replace(/[^\w]+/g, "_")}.mp3`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    downloadUrl(player.url, `cast_${chapterTitle.replace(/[^\w]+/g, "_")}.mp3`);
   };
 
   const allVoices = [...VOICES.es, ...VOICES.en];

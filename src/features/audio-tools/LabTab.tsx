@@ -8,6 +8,7 @@ import { PromptDialog } from "@/components/PromptDialog";
 import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
 import { activateOnKey } from "@/utils/a11y";
+import { downloadUrl } from "@/utils/download";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useCustomLabPresets } from "@/hooks/useCustomLabPresets";
@@ -123,12 +124,7 @@ export function LabTab({ t, onToast }: LabTabProps) {
 
   const handleDownload = (): void => {
     if (!player.url) return;
-    const a = document.createElement("a");
-    a.href = player.url;
-    a.download = `voxforge_lab.${format}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    downloadUrl(player.url, `voxforge_lab.${format}`);
   };
 
   const filteredPresets = presetFilter === "all"

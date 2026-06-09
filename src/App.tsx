@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Toast } from "@/components/Toast";
 import * as Icons from "@/components/icons";
@@ -469,8 +469,26 @@ function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
     { id: "audio-tools", icon: <Icons.SlidersIcon />, label: t.tabAudioTools },
     { id: "activity", icon: <Icons.Clock />, label: errorCount > 0 ? `${t.tabActivity} (${errorCount})` : t.tabActivity },
   ];
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const onTabKeyDown = (e: React.KeyboardEvent, idx: number): void => {
+    let next = idx;
+    if (e.key === "ArrowRight") next = (idx + 1) % tabs.length;
+    else if (e.key === "ArrowLeft") next = (idx - 1 + tabs.length) % tabs.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = tabs.length - 1;
+    else return;
+    e.preventDefault();
+    const target = tabs[next];
+    if (target) {
+      setTab(target.id);
+      btnRefs.current[next]?.focus();
+    }
+  };
+
   return (
     <nav
+      role="tablist"
+      aria-label={t.mainNavLabel}
       className="vf-tabs-nav"
       style={{
         position: "relative",
@@ -481,13 +499,17 @@ function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
         borderBottom: `1px solid ${colors.borderSubtle}`,
       }}
     >
-      {tabs.map((tb) => {
+      {tabs.map((tb, idx) => {
         const active = tab === tb.id;
         return (
           <button
             key={tb.id}
+            ref={(el) => { btnRefs.current[idx] = el; }}
+            role="tab"
+            aria-selected={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => setTab(tb.id)}
-            aria-current={active ? "page" : undefined}
+            onKeyDown={(e) => onTabKeyDown(e, idx)}
             style={{
               display: "flex",
               alignItems: "center",

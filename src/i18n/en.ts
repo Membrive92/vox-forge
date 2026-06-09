@@ -77,6 +77,7 @@ export const en: Record<TranslationKey, string> = {
   exportArtistPlaceholder: "Narrator",
   exportAlbumPlaceholder: "Chronicles Vol. 1",
   exportTokensLabel: "Tokens:",
+  mainNavLabel: "Main navigation",
   sampleLoaded: "Sample loaded",
   duration: "Duration",
   seconds: "seconds",

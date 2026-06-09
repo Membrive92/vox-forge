@@ -7,6 +7,7 @@ import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
@@ -82,12 +83,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
 
   const handleDownload = (): void => {
     if (!player.url) return;
-    const a = document.createElement("a");
-    a.href = player.url;
-    a.download = `voxforge_converted.${format}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    downloadUrl(player.url, `voxforge_converted.${format}`);
   };
 
   return (

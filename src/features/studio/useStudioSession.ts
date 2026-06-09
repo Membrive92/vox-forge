@@ -18,6 +18,7 @@ import {
   type VideoOptions,
 } from "@/api/studio";
 import { logger } from "@/logging/logger";
+import { downloadUrl } from "@/utils/download";
 
 export interface StudioSession {
   sources: StudioSource[];
@@ -269,12 +270,7 @@ export function useStudioSession(): StudioSessionApi {
   const download = useCallback(
     (filenameHint?: string) => {
       if (!resultBlob || !resultUrl) return;
-      const a = document.createElement("a");
-      a.href = resultUrl;
-      a.download = filenameHint ?? `studio_edit_${Date.now()}.mp3`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      downloadUrl(resultUrl, filenameHint ?? `studio_edit_${Date.now()}.mp3`);
     },
     [resultBlob, resultUrl],
   );
@@ -397,12 +393,7 @@ export function useStudioSession(): StudioSessionApi {
   const downloadVideo = useCallback(
     (filenameHint?: string) => {
       if (!videoBlob || !videoUrl) return;
-      const a = document.createElement("a");
-      a.href = videoUrl;
-      a.download = filenameHint ?? `studio_video_${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      downloadUrl(videoUrl, filenameHint ?? `studio_video_${Date.now()}.mp4`);
     },
     [videoBlob, videoUrl],
   );

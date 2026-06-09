@@ -17,6 +17,7 @@ import { FORMATS, VOICES } from "@/constants/voices";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useExportSettings } from "@/hooks/useExportSettings";
 import { useSynthesis } from "@/hooks/useSynthesis";
+import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
@@ -146,12 +147,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
 
   const handleDownload = (): void => {
     if (!player.url) return;
-    const a = document.createElement("a");
-    a.href = player.url;
-    a.download = exportCfg.renderFilename(settings.format);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    downloadUrl(player.url, exportCfg.renderFilename(settings.format));
   };
 
   const canGenerate = !synthesis.isGenerating && text.trim().length > 0;

@@ -14,6 +14,7 @@ import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Skeleton } from "@/components/Skeleton";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, space, typography } from "@/theme/tokens";
 
@@ -210,12 +211,7 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
               icon={<Icons.Download />}
               onClick={() => {
                 if (!player.url) return;
-                const a = document.createElement("a");
-                a.href = player.url;
-                a.download = `${chapterTitle.replace(/[^\w\s.-]/g, "_")}.mp3`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
+                downloadUrl(player.url, `${chapterTitle.replace(/[^\w\s.-]/g, "_")}.mp3`);
               }}
             >
               {t.download}

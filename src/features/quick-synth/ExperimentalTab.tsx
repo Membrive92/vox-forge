@@ -17,6 +17,7 @@ import { PromptDialog } from "@/components/PromptDialog";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useSharedProfiles } from "@/hooks/profilesContext";
+import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Language, Profile } from "@/types/domain";
@@ -173,12 +174,7 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
 
   const handleDownload = (): void => {
     if (!player.url) return;
-    const a = document.createElement("a");
-    a.href = player.url;
-    a.download = "voxforge_crosslingual.mp3";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    downloadUrl(player.url, "voxforge_crosslingual.mp3");
   };
 
   // Save the experimental sample as a reusable profile.

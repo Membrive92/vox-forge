@@ -23,6 +23,7 @@ import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 import { activateOnKey } from "@/utils/a11y";
+import { downloadUrl } from "@/utils/download";
 
 interface Props {
   t: Translations;
@@ -127,12 +128,7 @@ export function AmbienceMixer({ t, chapterId, onToast }: Props) {
 
   const handleDownloadMix = (): void => {
     if (!mixPlayer.url) return;
-    const a = document.createElement("a");
-    a.href = mixPlayer.url;
-    a.download = "mixed_chapter.mp3";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    downloadUrl(mixPlayer.url, "mixed_chapter.mp3");
   };
 
   return (
