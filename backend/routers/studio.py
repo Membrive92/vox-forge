@@ -67,16 +67,13 @@ def _is_within_allowed_roots(target: Path) -> bool:
 
 
 def _probe_duration_s(path: Path) -> float:
-    """Decode ``path`` and return its duration in seconds (0.0 on failure).
+    """Audio duration in seconds (0.0 on failure).
 
-    Blocking (pydub/ffmpeg) — call via ``asyncio.to_thread`` from handlers.
+    Blocking — call via ``asyncio.to_thread`` from handlers.
     """
-    try:
-        from pydub import AudioSegment
+    from ..audio_meta import duration_seconds
 
-        return float(len(AudioSegment.from_file(str(path)))) / 1000.0
-    except Exception:  # noqa: BLE001
-        return 0.0
+    return duration_seconds(path)
 
 
 @router.get(

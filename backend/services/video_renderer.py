@@ -17,8 +17,6 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from pydub import AudioSegment
-
 from ..exceptions import InvalidSampleError, SynthesisError
 from ..paths import STUDIO_VIDEOS_DIR
 from ..schemas import VideoImage, VideoOptions
@@ -55,10 +53,9 @@ def _measure_audio_duration_s(audio_path: Path) -> float:
     """Return the audio duration in seconds. Falls back to 0 on decode
     failure; callers should handle the zero case by substituting a
     sensible minimum (e.g. last image's start_s + buffer)."""
-    try:
-        return float(len(AudioSegment.from_file(str(audio_path)))) / 1000.0
-    except Exception:  # noqa: BLE001
-        return 0.0
+    from ..audio_meta import duration_seconds
+
+    return duration_seconds(audio_path)
 
 
 def _parse_resolution(res: str) -> tuple[int, int]:
@@ -463,10 +460,7 @@ class VideoRenderer:
         if not output_path.exists():
             raise SynthesisError("Renderer completed but no output file was produced")
 
-        try:
-            duration_s = float(len(AudioSegment.from_file(str(audio_path)))) / 1000.0
-        except Exception:  # noqa: BLE001
-            duration_s = 0.0
+        duration_s = _measure_audio_duration_s(audio_path)
 
         return RenderResult(
             output_path=output_path,
