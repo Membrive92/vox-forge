@@ -218,7 +218,6 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
                     borderRadius: radii.sm,
                     fontSize: typography.size.sm,
                     fontFamily: fonts.sans,
-                    outline: "none",
                     cursor: "pointer",
                   }}
                 >

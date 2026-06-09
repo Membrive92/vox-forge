@@ -86,7 +86,6 @@ export function CompareTab({ t, profiles, onToast }: Props) {
             lineHeight: 1.6,
             padding: 12,
             resize: "vertical",
-            outline: "none",
             boxSizing: "border-box",
           }}
         />

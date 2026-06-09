@@ -209,7 +209,6 @@ function Field({ label, value, onChange, placeholder, type = "text" }: FieldProp
           color: colors.text,
           fontSize: typography.size.sm,
           fontFamily: fonts.sans,
-          outline: "none",
           boxSizing: "border-box",
         }}
       />

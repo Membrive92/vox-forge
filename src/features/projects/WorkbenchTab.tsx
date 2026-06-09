@@ -289,7 +289,6 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
             fontFamily: fonts.sans,
             fontSize: typography.size.base,
             fontWeight: typography.weight.semibold,
-            outline: "none",
             padding: "2px 4px",
             borderRadius: radii.sm,
           }}
@@ -461,7 +460,6 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
               lineHeight: typography.leading.relaxed,
               padding: space[3],
               resize: "vertical",
-              outline: "none",
               boxSizing: "border-box",
             }}
           />
@@ -488,7 +486,6 @@ function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToas
                     style={{
                       width: "100%",
                       maxWidth: "100%",
-                      outline: "none",
                     }}
                   />
                 </div>
@@ -1034,7 +1031,6 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
                   fontFamily: fonts.serif,
                   fontSize: 24,
                   fontWeight: typography.weight.bold,
-                  outline: "none",
                   flex: 1,
                   padding: 0,
                   cursor: renaming ? "text" : "pointer",
@@ -1134,7 +1130,6 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
                     lineHeight: typography.leading.relaxed,
                     padding: space[4],
                     resize: "vertical",
-                    outline: "none",
                     boxSizing: "border-box",
                     marginBottom: space[3],
                   }}
@@ -1335,7 +1330,6 @@ function TakeSelector({ t, generations, activeId, onChange }: TakeSelectorProps)
           color: colors.text,
           fontSize: typography.size.xs,
           fontFamily: fonts.sans,
-          outline: "none",
           cursor: "pointer",
         }}
       >
@@ -1435,7 +1429,6 @@ function ChapterVoicePicker({ t, chapter, project, profiles, onChange }: Chapter
           color: colors.text,
           fontSize: typography.size.xs,
           fontFamily: fonts.sans,
-          outline: "none",
           cursor: "pointer",
           minWidth: 220,
         }}
@@ -1550,7 +1543,6 @@ function ProjectVoicePicker({ t, project, profiles, onChange }: VoicePickerProps
           color: colors.text,
           fontSize: typography.size.sm,
           fontFamily: fonts.sans,
-          outline: "none",
           cursor: "pointer",
           minWidth: 240,
         }}

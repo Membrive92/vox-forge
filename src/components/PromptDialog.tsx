@@ -193,7 +193,6 @@ const Field = forwardRef<HTMLInputElement, FieldProps>(
             color: colors.text,
             fontSize: typography.size.sm,
             fontFamily: fonts.sans,
-            outline: "none",
             boxSizing: "border-box",
           }}
         />

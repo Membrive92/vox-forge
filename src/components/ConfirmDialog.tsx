@@ -77,7 +77,6 @@ export function ConfirmDialog({
           width: "90%",
           maxWidth: 400,
           boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
-          outline: "none",
         }}
       >
         <h2 id="confirm-title" style={{ margin: "0 0 12px", fontSize: typography.size.lg, fontWeight: 700 }}>

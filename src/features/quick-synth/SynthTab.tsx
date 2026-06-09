@@ -225,7 +225,6 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
               fontSize: typography.size.base,
               lineHeight: 1.7,
               fontFamily: fonts.sans,
-              outline: "none",
               boxSizing: "border-box",
             }}
           />
@@ -701,7 +700,6 @@ function ExportField({ label, value, onChange, placeholder, type = "text" }: Exp
           color: colors.text,
           fontSize: typography.size.sm,
           fontFamily: fonts.sans,
-          outline: "none",
           boxSizing: "border-box",
         }}
       />

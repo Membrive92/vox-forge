@@ -443,5 +443,4 @@ const inputStyle: React.CSSProperties = {
   color: colors.text,
   fontSize: typography.size.xs,
   fontFamily: fonts.mono,
-  outline: "none",
 };

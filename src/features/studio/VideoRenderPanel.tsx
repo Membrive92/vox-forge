@@ -346,7 +346,6 @@ export function VideoRenderPanel({
             color: colors.text,
             fontSize: typography.size.sm,
             fontFamily: fonts.sans,
-            outline: "none",
           }}
         />
       </label>
@@ -448,7 +447,6 @@ const selectStyle: React.CSSProperties = {
   color: colors.text,
   fontSize: typography.size.sm,
   fontFamily: fonts.sans,
-  outline: "none",
 };
 
 // ── SceneManager ─────────────────────────────────────────────────────
@@ -733,7 +731,6 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
               fontSize: typography.size.sm,
               fontFamily: fonts.sans,
               resize: "vertical",
-              outline: "none",
             }}
             autoFocus
           />
@@ -756,7 +753,6 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
                 color: colors.text,
                 fontSize: typography.size.sm,
                 fontFamily: fonts.sans,
-                outline: "none",
               }}
             >
               <option value="16:9">16:9</option>
@@ -785,7 +781,6 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
                 color: colors.text,
                 fontSize: typography.size.sm,
                 fontFamily: fonts.mono,
-                outline: "none",
               }}
             />
           </label>

@@ -252,7 +252,7 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
               width: "100%", minHeight: 300, padding: 20, resize: "vertical",
               background: "none", border: "none", color: colors.text,
               fontSize: typography.size.base, lineHeight: 1.7, fontFamily: fonts.sans,
-              outline: "none", boxSizing: "border-box",
+              boxSizing: "border-box",
             }}
           />
           <div style={{

@@ -112,8 +112,7 @@ export function LogsTab() {
               padding: "6px 10px", fontSize: typography.size.sm, fontFamily: fonts.mono,
               background: colors.surfaceAlt, color: colors.text,
               border: `1px solid ${colors.border}`, borderRadius: radii.sm,
-              width: 130, outline: "none",
-            }}
+              width: 130,            }}
           />
           <button onClick={() => void loadServer()} disabled={loading} style={btnStyle}>
             {loading ? "..." : "Refresh"}
