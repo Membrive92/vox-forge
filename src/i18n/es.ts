@@ -395,6 +395,9 @@ export const es = {
   // ── Interactive player ───────────────────────────────────────────
   playerSkipBack: "Retroceder 10 segundos",
   playerSkipForward: "Avanzar 10 segundos",
+  playerRate: "Velocidad de reproducción",
+  playerResetRate: "Restablecer velocidad a 1×",
+  playerSeek: "Buscar",
   playerPlaybackRate: "Velocidad de reproducción {r}x",
 
   // ── Lab custom preset dialog ─────────────────────────────────────

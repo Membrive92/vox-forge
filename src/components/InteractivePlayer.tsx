@@ -24,6 +24,11 @@ interface Props {
   playLabel?: string;
   pauseLabel?: string;
   stopLabel?: string;
+  skipBackLabel?: string;
+  skipForwardLabel?: string;
+  rateLabel?: string;
+  resetRateLabel?: string;
+  seekLabel?: string;
 }
 
 export function InteractivePlayer({
@@ -32,6 +37,11 @@ export function InteractivePlayer({
   playLabel = "Play",
   pauseLabel = "Pause",
   stopLabel = "Stop",
+  skipBackLabel = "Skip back 10 seconds",
+  skipForwardLabel = "Skip forward 10 seconds",
+  rateLabel = "Playback rate",
+  resetRateLabel = "Reset playback rate to 1×",
+  seekLabel = "Seek",
 }: Props) {
   const ready = !disabled && player.url !== null;
   const progress = player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0;
@@ -62,7 +72,7 @@ export function InteractivePlayer({
           size="sm"
           disabled={!ready}
           onClick={() => player.skip(-10)}
-          aria-label="Skip back 10 seconds"
+          aria-label={skipBackLabel}
         >
           −10s
         </Button>
@@ -71,7 +81,7 @@ export function InteractivePlayer({
           size="sm"
           disabled={!ready}
           onClick={() => player.skip(10)}
-          aria-label="Skip forward 10 seconds"
+          aria-label={skipForwardLabel}
         >
           +10s
         </Button>
@@ -115,7 +125,7 @@ export function InteractivePlayer({
             value={player.playbackRate}
             disabled={!ready}
             onChange={(e) => player.setRate(Number(e.target.value))}
-            aria-label="Playback rate"
+            aria-label={rateLabel}
             style={{
               flex: 1,
               accentColor: colors.primary,
@@ -126,8 +136,8 @@ export function InteractivePlayer({
             type="button"
             disabled={!ready}
             onClick={() => player.setRate(1)}
-            aria-label="Reset playback rate to 1×"
-            title="Reset to 1×"
+            aria-label={resetRateLabel}
+            title={resetRateLabel}
             style={{
               fontFamily: fonts.mono,
               fontSize: typography.size.xs,
@@ -156,7 +166,7 @@ export function InteractivePlayer({
         value={progress}
         onChange={handleScrub}
         disabled={!ready || player.duration === 0}
-        aria-label="Seek"
+        aria-label={seekLabel}
         style={{
           width: "100%",
           accentColor: colors.primary,

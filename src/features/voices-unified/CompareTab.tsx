@@ -178,6 +178,11 @@ export function CompareTab({ t, profiles, onToast }: Props) {
                     playLabel={t.play}
                     pauseLabel={t.pause}
                     stopLabel={t.stop}
+                    skipBackLabel={t.playerSkipBack}
+                    skipForwardLabel={t.playerSkipForward}
+                    rateLabel={t.playerRate}
+                    resetRateLabel={t.playerResetRate}
+                    seekLabel={t.playerSeek}
                   />
                 </div>
               )}

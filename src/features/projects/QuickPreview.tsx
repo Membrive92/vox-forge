@@ -153,6 +153,11 @@ export function QuickPreview({
             playLabel={t.play}
             pauseLabel={t.pause}
             stopLabel={t.stop}
+            skipBackLabel={t.playerSkipBack}
+            skipForwardLabel={t.playerSkipForward}
+            rateLabel={t.playerRate}
+            resetRateLabel={t.playerResetRate}
+            seekLabel={t.playerSeek}
           />
           <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
             <Button variant="ghost" size="sm" onClick={() => setPronOpen(true)}>

@@ -270,7 +270,7 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
       {player.url && (
         <div style={{ marginTop: 12 }}>
           <HiddenAudio player={player} />
-          <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} />
+          <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} skipBackLabel={t.playerSkipBack} skipForwardLabel={t.playerSkipForward} rateLabel={t.playerRate} resetRateLabel={t.playerResetRate} seekLabel={t.playerSeek} />
           <button
             onClick={handleDownload}
             style={{

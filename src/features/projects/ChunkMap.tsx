@@ -197,7 +197,7 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
       {player.url && (
         <div style={{ marginBottom: 16 }}>
           <HiddenAudio player={player} />
-          <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} />
+          <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} skipBackLabel={t.playerSkipBack} skipForwardLabel={t.playerSkipForward} rateLabel={t.playerRate} resetRateLabel={t.playerResetRate} seekLabel={t.playerSeek} />
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
             <Button
               variant="secondary"

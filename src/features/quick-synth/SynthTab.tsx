@@ -307,6 +307,11 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
             playLabel={t.play}
             pauseLabel={t.pause}
             stopLabel={t.stop}
+            skipBackLabel={t.playerSkipBack}
+            skipForwardLabel={t.playerSkipForward}
+            rateLabel={t.playerRate}
+            resetRateLabel={t.playerResetRate}
+            seekLabel={t.playerSeek}
           />
           {synthesis.isGenerated && player.url && (
             <div

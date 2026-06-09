@@ -295,7 +295,7 @@ export function AmbienceMixer({ t, chapterId, onToast }: Props) {
       {mixPlayer.url && (
         <div style={{ marginTop: 12 }}>
           <HiddenAudio player={mixPlayer} />
-          <InteractivePlayer player={mixPlayer} playLabel={t.ambientPlayMix} pauseLabel={t.pause} stopLabel={t.stop} />
+          <InteractivePlayer player={mixPlayer} playLabel={t.ambientPlayMix} pauseLabel={t.pause} stopLabel={t.stop} skipBackLabel={t.playerSkipBack} skipForwardLabel={t.playerSkipForward} rateLabel={t.playerRate} resetRateLabel={t.playerResetRate} seekLabel={t.playerSeek} />
           <button
             onClick={handleDownloadMix}
             style={{

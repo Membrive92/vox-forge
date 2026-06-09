@@ -397,6 +397,9 @@ export const en: Record<TranslationKey, string> = {
   // ── Interactive player ───────────────────────────────────────────
   playerSkipBack: "Skip back 10 seconds",
   playerSkipForward: "Skip forward 10 seconds",
+  playerRate: "Playback rate",
+  playerResetRate: "Reset playback rate to 1×",
+  playerSeek: "Seek",
   playerPlaybackRate: "Playback rate {r}x",
 
   // ── Lab custom preset dialog ─────────────────────────────────────
