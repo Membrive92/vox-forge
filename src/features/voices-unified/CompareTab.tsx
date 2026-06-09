@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 
 import { synthesize } from "@/api/synthesis";
 import { Button } from "@/components/Button";
+import { HiddenAudio } from "@/components/HiddenAudio";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
@@ -171,14 +172,7 @@ export function CompareTab({ t, profiles, onToast }: Props) {
 
               {player.url && (
                 <div style={{ marginTop: 12 }}>
-                  <audio
-                    ref={player.audioRef}
-                    src={player.url}
-                    onPlay={() => player.setIsPlaying(true)}
-                    onPause={() => player.setIsPlaying(false)}
-                    onEnded={() => player.setIsPlaying(false)}
-                    style={{ display: "none" }}
-                  />
+                  <HiddenAudio player={player} />
                   <InteractivePlayer
                     player={player}
                     playLabel={t.play}

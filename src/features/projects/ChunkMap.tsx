@@ -10,6 +10,7 @@ import {
 import { isAbortError } from "@/api/client";
 import { listStudioRenders, type StudioRender } from "@/api/studio";
 import { Button } from "@/components/Button";
+import { HiddenAudio } from "@/components/HiddenAudio";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Skeleton } from "@/components/Skeleton";
 import * as Icons from "@/components/icons";
@@ -195,14 +196,7 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
       {/* Player for the full chapter audio */}
       {player.url && (
         <div style={{ marginBottom: 16 }}>
-          <audio
-            ref={player.audioRef}
-            src={player.url}
-            onPlay={() => player.setIsPlaying(true)}
-            onPause={() => player.setIsPlaying(false)}
-            onEnded={() => player.setIsPlaying(false)}
-            style={{ display: "none" }}
-          />
+          <HiddenAudio player={player} />
           <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} />
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
             <Button

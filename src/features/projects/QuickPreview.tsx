@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { upsertPronunciation } from "@/api/pronunciation";
 import { synthesize } from "@/api/synthesis";
 import { Button } from "@/components/Button";
+import { HiddenAudio } from "@/components/HiddenAudio";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { PromptDialog } from "@/components/PromptDialog";
 import * as Icons from "@/components/icons";
@@ -146,14 +147,7 @@ export function QuickPreview({
 
       {player.url && (
         <div style={{ marginTop: 10 }}>
-          <audio
-            ref={player.audioRef}
-            src={player.url}
-            onPlay={() => player.setIsPlaying(true)}
-            onPause={() => player.setIsPlaying(false)}
-            onEnded={() => player.setIsPlaying(false)}
-            style={{ display: "none" }}
-          />
+          <HiddenAudio player={player} />
           <InteractivePlayer
             player={player}
             playLabel={t.play}

@@ -8,6 +8,7 @@ import {
   type IncompleteJobDTO,
 } from "@/api/synthesis";
 import { Button } from "@/components/Button";
+import { HiddenAudio } from "@/components/HiddenAudio";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
@@ -299,14 +300,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
             isPlaying={player.isPlaying}
             isGenerated={synthesis.isGenerated}
           />
-          <audio
-            ref={player.audioRef}
-            src={player.url ?? undefined}
-            onPlay={() => player.setIsPlaying(true)}
-            onPause={() => player.setIsPlaying(false)}
-            onEnded={() => player.setIsPlaying(false)}
-            style={{ display: "none" }}
-          />
+          <HiddenAudio player={player} />
           <InteractivePlayer
             player={player}
             disabled={!synthesis.isGenerated}

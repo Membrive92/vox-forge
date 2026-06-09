@@ -14,6 +14,7 @@ import {
 } from "@/api/characterSynth";
 import { isAbortError } from "@/api/client";
 import { Button } from "@/components/Button";
+import { HiddenAudio } from "@/components/HiddenAudio";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import * as Icons from "@/components/icons";
 import { VOICES } from "@/constants/voices";
@@ -268,14 +269,7 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
 
       {player.url && (
         <div style={{ marginTop: 12 }}>
-          <audio
-            ref={player.audioRef}
-            src={player.url}
-            onPlay={() => player.setIsPlaying(true)}
-            onPause={() => player.setIsPlaying(false)}
-            onEnded={() => player.setIsPlaying(false)}
-            style={{ display: "none" }}
-          />
+          <HiddenAudio player={player} />
           <InteractivePlayer player={player} playLabel={t.play} pauseLabel={t.pause} stopLabel={t.stop} />
           <button
             onClick={handleDownload}

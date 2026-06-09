@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { isAbortError } from "@/api/client";
 import { convertVoice } from "@/api/conversion";
 import { Button } from "@/components/Button";
+import { HiddenAudio } from "@/components/HiddenAudio";
 import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
 import * as Icons from "@/components/icons";
@@ -151,14 +152,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
               backdropFilter: "blur(12px)",
             }}
           >
-            <audio
-              ref={player.audioRef}
-              src={player.url}
-              onPlay={() => player.setIsPlaying(true)}
-              onPause={() => player.setIsPlaying(false)}
-              onEnded={() => player.setIsPlaying(false)}
-              style={{ display: "none" }}
-            />
+            <HiddenAudio player={player} />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button

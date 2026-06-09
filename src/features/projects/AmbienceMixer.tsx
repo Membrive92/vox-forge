@@ -16,6 +16,7 @@ import {
 } from "@/api/ambience";
 import { isAbortError } from "@/api/client";
 import { Button } from "@/components/Button";
+import { HiddenAudio } from "@/components/HiddenAudio";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Slider } from "@/components/Slider";
 import * as Icons from "@/components/icons";
@@ -293,14 +294,7 @@ export function AmbienceMixer({ t, chapterId, onToast }: Props) {
       {/* Mixed audio player */}
       {mixPlayer.url && (
         <div style={{ marginTop: 12 }}>
-          <audio
-            ref={mixPlayer.audioRef}
-            src={mixPlayer.url}
-            onPlay={() => mixPlayer.setIsPlaying(true)}
-            onPause={() => mixPlayer.setIsPlaying(false)}
-            onEnded={() => mixPlayer.setIsPlaying(false)}
-            style={{ display: "none" }}
-          />
+          <HiddenAudio player={mixPlayer} />
           <InteractivePlayer player={mixPlayer} playLabel={t.ambientPlayMix} pauseLabel={t.pause} stopLabel={t.stop} />
           <button
             onClick={handleDownloadMix}

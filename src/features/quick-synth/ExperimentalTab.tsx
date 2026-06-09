@@ -12,6 +12,7 @@ import {
 import type { CreateProfileInput } from "@/api/profiles";
 import { getStudioAudioUrl } from "@/api/studio";
 import { AudioRecorder } from "@/components/AudioRecorder";
+import { HiddenAudio } from "@/components/HiddenAudio";
 import { Button } from "@/components/Button";
 import { PromptDialog } from "@/components/PromptDialog";
 import * as Icons from "@/components/icons";
@@ -269,12 +270,7 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
             background: colors.surface, border: `1px solid ${colors.border}`,
             borderRadius: radii.xl, padding: 20, backdropFilter: "blur(12px)",
           }}>
-            <audio ref={player.audioRef} src={player.url}
-              onPlay={() => player.setIsPlaying(true)}
-              onPause={() => player.setIsPlaying(false)}
-              onEnded={() => player.setIsPlaying(false)}
-              style={{ display: "none" }}
-            />
+            <HiddenAudio player={player} />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button onClick={player.toggle} aria-label={player.isPlaying ? t.pause : t.play} style={{
