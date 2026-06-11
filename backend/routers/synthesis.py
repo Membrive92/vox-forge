@@ -1,6 +1,8 @@
 """Text-to-speech synthesis endpoint."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydub import AudioSegment
@@ -22,7 +24,21 @@ from ..services.progress import registry as progress_registry
 from ..services.tts_engine import TTSEngine
 from ..utils import cleanup_old_files
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["synthesis"])
+
+
+def _job_is_running(job_id: str) -> bool:
+    """True when the progress registry shows an in-flight run for this job.
+
+    Used to serialize work on a job_id: the snapshot read and the
+    ``progress_registry.start()`` that follows it run synchronously on the
+    event loop (no await in between), so two concurrent requests can't both
+    pass the check — the loser always observes ``status == "running"``.
+    """
+    live = progress_registry.snapshot(job_id)
+    return live is not None and live.status == "running"
 
 
 @router.post("/synthesize", summary="Synthesize text to audio")
@@ -54,12 +70,18 @@ async def synthesize_text(
     cancel_token = create_cancellation_token(http_request)
     # The job id becomes a filesystem path; never trust the client header
     # verbatim. Use it only if it passes the allowlist, else mint a fresh id.
+    # A header id that is ALREADY running gets a fresh id too: reusing it
+    # would clobber the live job's progress and race on its chunk dir.
     header_job_id = http_request.headers.get("x-synthesis-job-id")
-    job_id = (
-        header_job_id
-        if header_job_id and job_store.is_valid_job_id(header_job_id)
-        else job_store.new_job_id()
-    )
+    job_id = job_store.new_job_id()
+    if header_job_id and job_store.is_valid_job_id(header_job_id):
+        if _job_is_running(header_job_id):
+            logger.warning(
+                "Job %s is already running; using fresh job id %s",
+                header_job_id, job_id,
+            )
+        else:
+            job_id = header_job_id
     progress_registry.start(job_id, chunks_total=0, step="starting")
 
     record = job_store.JobRecord(
@@ -170,6 +192,16 @@ async def resume_job(
     record = job_store.load_record(job_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    # Reject a resume while the same job is in flight (the original request
+    # or a previous resume): both would write to the same chunk dir and
+    # clobber each other's progress. See _job_is_running for why this
+    # check-then-start is race-free on a single event loop.
+    if _job_is_running(job_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Job is already running. Wait for it to finish before resuming.",
+        )
 
     # Rehydrate the original request from the stored snapshot.
     request = SynthesisRequest.model_validate(record.request)

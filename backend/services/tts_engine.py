@@ -293,7 +293,17 @@ class TTSEngine:
                     pitch=_pitch_str(request.pitch),
                     volume=_volume_str(request.volume),
                 )
-                await communicate.save(str(chunk_file))
+                if use_job_dir:
+                    # Write to a temp name and promote with an atomic
+                    # os.replace: a crash mid-write must never leave a
+                    # truncated chunk_*.mp3 that a later resume would
+                    # silently keep. The "incoming_" prefix also keeps the
+                    # partial file out of the chunk_*.* resume glob.
+                    partial = chunk_file.with_name(f"incoming_{chunk_file.name}")
+                    await communicate.save(str(partial))
+                    partial.replace(chunk_file)
+                else:
+                    await communicate.save(str(chunk_file))
                 logger.info(
                     "Chunk %d/%d synthesized: %d bytes",
                     i + 1, len(chunks), chunk_file.stat().st_size,

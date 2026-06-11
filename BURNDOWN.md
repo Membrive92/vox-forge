@@ -19,7 +19,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 **Estados**: `RESUELTO-PREVIO` · `ABIERTO` · `NO-REPRODUCIBLE` · `WONTFIX` (justificado) · `HUMANO-PENDIENTE` · `DIFERIDO` (solo §F9).
 
-**Recuento**: Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 22/33 resueltos, **11 abiertos** · Bajos 11/38 resueltos, **27 abiertos** · Nuevos (fuentes 2 y 3): **26 abiertos** (3 de ellos HUMANO).
+**Recuento**: Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 22/33 resueltos, **11 abiertos** · Bajos 12/38 resueltos, **26 abiertos** · Nuevos (fuentes 2 y 3): **26 abiertos** (3 de ellos HUMANO).
 
 ---
 
@@ -113,7 +113,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-14 | useErrorBadge sin pausa en hidden | **ABIERTO** | useErrorBadge.ts:20 |
 | BAJO-15 | HTTPException sin mensaje amigable | **ABIERTO** | chapter_synth.py:48+ |
 | BAJO-16 | `catch {}` vacíos | **ABIERTO** | WorkbenchTab.tsx:118, ChunkMap.tsx:50,58 |
-| BAJO-17 | Resume concurrente mismo job_id | **ABIERTO** (→F1) | synthesis.py:154 sin lock |
+| BAJO-17 | Resume concurrente mismo job_id | RESUELTO | resume devuelve 409 si `status=="running"` (check+start sin await, race-free); /synthesize acuña id fresco si el header está en vuelo; chunks con `os.replace` atómico — F1 `fix(audit-bajo) BAJO-17` |
 | BAJO-18 | Takes done sin file_path | RESUELTO-PREVIO | chapter_synth.py:150,239,245 persisten file_path |
 | BAJO-19 | Nav sin tablist/tab | RESUELTO-PREVIO | ARIA tabs completo (App.tsx:490+) — d6777a7 |
 | BAJO-20 | `<audio>/<video>` sin nombre accesible | **ABIERTO** | ChapterCard/StudioTab/Recorder/VideoRenderPanel |
