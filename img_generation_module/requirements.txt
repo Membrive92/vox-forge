@@ -1,0 +1,3 @@
+# Dependencias de runtime del paquete pipeline/ (stdlib + esto; ver CLAUDE.md).
+# Los tests unitarios solo necesitan pytest (ya presente en el repo padre).
+websocket-client>=1.6

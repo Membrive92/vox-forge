@@ -1,0 +1,11 @@
+# Workspace de ComfyUI instalado por setup.ps1 (no versionado)
+vendor/
+
+# Binarios generados (los sidecars .json y los manifests SI se versionan)
+assets/**/*.png
+assets/**/*.mp4
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

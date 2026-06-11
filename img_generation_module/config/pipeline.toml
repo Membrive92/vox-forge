@@ -1,0 +1,32 @@
+[engine]
+workspace = "vendor/ComfyUI"
+python_exe = "vendor/ComfyUI/.venv/Scripts/python.exe"   # lo fija setup.ps1
+host = "127.0.0.1"
+port = 8188
+start_timeout_s = 180
+comfyui_pin = "6d18f4adacea2304f1f6f4ff3c0279d13654ec5c"
+gpu = "RTX 4070 Super 12GB"   # informativo: bloque engine del sidecar
+
+[image]
+workflow = "workflows/zimage_t2i_fp8.api.json"
+width = 1248
+height = 720
+timeout_s = 180
+
+[video]
+workflow = "workflows/wan22_i2v_q5.api.json"
+width = 832
+height = 480
+frames = 81
+timeout_s = 900
+oom_max_retries = 2        # free_vram -> restart -> fail
+
+[models]
+video_quant = "Q5_K_M"     # informativo: validate comprueba que los GGUF en
+                           # disco coinciden con este nivel
+
+[paths]
+assets = "assets"
+
+[post]
+enabled = false            # fase opcional (ADR-004), sin implementar en v1
