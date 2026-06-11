@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "episode": "e01",
+  "defaults": {
+    "image_suffix": ", abandoned stone tower, dense fog, cold blue hour, ominous, cinematic, 35mm film grain",
+    "motion_suffix": ", static camera, slow drift"
+  },
+  "scenes": [
+    {
+      "id": "s01",
+      "image_prompt": "wide shot of the tower emerging from the mist",
+      "motion_prompt": "fog rolling slowly across the frame"
+    },
+    {
+      "id": "s02",
+      "image_prompt": "rusted iron door at the tower base, peeling paint",
+      "motion_prompt": "almost imperceptible camera push-in",
+      "seed": 4471
+    },
+    {
+      "id": "s03",
+      "image_prompt": "narrow spiral staircase inside the tower, lit by a single torch",
+      "motion_prompt": "torch flame flickering, shadows breathing on the stone wall"
+    }
+  ]
+}
