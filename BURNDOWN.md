@@ -19,7 +19,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 **Estados**: `RESUELTO-PREVIO` · `ABIERTO` · `NO-REPRODUCIBLE` · `WONTFIX` (justificado) · `HUMANO-PENDIENTE` · `DIFERIDO` (solo §F9).
 
-**Recuento**: Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 23/33 resueltos, **10 abiertos** · Bajos 12/38 resueltos, **26 abiertos** · Nuevos (fuentes 2 y 3): **26 abiertos** (3 de ellos HUMANO).
+**Recuento**: Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 23/33 resueltos, **10 abiertos** · Bajos 14/38 resueltos, **24 abiertos** · Nuevos (fuentes 2 y 3): **26 abiertos** (3 de ellos HUMANO).
 
 ---
 
@@ -58,7 +58,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | MED-SEC-3 | Uploads confían en content-type | RESUELTO-PREVIO | `validate_audio_bytes` magic-bytes en 4 endpoints persistentes | 4a88bde |
 | MED-COR-1 | candidates fuga WAV anclado | RESUELTO-PREVIO | experimental.py:348-351 unlink en finally | 4a88bde |
 | MED-COR-2 | single no borra `anchored_path` | RESUELTO-PREVIO | experimental.py:274-277 unlink en finally | 4a88bde |
-| MED-COR-3 | Resume XTTS imposible; `JobRecord.engine` hardcodeado | RESUELTO | `JobRecord.engine` vía `TTSEngine.resolve_routing`; `synthesize_long` persiste `chunk_NNNN.wav` en `data/jobs/{id}` con `os.replace` y salta existentes al reanudar | F1 `fix(audit-medio) MED-COR-3` |
+| MED-COR-3 | Resume XTTS imposible; `JobRecord.engine` hardcodeado | RESUELTO | `JobRecord.engine` vía `TTSEngine.resolve_routing`; `synthesize_long` persiste `chunk_NNNN.wav` en `data/jobs/{id}` con `os.replace` y salta existentes al reanudar | c6ff522 |
 | MED-COR-4 | `_spell_unknown_siglas` rompe 'NO' | RESUELTO-PREVIO | `_COMMON_UPPER_WORDS` allowlist + test | 4a88bde |
 | MED-COR-5 | extract-characters `body: dict` | RESUELTO-PREVIO | `ExtractCharactersRequest` (character_synth.py:45) | 6553c2d |
 | MED-COR-6 | `update_project` `type: ignore` oculta None | RESUELTO-PREVIO | 0 type:ignore; None→404 | 6553c2d |
@@ -129,8 +129,8 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-30 | Prop drilling Voices (~17 props) | **ABIERTO** | VoicesPlusLab.tsx:43+ |
 | BAJO-31 | `moveOperation` sin UI | **ABIERTO** | useStudioSession.ts:168 |
 | BAJO-32 | `_PAUSE_TAG_*` muertas | **ABIERTO** | tts_engine.py:106-108 |
-| BAJO-33 | Rama fallo `_run_command` sin test | **ABIERTO** | video_renderer.py:493-497 |
-| BAJO-34 | Concat character-cast sin test | **ABIERTO** | character_synth.py:109-129 |
+| BAJO-33 | Rama fallo `_run_command` sin test | RESUELTO | test_studio.py: exit!=0 con extracto de cola de stderr, ffmpeg ausente, y render sin output file — F1 `test(audit-bajo) BAJO-33` |
+| BAJO-34 | Concat character-cast sin test | RESUELTO | test_workbench.py: spy sobre `AudioSegment.silent` (600ms switch / 300ms mismo personaje, verificado vía X-Audio-Duration) + cleanup de temporales en éxito y en fallo — F1 `test(audit-bajo) BAJO-34` |
 | BAJO-35 | Invariante semáforo sin test | RESUELTO-PREVIO | test_clone_engine: holds_gpu_semaphore — a614a96 |
 | BAJO-36 | Defaults EN en InteractivePlayer | **ABIERTO** (→F6) | InteractivePlayer.tsx:24-31 props opcionales |
 | BAJO-37 | Acentos es.ts convert/lab | **ABIERTO (resto mínimo)** | 1 cadena sospechosa restante en es.ts |

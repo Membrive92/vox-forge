@@ -525,6 +525,65 @@ def test_run_command_passes_pipes_as_keyword_args(client, monkeypatch, tmp_path)
     assert captured["kwargs"]["stderr"] is sp.PIPE
 
 
+async def test_run_command_failure_raises_with_stderr_excerpt(client, monkeypatch, tmp_path) -> None:
+    """``returncode != 0`` must surface as SynthesisError carrying the exit
+    code and the TAIL of stderr (ffmpeg prints the actual error last)."""
+    from backend.exceptions import SynthesisError
+    from backend.services import video_renderer as vr
+
+    class _Failed:
+        returncode = 1
+        # The useful message sits after >2000 bytes of noise: only the
+        # tail may make it into the exception.
+        stderr = b"EARLY-NOISE " + b"x" * 2500 + b" Error: invalid filter graph"
+
+    monkeypatch.setattr(vr.subprocess, "run", lambda *a, **k: _Failed())
+
+    with pytest.raises(SynthesisError) as exc:
+        await vr.VideoRenderer()._run_command(
+            ["ffmpeg", "-i", "in.wav", "out.mp4"], tmp_path / "out.mp4",
+        )
+
+    message = str(exc.value)
+    assert "exited 1" in message
+    assert "invalid filter graph" in message
+    assert "EARLY-NOISE" not in message, "stderr excerpt must be the tail, capped"
+
+
+async def test_run_command_raises_when_ffmpeg_not_on_path(client, monkeypatch, tmp_path) -> None:
+    from backend.exceptions import SynthesisError
+    from backend.services import video_renderer as vr
+
+    monkeypatch.setattr(vr.shutil, "which", lambda _exe: None)
+
+    with pytest.raises(SynthesisError, match="ffmpeg not found"):
+        await vr.VideoRenderer()._run_command(["ffmpeg"], tmp_path / "out.mp4")
+
+
+async def test_render_raises_when_no_output_file_produced(client, monkeypatch) -> None:
+    """ffmpeg can exit 0 without writing the file (e.g. dry/aborted runs):
+    render() must fail loudly instead of returning a phantom result."""
+    from backend.exceptions import SynthesisError
+    from backend.schemas import VideoOptions
+    from backend.services.video_renderer import VideoRenderer
+
+    src = _seed_source("no_output_src.wav")
+    cover = _seed_cover("no_output_cover.png")
+
+    async def fake_run(self, argv, output_path):
+        pass  # "succeeds" but produces nothing
+
+    monkeypatch.setattr(VideoRenderer, "_run_command", fake_run)
+
+    with pytest.raises(SynthesisError, match="no output file"):
+        await VideoRenderer().render(
+            audio_path=src,
+            cover_path=cover,
+            subtitles_path=None,
+            options=VideoOptions(),
+        )
+
+
 def test_validate_options_rejects_bad_resolution(client) -> None:
     from backend.exceptions import InvalidSampleError
     from backend.schemas import VideoOptions

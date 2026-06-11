@@ -312,6 +312,135 @@ def test_cast_synthesize_unmapped_warning(client) -> None:
     assert "Stranger" in response.headers.get("x-unmapped-characters", "")
 
 
+# ── Character-cast concat: silence pattern + temp cleanup (BAJO-34) ──
+
+
+def _spy_on_silence(monkeypatch) -> list[int]:
+    """Record every ``AudioSegment.silent`` duration the cast router asks
+    for, while keeping the stub's behavior (a clip of that length)."""
+    from backend.routers import character_synth as cs
+
+    calls: list[int] = []
+    original = cs.AudioSegment.silent.__func__
+
+    def spy(cls, duration=0, **kwargs):
+        calls.append(duration)
+        return original(cls, duration=duration, **kwargs)
+
+    monkeypatch.setattr(cs.AudioSegment, "silent", classmethod(spy))
+    return calls
+
+
+def test_cast_concat_inserts_600ms_pause_on_character_switch(client, monkeypatch) -> None:
+    """Three segments (Ana/Luis/Ana) → two character switches. Each stub
+    segment is 1000ms, so the duration header proves the two 600ms pauses
+    actually landed in the concatenated audio."""
+    silent_calls = _spy_on_silence(monkeypatch)
+
+    response = client.post(
+        "/api/character-synth/synthesize",
+        json={
+            "text": "[Ana] Hola.\n[Luis] Buenas noches.\n[Ana] Adiós.",
+            "cast": [
+                {"character": "Ana", "voice_id": "es-ES-AlvaroNeural"},
+                {"character": "Luis", "voice_id": "es-ES-AlvaroNeural"},
+            ],
+            "output_format": "mp3",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["x-audio-segments"] == "3"
+    # 3 × 1000ms segments + 2 × 600ms switch pauses = 4.2s
+    assert response.headers["x-audio-duration"] == "4.2"
+    assert 600 in silent_calls
+
+
+def test_cast_concat_uses_300ms_pause_between_same_character_segments(client, monkeypatch) -> None:
+    """Adjacent segments by the SAME character get the short 300ms breath,
+    not the 600ms switch pause. The parser merges same-character lines, so
+    the segment list is injected to exercise the branch."""
+    from backend.routers import character_synth as cs
+    from backend.services.character_parser import CharacterSegment
+
+    monkeypatch.setattr(
+        cs,
+        "parse_character_markup",
+        lambda _text: [
+            CharacterSegment(character="Ana", text="Hola."),
+            CharacterSegment(character="Ana", text="Sigo siendo yo."),
+            CharacterSegment(character="Luis", text="Adiós."),
+        ],
+    )
+    silent_calls = _spy_on_silence(monkeypatch)
+
+    response = client.post(
+        "/api/character-synth/synthesize",
+        json={
+            "text": "ignored by the patched parser",
+            "cast": [
+                {"character": "Ana", "voice_id": "es-ES-AlvaroNeural"},
+                {"character": "Luis", "voice_id": "es-ES-AlvaroNeural"},
+            ],
+            "output_format": "mp3",
+        },
+    )
+    assert response.status_code == 200, response.text
+    # One 600ms pause object built up front + one 300ms same-character gap.
+    assert silent_calls == [600, 300]
+    # 3 × 1000ms + 300ms (same char) + 600ms (switch) = 3.9s
+    assert response.headers["x-audio-duration"] == "3.9"
+
+
+def test_cast_synthesize_cleans_per_segment_temp_files(client) -> None:
+    """The per-segment synth outputs are intermediates: after the request,
+    only the final cast_*.mp3 may remain in the output dir."""
+    from backend.paths import OUTPUT_DIR
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    before = set(OUTPUT_DIR.iterdir())
+
+    response = client.post(
+        "/api/character-synth/synthesize",
+        json={
+            "text": "[Ana] Hola.\n[Luis] Adiós.",
+            "cast": [
+                {"character": "Ana", "voice_id": "es-ES-AlvaroNeural"},
+                {"character": "Luis", "voice_id": "es-ES-AlvaroNeural"},
+            ],
+            "output_format": "mp3",
+        },
+    )
+    assert response.status_code == 200
+
+    new_files = set(OUTPUT_DIR.iterdir()) - before
+    assert len(new_files) == 1, f"segment temp files leaked: {new_files}"
+    assert next(iter(new_files)).name.startswith("cast_")
+
+
+def test_cast_synthesize_failure_cleans_partial_segments(client) -> None:
+    """If a later segment fails (invalid voice), the already-synthesized
+    segment files must not be left behind."""
+    from backend.paths import OUTPUT_DIR
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    before = set(OUTPUT_DIR.iterdir())
+
+    response = client.post(
+        "/api/character-synth/synthesize",
+        json={
+            "text": "[Ana] Hola.\n[Luis] Adiós.",
+            "cast": [
+                {"character": "Ana", "voice_id": "es-ES-AlvaroNeural"},
+                {"character": "Luis", "voice_id": "voz-inexistente"},
+            ],
+            "output_format": "mp3",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "unsupported_voice"
+    assert set(OUTPUT_DIR.iterdir()) == before, "partial segment audio leaked"
+
+
 # ── Pronunciation dictionary ─────────────────────────────────────────
 
 def test_pronunciation_crud(client) -> None:
