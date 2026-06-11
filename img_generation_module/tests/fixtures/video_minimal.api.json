@@ -1,0 +1,110 @@
+{
+  "10": {
+    "class_type": "UnetLoaderGGUF",
+    "inputs": { "unet_name": "Wan2.2-I2V-A14B-HighNoise-Q5_K_M.gguf" },
+    "_meta": { "title": "Load High Noise GGUF" }
+  },
+  "11": {
+    "class_type": "UnetLoaderGGUF",
+    "inputs": { "unet_name": "Wan2.2-I2V-A14B-LowNoise-Q5_K_M.gguf" },
+    "_meta": { "title": "Load Low Noise GGUF" }
+  },
+  "12": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "lora_name": "wan22_i2v_lightning4_high.safetensors", "strength_model": 1.0, "model": ["10", 0] },
+    "_meta": { "title": "Lightning LoRA High" }
+  },
+  "13": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": { "lora_name": "wan22_i2v_lightning4_low.safetensors", "strength_model": 1.0, "model": ["11", 0] },
+    "_meta": { "title": "Lightning LoRA Low" }
+  },
+  "14": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type": "wan" },
+    "_meta": { "title": "Load Text Encoder" }
+  },
+  "15": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "wan_2.1_vae.safetensors" },
+    "_meta": { "title": "Load VAE" }
+  },
+  "16": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "placeholder motion prompt", "clip": ["14", 0] },
+    "_meta": { "title": "PROMPT_POSITIVE" }
+  },
+  "17": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "placeholder negative", "clip": ["14", 0] },
+    "_meta": { "title": "PROMPT_NEGATIVE" }
+  },
+  "18": {
+    "class_type": "LoadImage",
+    "inputs": { "image": "placeholder.png" },
+    "_meta": { "title": "INPUT_IMAGE" }
+  },
+  "19": {
+    "class_type": "WanImageToVideo",
+    "inputs": {
+      "width": 832,
+      "height": 480,
+      "length": 81,
+      "batch_size": 1,
+      "positive": ["16", 0],
+      "negative": ["17", 0],
+      "vae": ["15", 0],
+      "start_image": ["18", 0]
+    },
+    "_meta": { "title": "SIZE" }
+  },
+  "20": {
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 0,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 2,
+      "model": ["12", 0],
+      "positive": ["16", 0],
+      "negative": ["17", 0],
+      "latent_image": ["19", 0]
+    },
+    "_meta": { "title": "SEED" }
+  },
+  "21": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["13", 0],
+      "positive": ["16", 0],
+      "negative": ["17", 0],
+      "latent_image": ["20", 0]
+    },
+    "_meta": { "title": "SEED" }
+  },
+  "22": {
+    "class_type": "WanVideoLength",
+    "inputs": { "length": 81, "samples": ["21", 0] },
+    "_meta": { "title": "LENGTH" }
+  },
+  "23": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["22", 0], "vae": ["15", 0] },
+    "_meta": { "title": "VAE Decode" }
+  },
+  "24": {
+    "class_type": "SaveVideo",
+    "inputs": { "filename_prefix": "wan22", "fps": 16, "video": ["23", 0] },
+    "_meta": { "title": "SAVE" }
+  }
+}

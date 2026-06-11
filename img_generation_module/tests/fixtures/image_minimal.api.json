@@ -1,0 +1,58 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": { "unet_name": "z_image_turbo_bf16.safetensors", "weight_dtype": "fp8_e4m3fn" },
+    "_meta": { "title": "Load Diffusion Model" }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": { "clip_name": "qwen_3_4b.safetensors", "type": "qwen_image" },
+    "_meta": { "title": "Load CLIP" }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": { "vae_name": "ae.safetensors" },
+    "_meta": { "title": "Load VAE" }
+  },
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "placeholder positive", "clip": ["2", 0] },
+    "_meta": { "title": "PROMPT_POSITIVE" }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": { "text": "placeholder negative", "clip": ["2", 0] },
+    "_meta": { "title": "PROMPT_NEGATIVE" }
+  },
+  "6": {
+    "class_type": "EmptySD3LatentImage",
+    "inputs": { "width": 1024, "height": 1024, "batch_size": 1 },
+    "_meta": { "title": "SIZE" }
+  },
+  "7": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 8,
+      "cfg": 1.8,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["1", 0],
+      "positive": ["4", 0],
+      "negative": ["5", 0],
+      "latent_image": ["6", 0]
+    },
+    "_meta": { "title": "SEED" }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["7", 0], "vae": ["3", 0] },
+    "_meta": { "title": "VAE Decode" }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": { "filename_prefix": "zimage", "images": ["8", 0] },
+    "_meta": { "title": "SAVE" }
+  }
+}
