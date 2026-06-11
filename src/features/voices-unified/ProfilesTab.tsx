@@ -1,6 +1,9 @@
+import { API_BASE } from "@/api/client";
 import { Button } from "@/components/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { IconButton } from "@/components/IconButton";
+import { logger } from "@/logging/logger";
+import { downloadBlob } from "@/utils/download";
 import * as Icons from "@/components/icons";
 import { ALL_VOICES } from "@/constants/voices";
 import type { SamplePlayerState } from "@/hooks/useSamplePlayer";
@@ -99,6 +102,26 @@ interface ProfileCardProps {
 function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnchor, samplePlayer, voicePreview }: ProfileCardProps) {
   const confirm = useConfirm();
   const voice = ALL_VOICES.find((v) => v.id === profile.voiceId);
+
+  // Downloads the stored voice sample named after the profile (not the
+  // opaque server filename). Fetched as a blob so the anchor download
+  // works regardless of API origin.
+  const handleDownloadSample = async (): Promise<void> => {
+    if (!profile.sampleName) return;
+    const dot = profile.sampleName.lastIndexOf(".");
+    const ext = dot >= 0 ? profile.sampleName.slice(dot) : ".wav";
+    const base = profile.name.replace(/[^\w\s.-]/g, "_").trim() || "voice_sample";
+    try {
+      const res = await fetch(`${API_BASE}/voices/samples/${profile.sampleName}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      downloadBlob(await res.blob(), `${base}${ext}`);
+    } catch (e) {
+      logger.error("Profile sample download failed", {
+        profileId: profile.id,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  };
   const params = [
     { label: t.speed, value: `${profile.speed}%` },
     { label: t.pitch, value: `${profile.pitch > 0 ? "+" : ""}${profile.pitch}st` },
@@ -235,36 +258,63 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnc
               {profile.sampleDuration}s
             </p>
           </div>
+          <IconButton
+            aria-label={t.profileDownloadSample}
+            variant="secondary"
+            size="sm"
+            onClick={() => void handleDownloadSample()}
+          >
+            <Icons.Download />
+          </IconButton>
         </div>
       ) : null}
 
-      {/* Preview the profile's base voice */}
-      <button
-        onClick={() => voicePreview.toggle(profile.voiceId, profile.lang)}
-        style={{
-          width: "100%",
-          padding: "6px 0",
-          borderRadius: radii.sm,
-          marginBottom: 8,
-          background: voicePreview.previewingId === profile.voiceId
-            ? colors.primarySoft
-            : "transparent",
-          border: `1px solid ${colors.borderFaint}`,
-          color: colors.textMuted,
-          cursor: "pointer",
-          fontSize: typography.size.xs,
-          fontWeight: 500,
-          fontFamily: fonts.sans,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
-          transition: "all 0.2s",
-        }}
-      >
-        {voicePreview.previewingId === profile.voiceId ? <Icons.Stop /> : <Icons.Volume />}
-        {voicePreview.previewingId === profile.voiceId ? t.stop : t.previewVoice} {voice?.name ?? ""}
-      </button>
+      {/* Preview: cloned profiles route through the clone engine (real
+          cloned voice); preset profiles preview their base voice. */}
+      {(() => {
+        const isCloned = profile.sampleName !== null;
+        const previewKey = isCloned ? profile.id : profile.voiceId;
+        const isActive = voicePreview.previewingId === previewKey;
+        const isLoading = voicePreview.loadingId === previewKey;
+        const label = isLoading
+          ? t.previewGenerating
+          : isActive
+            ? t.stop
+            : isCloned
+              ? t.previewClonedVoice
+              : `${t.previewVoice} ${voice?.name ?? ""}`;
+        return (
+          <button
+            onClick={() =>
+              isCloned
+                ? voicePreview.toggle(profile.voiceId, profile.lang, profile.id)
+                : voicePreview.toggle(profile.voiceId, profile.lang)
+            }
+            style={{
+              width: "100%",
+              padding: "6px 0",
+              borderRadius: radii.sm,
+              marginBottom: 8,
+              background: isActive ? colors.primarySoft : "transparent",
+              border: `1px solid ${colors.borderFaint}`,
+              color: colors.textMuted,
+              cursor: "pointer",
+              fontSize: typography.size.xs,
+              fontWeight: 500,
+              fontFamily: fonts.sans,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              transition: "all 0.2s",
+              opacity: isLoading ? 0.7 : 1,
+            }}
+          >
+            {isActive ? <Icons.Stop /> : <Icons.Volume />}
+            {label}
+          </button>
+        );
+      })()}
 
       {/* Castilian anchor toggle: prepend the configured reference voice
           to this profile's sample at synthesis time. Off by default. */}

@@ -1,4 +1,4 @@
-/** Synthesize a demo phrase with a given voice and play it. */
+/** Synthesize a demo phrase with a given voice (or cloned profile) and play it. */
 import { useCallback, useRef, useState } from "react";
 
 import { synthesize } from "@/api/synthesis";
@@ -10,18 +10,28 @@ const DEMO_PHRASES: Record<Language, string> = {
 };
 
 export interface VoicePreviewState {
-  /** ID of the voice being previewed (null if none). */
+  /** Key of the voice being previewed (null if none). For profile previews
+   *  this is the profile id; for plain voices, the voice id. */
   previewingId: string | null;
-  /** Start or stop the voice preview. */
-  toggle: (voiceId: string, lang: Language) => void;
+  /** Key currently synthesizing (cloned previews take seconds; the first
+   *  one also loads the XTTS model). Cleared when playback starts. */
+  loadingId: string | null;
+  /** Start or stop the preview. Pass `profileId` to preview a cloned
+   *  profile (routes through the clone engine instead of the base voice). */
+  toggle: (voiceId: string, lang: Language, profileId?: string) => void;
 }
 
 export function useVoicePreview(): VoicePreviewState {
   const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
+  // Invalida promesas de síntesis en vuelo cuando el usuario para o cambia
+  // de voz antes de que terminen (evita que la vieja suene sobre la nueva).
+  const seqRef = useRef(0);
 
   const cleanup = useCallback(() => {
+    seqRef.current++;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -31,19 +41,24 @@ export function useVoicePreview(): VoicePreviewState {
       urlRef.current = null;
     }
     setPreviewingId(null);
+    setLoadingId(null);
   }, []);
 
   const toggle = useCallback(
-    (voiceId: string, lang: Language) => {
-      // If this voice is already playing, stop it
-      if (previewingId === voiceId) {
+    (voiceId: string, lang: Language, profileId?: string) => {
+      const key = profileId ?? voiceId;
+
+      // If this voice is already playing or synthesizing, stop it
+      if (previewingId === key) {
         cleanup();
         return;
       }
 
       // Stop previous preview if any
       cleanup();
-      setPreviewingId(voiceId);
+      setPreviewingId(key);
+      setLoadingId(key);
+      const seq = ++seqRef.current;
 
       const text = DEMO_PHRASES[lang];
 
@@ -54,22 +69,25 @@ export function useVoicePreview(): VoicePreviewState {
         speed: 100,
         pitch: 0,
         volume: 80,
+        ...(profileId !== undefined ? { profileId } : {}),
       })
         .then(({ blob }) => {
+          if (seq !== seqRef.current) return; // superseded or stopped
           const url = URL.createObjectURL(blob);
           urlRef.current = url;
           const audio = new Audio(url);
           audioRef.current = audio;
           audio.onended = cleanup;
           audio.onerror = cleanup;
+          setLoadingId(null);
           void audio.play();
         })
         .catch(() => {
-          cleanup();
+          if (seq === seqRef.current) cleanup();
         });
     },
     [previewingId, cleanup],
   );
 
-  return { previewingId, toggle };
+  return { previewingId, loadingId, toggle };
 }
