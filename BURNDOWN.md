@@ -19,7 +19,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 **Estados**: `RESUELTO-PREVIO` · `ABIERTO` · `NO-REPRODUCIBLE` · `WONTFIX` (justificado) · `HUMANO-PENDIENTE` · `DIFERIDO` (solo §F9).
 
-**Recuento**: Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 22/33 resueltos, **11 abiertos** · Bajos 12/38 resueltos, **26 abiertos** · Nuevos (fuentes 2 y 3): **26 abiertos** (3 de ellos HUMANO).
+**Recuento**: Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 23/33 resueltos, **10 abiertos** · Bajos 12/38 resueltos, **26 abiertos** · Nuevos (fuentes 2 y 3): **26 abiertos** (3 de ellos HUMANO).
 
 ---
 
@@ -58,7 +58,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | MED-SEC-3 | Uploads confían en content-type | RESUELTO-PREVIO | `validate_audio_bytes` magic-bytes en 4 endpoints persistentes | 4a88bde |
 | MED-COR-1 | candidates fuga WAV anclado | RESUELTO-PREVIO | experimental.py:348-351 unlink en finally | 4a88bde |
 | MED-COR-2 | single no borra `anchored_path` | RESUELTO-PREVIO | experimental.py:274-277 unlink en finally | 4a88bde |
-| MED-COR-3 | Resume XTTS imposible; `JobRecord.engine` hardcodeado | **ABIERTO** | synthesis.py:68 hardcodea `edge-tts`; clone no persiste chunks por job | — |
+| MED-COR-3 | Resume XTTS imposible; `JobRecord.engine` hardcodeado | RESUELTO | `JobRecord.engine` vía `TTSEngine.resolve_routing`; `synthesize_long` persiste `chunk_NNNN.wav` en `data/jobs/{id}` con `os.replace` y salta existentes al reanudar | F1 `fix(audit-medio) MED-COR-3` |
 | MED-COR-4 | `_spell_unknown_siglas` rompe 'NO' | RESUELTO-PREVIO | `_COMMON_UPPER_WORDS` allowlist + test | 4a88bde |
 | MED-COR-5 | extract-characters `body: dict` | RESUELTO-PREVIO | `ExtractCharactersRequest` (character_synth.py:45) | 6553c2d |
 | MED-COR-6 | `update_project` `type: ignore` oculta None | RESUELTO-PREVIO | 0 type:ignore; None→404 | 6553c2d |
@@ -113,7 +113,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-14 | useErrorBadge sin pausa en hidden | **ABIERTO** | useErrorBadge.ts:20 |
 | BAJO-15 | HTTPException sin mensaje amigable | **ABIERTO** | chapter_synth.py:48+ |
 | BAJO-16 | `catch {}` vacíos | **ABIERTO** | WorkbenchTab.tsx:118, ChunkMap.tsx:50,58 |
-| BAJO-17 | Resume concurrente mismo job_id | RESUELTO | resume devuelve 409 si `status=="running"` (check+start sin await, race-free); /synthesize acuña id fresco si el header está en vuelo; chunks con `os.replace` atómico — F1 `fix(audit-bajo) BAJO-17` |
+| BAJO-17 | Resume concurrente mismo job_id | RESUELTO | resume devuelve 409 si `status=="running"` (check+start sin await, race-free); /synthesize acuña id fresco si el header está en vuelo; chunks con `os.replace` atómico — 479aafa |
 | BAJO-18 | Takes done sin file_path | RESUELTO-PREVIO | chapter_synth.py:150,239,245 persisten file_path |
 | BAJO-19 | Nav sin tablist/tab | RESUELTO-PREVIO | ARIA tabs completo (App.tsx:490+) — d6777a7 |
 | BAJO-20 | `<audio>/<video>` sin nombre accesible | **ABIERTO** | ChapterCard/StudioTab/Recorder/VideoRenderPanel |

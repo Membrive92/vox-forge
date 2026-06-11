@@ -84,10 +84,13 @@ async def synthesize_text(
             job_id = header_job_id
     progress_registry.start(job_id, chunks_total=0, step="starting")
 
+    # Persist the engine this request will actually route to: a crashed
+    # XTTS job listed in /incomplete must say so, and its chunks live as
+    # WAVs in the job dir — replaying it as "edge-tts" would be a lie.
     record = job_store.JobRecord(
         job_id=job_id,
         request=request.model_dump(),
-        engine="edge-tts",
+        engine=engine.resolve_routing(request).engine,
     )
     job_store.save_record(record)
 

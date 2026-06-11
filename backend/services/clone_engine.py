@@ -23,6 +23,7 @@ from ..cancellation import CancelledError, CancellationToken
 from ..exceptions import SynthesisError
 from ..gpu_lock import gpu_semaphore
 from ..paths import OUTPUT_DIR, TEMP_DIR
+from .job_store import chunk_path as job_chunk_path
 
 if TYPE_CHECKING:
     from TTS.api import TTS as TTSApi
@@ -451,10 +452,17 @@ class CloneEngine:
 
         Each chunk has its own pause_ms that determines the silence
         inserted after it (comma=200ms, sentence=500ms, paragraph=900ms).
+
+        When ``job_id`` is set, every finished chunk is promoted into the
+        job dir (``data/jobs/{job_id}/chunk_NNNN.wav``) with an atomic
+        ``os.replace``, mirroring the Edge-TTS path: a crashed job can be
+        resumed and chunks already on disk are skipped instead of paying
+        the full candidates × retries GPU loop again.
         """
         file_id = str(uuid.uuid4())[:12]
         output_path = OUTPUT_DIR / f"{file_id}.{output_format}"
         temp_files: list[Path] = []
+        use_job_dir = job_id is not None
 
         # Local import to avoid a circular dep with tts_engine at module load.
         from .progress import registry as progress_registry
@@ -464,7 +472,26 @@ class CloneEngine:
                 chunk_text = chunk.text if hasattr(chunk, "text") else str(chunk)
                 if cancel_token is not None:
                     cancel_token.check()
+
+                if use_job_dir:
+                    persisted = job_chunk_path(job_id, i, "wav")
+                    persisted.parent.mkdir(parents=True, exist_ok=True)
+                    if persisted.exists() and persisted.stat().st_size > 0:
+                        logger.info(
+                            "Clone chunk %d/%d already present, skipping",
+                            i + 1, len(chunks),
+                        )
+                        temp_files.append(persisted)
+                        progress_registry.update(job_id, chunks_done=i + 1)
+                        continue
+
                 chunk_path = await self.synthesize_chunk(chunk_text, speaker_wav, language, cancel_token=cancel_token, speed=speed)
+                if use_job_dir:
+                    # Promote the finished chunk into the job dir with an
+                    # atomic rename so a crash can only ever leave whole
+                    # chunk files behind.
+                    chunk_path.replace(persisted)
+                    chunk_path = persisted
                 temp_files.append(chunk_path)
                 logger.info("Clone chunk %d/%d done: '%s'", i + 1, len(chunks),
                             chunk_text[:60] + ("..." if len(chunk_text) > 60 else ""))
@@ -503,5 +530,9 @@ class CloneEngine:
             logger.error("Clone synthesis error: %s", exc)
             raise SynthesisError(f"Voice cloning error: {exc}") from exc
         finally:
-            for tf in temp_files:
-                tf.unlink(missing_ok=True)
+            # Chunks living in a job dir are the resume payload — the caller
+            # tears them down via job_store.cleanup_job on success. On crash
+            # they are exactly what makes resume possible.
+            if not use_job_dir:
+                for tf in temp_files:
+                    tf.unlink(missing_ok=True)

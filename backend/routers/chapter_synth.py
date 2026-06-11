@@ -252,10 +252,11 @@ async def regenerate_chunk(
     # possible when every chunk of the original synthesis is on disk: the
     # Edge-TTS path keeps them under the job dir (data/jobs/{gen_id}/), so
     # we overwrite this chunk there and concatenate all chunks in order
-    # with the same 400ms pauses the engine uses. When the chunks aren't
-    # available (e.g. an XTTS clone, which doesn't persist per-chunk files
-    # yet), we leave the take updated and report that the chapter audio was
-    # NOT re-spliced so the client can warn / offer a full re-synthesis.
+    # with the same 400ms pauses the engine uses. When the mp3 chunks aren't
+    # available (e.g. an XTTS clone, which persists clause-level WAV chunks
+    # under the job dir — a different chunking than the takes use), we leave
+    # the take updated and report that the chapter audio was NOT re-spliced
+    # so the client can warn / offer a full re-synthesis.
     respliced = await _resplice_chapter(gen, chunks, chunk_index, chunk_audio)
 
     return FileResponse(

@@ -162,6 +162,101 @@ class TestCloneEngineUnit:
             path.unlink(missing_ok=True)
 
     @pytest.mark.asyncio
+    async def test_synthesize_long_persists_job_chunks_for_resume(self, tmp_path) -> None:
+        """With a job_id, every finished chunk must land in the job dir as
+        chunk_NNNN.wav — that's the crash-resume payload (MED-COR-3)."""
+        from backend.catalogs import AUDIO_FORMATS
+        from backend.services import job_store
+        from backend.services.clone_engine import CloneEngine
+
+        engine = CloneEngine()
+        engine._device = "cpu"
+
+        def fake_tts_to_file(text, speaker_wav, language, file_path, **_kwargs):
+            Path(file_path).write_bytes(b"RIFF" + b"\x00" * 100)
+
+        fake_model = MagicMock()
+        fake_model.tts_to_file = fake_tts_to_file
+        engine._model = fake_model
+
+        ref_wav = tmp_path / "ref.wav"
+        ref_wav.write_bytes(b"RIFF" + b"\x00" * 100)
+        job_id = job_store.new_job_id()
+
+        with patch.object(type(engine), "is_available", new_callable=lambda: property(lambda self: True)):
+            path, chunk_count = await engine.synthesize_long(
+                chunks=["Chunk one.", "Chunk two."],
+                speaker_wav=ref_wav,
+                language="es",
+                output_format="mp3",
+                format_config=AUDIO_FORMATS["mp3"],
+                job_id=job_id,
+            )
+
+        try:
+            assert chunk_count == 2
+            assert path.exists()
+            for i in range(2):
+                chunk_file = job_store.chunk_path(job_id, i, "wav")
+                assert chunk_file.exists(), f"chunk {i} not persisted in job dir"
+                assert chunk_file.stat().st_size > 0
+        finally:
+            path.unlink(missing_ok=True)
+            job_store.cleanup_job(job_id)
+
+    @pytest.mark.asyncio
+    async def test_synthesize_long_resume_skips_existing_job_chunks(self, tmp_path) -> None:
+        """Resuming a clone job must only synthesize the chunks that are NOT
+        already on disk — no re-paying the candidates loop for finished ones."""
+        from backend.catalogs import AUDIO_FORMATS
+        from backend.services import job_store
+        from backend.services.clone_engine import CloneEngine
+
+        engine = CloneEngine()
+        engine._device = "cpu"
+
+        synthesized_texts: list[str] = []
+
+        def fake_tts_to_file(text, speaker_wav, language, file_path, **_kwargs):
+            synthesized_texts.append(text)
+            Path(file_path).write_bytes(b"RIFF" + b"\x00" * 100)
+
+        fake_model = MagicMock()
+        fake_model.tts_to_file = fake_tts_to_file
+        engine._model = fake_model
+
+        ref_wav = tmp_path / "ref.wav"
+        ref_wav.write_bytes(b"RIFF" + b"\x00" * 100)
+
+        # Simulate a crash after chunks 0 and 1 completed.
+        job_id = job_store.new_job_id()
+        for i in (0, 1):
+            seeded = job_store.chunk_path(job_id, i, "wav")
+            seeded.parent.mkdir(parents=True, exist_ok=True)
+            seeded.write_bytes(b"RIFF" + b"\x00" * 100)
+
+        with patch.object(type(engine), "is_available", new_callable=lambda: property(lambda self: True)):
+            path, chunk_count = await engine.synthesize_long(
+                chunks=["Chunk one.", "Chunk two.", "Chunk three."],
+                speaker_wav=ref_wav,
+                language="es",
+                output_format="mp3",
+                format_config=AUDIO_FORMATS["mp3"],
+                job_id=job_id,
+            )
+
+        try:
+            assert chunk_count == 3
+            assert path.exists()
+            assert synthesized_texts, "the missing chunk must be synthesized"
+            assert all(t == "Chunk three." for t in synthesized_texts), (
+                f"already-persisted chunks were re-synthesized: {set(synthesized_texts)}"
+            )
+        finally:
+            path.unlink(missing_ok=True)
+            job_store.cleanup_job(job_id)
+
+    @pytest.mark.asyncio
     async def test_synthesize_chunk_cleans_up_on_error(self) -> None:
         """Verify temp files are cleaned up when synthesis fails."""
         from backend.services.clone_engine import CloneEngine
@@ -419,6 +514,65 @@ class TestCloneAPI:
         assert r2.status_code == 500
         body = r2.json()
         assert "CUDA" in body.get("technical", body.get("detail", ""))
+
+    def test_failed_clone_job_records_xtts_engine(self, client) -> None:
+        """The crash-safe JobRecord must persist the engine the request
+        actually routes to (MED-COR-3) — it was hardcoded to 'edge-tts',
+        making crashed clone jobs lie in the resume UI."""
+        from backend.services import job_store
+
+        profile = _create_profile_with_sample(client)
+        job_id = job_store.new_job_id()
+
+        response = client.post(
+            "/api/synthesize",
+            json={
+                "text": "Hello world.",
+                "voice_id": "es-ES-AlvaroNeural",
+                "output_format": "mp3",
+                "profile_id": profile["id"],
+            },
+            headers={"X-Synthesis-Job-ID": job_id},
+        )
+        # No CUDA in tests: the clone attempt fails and leaves the record.
+        assert response.status_code == 500
+
+        try:
+            jobs = client.get("/api/synthesize/incomplete").json()["jobs"]
+            job = next((j for j in jobs if j["job_id"] == job_id), None)
+            assert job is not None, "failed clone job must be listed as incomplete"
+            assert job["engine"] == "xtts-v2"
+        finally:
+            client.delete(f"/api/synthesize/incomplete/{job_id}")
+
+    def test_failed_edge_job_records_edge_engine(self, client) -> None:
+        """Sanity counterpart: a sampleless request records 'edge-tts'."""
+        from backend.exceptions import SynthesisError
+        from backend.services import job_store
+        from backend.services.tts_engine import TTSEngine
+
+        job_id = job_store.new_job_id()
+        with patch.object(
+            TTSEngine, "synthesize", AsyncMock(side_effect=SynthesisError("crash")),
+        ):
+            response = client.post(
+                "/api/synthesize",
+                json={
+                    "text": "Hello world.",
+                    "voice_id": "es-ES-AlvaroNeural",
+                    "output_format": "mp3",
+                },
+                headers={"X-Synthesis-Job-ID": job_id},
+            )
+        assert response.status_code == 500
+
+        try:
+            jobs = client.get("/api/synthesize/incomplete").json()["jobs"]
+            job = next((j for j in jobs if j["job_id"] == job_id), None)
+            assert job is not None
+            assert job["engine"] == "edge-tts"
+        finally:
+            client.delete(f"/api/synthesize/incomplete/{job_id}")
 
     def test_delete_sample_profile_falls_back_to_edge(self, client) -> None:
         """After deleting a profile with sample, a new sampleless profile uses Edge-TTS."""

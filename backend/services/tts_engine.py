@@ -13,8 +13,13 @@ from pydub import AudioSegment
 from ..cancellation import CancellationToken
 from ..catalogs import AUDIO_FORMATS, all_voice_ids
 from ..config import settings
-from ..exceptions import SynthesisError, UnsupportedFormatError, UnsupportedVoiceError
-from ..paths import OUTPUT_DIR, TEMP_DIR
+from ..exceptions import (
+    ProfileNotFound,
+    SynthesisError,
+    UnsupportedFormatError,
+    UnsupportedVoiceError,
+)
+from ..paths import OUTPUT_DIR, TEMP_DIR, VOICES_DIR
 from ..schemas import SynthesisRequest
 from .clone_engine import CloneEngine
 from .job_store import chunk_path as job_chunk_path
@@ -31,6 +36,20 @@ class SynthesisResult:
     path: Path
     chunks: int
     engine: str  # "edge-tts" or "xtts-v2"
+
+
+@dataclass(frozen=True)
+class RoutingDecision:
+    """Resolved profile data plus which engine a request will route to."""
+
+    sample_path: Path | None
+    voice_id: str
+    language: str
+    castilian_anchor: bool
+
+    @property
+    def engine(self) -> str:
+        return "xtts-v2" if self.sample_path is not None else "edge-tts"
 
 
 # Regex to split at sentence boundaries (preserving the delimiter).
@@ -206,6 +225,39 @@ class TTSEngine:
             self._clone_engine = CloneEngine()
         return self._clone_engine
 
+    def resolve_routing(self, request: SynthesisRequest) -> RoutingDecision:
+        """Resolve profile data and decide which engine will handle a request.
+
+        Used by ``synthesize`` for the actual routing and by the synthesis
+        router to persist the real engine on the crash-safe ``JobRecord``
+        (a resumed XTTS job must not be replayed as Edge-TTS).
+        """
+        sample_path: Path | None = None
+        language = "es"
+        voice_id = request.voice_id
+        castilian_anchor = False
+
+        if request.profile_id:
+            profile = self._profiles.get(request.profile_id)
+            if profile is None:
+                raise ProfileNotFound(f"Profile not found: {request.profile_id}")
+            # Override voice_id from profile for routing. Speed/pitch/volume
+            # come from the request (frontend sliders), not the profile.
+            voice_id = profile.voice_id
+            language = profile.language
+            castilian_anchor = profile.castilian_anchor
+            if profile.sample_filename:
+                candidate = VOICES_DIR / profile.sample_filename
+                if candidate.exists():
+                    sample_path = candidate
+
+        return RoutingDecision(
+            sample_path=sample_path,
+            voice_id=voice_id,
+            language=language,
+            castilian_anchor=castilian_anchor,
+        )
+
     async def synthesize(
         self,
         request: SynthesisRequest,
@@ -223,38 +275,17 @@ class TTSEngine:
                 f"Valid: {sorted(AUDIO_FORMATS)}"
             )
 
-        # Resolve profile and check for voice sample (without mutating request)
-        sample_path: Path | None = None
-        profile_language: str = "es"
-        voice_id: str = request.voice_id
-        castilian_anchor: bool = False
-
-        if request.profile_id:
-            profile = self._profiles.get(request.profile_id)
-            if profile is None:
-                from ..exceptions import ProfileNotFound
-                raise ProfileNotFound(f"Profile not found: {request.profile_id}")
-            if profile is not None:
-                # Override voice_id from profile for routing. Speed/pitch/volume
-                # come from the request (frontend sliders), not the profile.
-                voice_id = profile.voice_id
-                profile_language = profile.language
-                castilian_anchor = profile.castilian_anchor
-                if profile.sample_filename:
-                    from ..paths import VOICES_DIR
-
-                    candidate = VOICES_DIR / profile.sample_filename
-                    if candidate.exists():
-                        sample_path = candidate
+        routing = self.resolve_routing(request)
 
         # Route to clone engine if we have a sample
-        if sample_path is not None:
+        if routing.sample_path is not None:
             return await self._synthesize_cloned(
-                request, sample_path, profile_language, cancel_token, job_id,
-                castilian_anchor=castilian_anchor,
+                request, routing.sample_path, routing.language, cancel_token, job_id,
+                castilian_anchor=routing.castilian_anchor,
             )
 
         # Otherwise use Edge-TTS
+        voice_id = routing.voice_id
         if voice_id not in all_voice_ids():
             raise UnsupportedVoiceError(
                 f"Unsupported voice: {voice_id}"
