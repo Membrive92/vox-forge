@@ -55,7 +55,7 @@ test.describe("Profile sync — Experimental → Voices", () => {
     // Navigate to Voices — the regression check: the parent's hook saw the
     // create, so the new profile renders as a heading in the My Profiles
     // section (not just as a transient toast).
-    await page.getByRole("button", { name: /^mis voces$/i }).click();
+    await page.getByRole("tab", { name: /^mis voces$/i }).click();
     await expect(
       page.getByRole("heading", { name: "Voz E2E" }),
     ).toBeVisible({ timeout: 5_000 });
