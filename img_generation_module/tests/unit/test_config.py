@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -113,7 +114,9 @@ def test_load_config_invalid_toml(tmp_path: Path) -> None:
 
 
 def test_repo_config_file_loads() -> None:
-    # El pipeline.toml versionado del modulo debe cargar tal cual.
+    # El pipeline.toml versionado del modulo debe cargar tal cual. El pin es
+    # "UNSET" antes de la provision; setup.ps1 lo sustituye por el sha del
+    # checkout de ComfyUI (40 hex) y ese valor SI se versiona.
     cfg = load_config()
-    assert cfg.engine.comfyui_pin == "UNSET"  # placeholder hasta setup.ps1
+    assert re.fullmatch(r"UNSET|[0-9a-f]{40}", cfg.engine.comfyui_pin)
     assert cfg.video.frames == 81
