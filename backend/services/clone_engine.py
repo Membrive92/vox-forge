@@ -23,6 +23,7 @@ from ..cancellation import CancelledError, CancellationToken
 from ..exceptions import SynthesisError
 from ..gpu_lock import gpu_semaphore
 from ..paths import OUTPUT_DIR, TEMP_DIR
+from .castilian_warmup import time_stretch_wav
 from .job_store import chunk_path as job_chunk_path
 
 if TYPE_CHECKING:
@@ -229,7 +230,6 @@ class CloneEngine:
         speaker_wav: str,
         language: str,
         output_path: Path,
-        speed: float = 1.0,
     ) -> None:
         """Generate a single audio file (one attempt).
 
@@ -237,6 +237,13 @@ class CloneEngine:
         GPU work (a second chapter, /convert, experimental) can interleave
         between candidates instead of waiting behind the whole
         8-candidates × retries loop + CPU scoring.
+
+        Speed policy (VOZ-04): XTTS's native ``speed`` kwarg is NEVER
+        forwarded — with long speaker_wavs the model locks onto the
+        sample's cadence and silently ignores it, and when it does act
+        the quality is poor. Clone speed is always resolved as a Rubber
+        Band post-stretch over natural-cadence output (see
+        ``synthesize_long`` and ``castilian_warmup.time_stretch_wav``).
         """
         assert self._model is not None  # noqa: S101
         async with _gpu_semaphore:
@@ -250,7 +257,6 @@ class CloneEngine:
                     speaker_wav=speaker_wav,
                     language=language,
                     file_path=str(output_path),
-                    speed=speed,
                     **_XTTS_QUALITY_PARAMS,
                 ),
                 timeout=_CHUNK_TIMEOUT_SECONDS,
@@ -265,13 +271,19 @@ class CloneEngine:
         temperature: float = 0.3,
         top_p: float = 0.7,
         repetition_penalty: float = 10.0,
-        speed: float = 1.0,
     ) -> None:
         """Direct XTTS v2 synthesis for experimental use.
 
         Bypasses the quality system (no candidates, no retries) but
         still acquires the shared GPU semaphore. Use for fast iteration
         on cross-lingual tests.
+
+        Speed policy (VOZ-04): no ``speed`` kwarg, ever — the model
+        always synthesizes at its natural cadence (which also keeps the
+        Castilian-leaning code path: forwarding ``speed`` has been
+        observed to nudge Spanish output toward a Latin American
+        accent). Callers that need a different speed post-stretch the
+        output with ``castilian_warmup.time_stretch_wav`` (Rubber Band).
         """
         if not self.is_available:
             raise SynthesisError("CUDA is not available. Voice cloning requires an NVIDIA GPU.")
@@ -279,28 +291,18 @@ class CloneEngine:
         self.load_model()
         assert self._model is not None  # noqa: S101
 
-        # Only forward ``speed`` when the user actually wants to deviate from
-        # the model's natural rate. Passing speed=1.0 takes a different
-        # internal code path in XTTS v2 that has been observed to nudge the
-        # Spanish output toward a Latin American accent — when the user
-        # supplied a non-Spanish speaker_wav, the cleanest restoration of the
-        # original "neutral / Castilian-leaning" behavior is to omit the kwarg
-        # entirely whenever it would be a no-op.
-        kwargs: dict = {
-            "text": text,
-            "speaker_wav": speaker_wav,
-            "language": language,
-            "file_path": str(output_path),
-            "temperature": temperature,
-            "top_p": top_p,
-            "repetition_penalty": repetition_penalty,
-        }
-        if abs(speed - 1.0) > 1e-6:
-            kwargs["speed"] = speed
-
         async with _gpu_semaphore:
             await asyncio.wait_for(
-                asyncio.to_thread(self._model.tts_to_file, **kwargs),
+                asyncio.to_thread(
+                    self._model.tts_to_file,
+                    text=text,
+                    speaker_wav=speaker_wav,
+                    language=language,
+                    file_path=str(output_path),
+                    temperature=temperature,
+                    top_p=top_p,
+                    repetition_penalty=repetition_penalty,
+                ),
                 timeout=_CHUNK_TIMEOUT_SECONDS,
             )
 
@@ -313,7 +315,6 @@ class CloneEngine:
         count: int,
         offset: int = 0,
         cancel_token: CancellationToken | None = None,
-        speed: float = 1.0,
     ) -> list[Path]:
         """Generate N candidate audio files for a chunk."""
         candidates: list[Path] = []
@@ -327,7 +328,6 @@ class CloneEngine:
                 speaker_wav=speaker_wav,
                 language=language,
                 output_path=candidate,
-                speed=speed,
             )
         return candidates
 
@@ -337,13 +337,14 @@ class CloneEngine:
         speaker_wav: str | Path,
         language: str = "es",
         cancel_token: CancellationToken | None = None,
-        speed: float = 1.0,
     ) -> Path:
         """Synthesize a single chunk using voice cloning.
 
         Generates N candidates, scores each, and picks the cleanest.
         If the best candidate exceeds the quality threshold, retries
         up to _MAX_RETRIES additional rounds to get a clean take.
+        Always at natural cadence — speed is a post-stretch concern
+        of ``synthesize_long``.
         """
         if not self.is_available:
             raise SynthesisError("CUDA is not available. Voice cloning requires an NVIDIA GPU.")
@@ -361,7 +362,7 @@ class CloneEngine:
             # outside any GPU lock so it can't block other work.
             candidates = await self._generate_candidates(
                 text, str(speaker_wav), xtts_lang, file_id, _CANDIDATES_PER_CHUNK,
-                cancel_token=cancel_token, speed=speed,
+                cancel_token=cancel_token,
             )
             all_candidates.extend(candidates)
 
@@ -380,7 +381,7 @@ class CloneEngine:
                 extra = await self._generate_candidates(
                     text, str(speaker_wav), xtts_lang, file_id,
                     _CANDIDATES_PER_CHUNK, offset=len(all_candidates),
-                    cancel_token=cancel_token, speed=speed,
+                    cancel_token=cancel_token,
                 )
                 all_candidates.extend(extra)
                 scored = [(c, await asyncio.to_thread(self._score_audio, c)) for c in all_candidates]
@@ -453,6 +454,11 @@ class CloneEngine:
         Each chunk has its own pause_ms that determines the silence
         inserted after it (comma=200ms, sentence=500ms, paragraph=900ms).
 
+        ``speed`` is never forwarded to XTTS (see ``_generate_one``):
+        every chunk is synthesized at natural cadence and the
+        concatenated master is post-stretched once with Rubber Band
+        (clamped to the safe ±25% range).
+
         When ``job_id`` is set, every finished chunk is promoted into the
         job dir (``data/jobs/{job_id}/chunk_NNNN.wav``) with an atomic
         ``os.replace``, mirroring the Edge-TTS path: a crashed job can be
@@ -485,7 +491,7 @@ class CloneEngine:
                         progress_registry.update(job_id, chunks_done=i + 1)
                         continue
 
-                chunk_path = await self.synthesize_chunk(chunk_text, speaker_wav, language, cancel_token=cancel_token, speed=speed)
+                chunk_path = await self.synthesize_chunk(chunk_text, speaker_wav, language, cancel_token=cancel_token)
                 if use_job_dir:
                     # Promote the finished chunk into the job dir with an
                     # atomic rename so a crash can only ever leave whole
@@ -506,6 +512,16 @@ class CloneEngine:
                 pause_ms = chunk.pause_ms if hasattr(chunk, "pause_ms") else 500
                 if pause_ms > 0 and j < len(temp_files) - 1:
                     combined += AudioSegment.silent(duration=pause_ms)
+
+            # Speed is resolved HERE, never inside XTTS: one Rubber Band
+            # post-stretch over the natural-cadence master (no-op within
+            # epsilon, clamped to ±25% inside time_stretch_wav).
+            if abs(speed - 1.0) >= 0.01:
+                stretch_wav = TEMP_DIR / f"{file_id}_stretch.wav"
+                combined.export(str(stretch_wav), format="wav")
+                if time_stretch_wav(stretch_wav, speed):
+                    combined = AudioSegment.from_wav(str(stretch_wav))
+                stretch_wav.unlink(missing_ok=True)
 
             # Export to requested format
             combined.export(

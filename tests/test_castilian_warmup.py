@@ -250,9 +250,10 @@ class TestTimeStretch:
     """Post-synthesis time-stretching replaces XTTS's unreliable speed kwarg.
 
     The model silently ignores ``speed`` when the speaker_wav is long
-    (e.g. with audio anchor), so we now stretch the output ourselves
-    via librosa. These tests guard the helper's no-op cases — the real
-    stretching is end-to-end-tested via E2E.
+    (e.g. with audio anchor), so we stretch the output ourselves with
+    pedalboard's Rubber Band ``time_stretch``. These tests guard the
+    helper's no-op cases — real durations and the ±25% clamp are
+    covered in ``test_audio_stretch.py``.
     """
 
     def test_returns_false_when_rate_is_one(self, tmp_path) -> None:
@@ -274,7 +275,7 @@ class TestTimeStretch:
     def test_returns_false_on_load_failure(self, tmp_path) -> None:
         from backend.services.castilian_warmup import time_stretch_wav
 
-        # rate != 1.0 but the file doesn't exist → librosa.load raises,
+        # rate != 1.0 but the file doesn't exist → soundfile.read raises,
         # the helper swallows it and returns False (caller sees the
         # un-stretched audio rather than crashing the whole take).
         result = time_stretch_wav(tmp_path / "does_not_exist.wav", 0.75)

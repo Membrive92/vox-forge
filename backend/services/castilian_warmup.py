@@ -30,6 +30,7 @@ import logging
 from pathlib import Path
 
 from ..paths import REFERENCE_VOICES_DIR
+from .audio_stretch import clamp_stretch_factor
 
 logger = logging.getLogger(__name__)
 
@@ -121,45 +122,45 @@ def get_reference_voice() -> Path | None:
 
 
 def time_stretch_wav(audio_path: Path, rate: float) -> bool:
-    """Stretch ``audio_path`` to ``rate`` × duration, preserving pitch.
+    """Change the speed of ``audio_path`` in place, preserving pitch.
 
     ``rate > 1`` = faster (shorter audio). ``rate < 1`` = slower (longer).
-    A no-op if rate is within 0.01 of 1.0. Returns ``True`` if the file
-    was rewritten.
+    A no-op if rate is within 0.01 of 1.0. The effective rate is clamped
+    to the safe ±25% range (see ``audio_stretch``). Returns ``True`` if
+    the file was rewritten.
 
-    Background: XTTS v2 has a ``speed`` kwarg, but it's silently ignored
-    when the speaker_wav is long enough that the model "locks onto" the
-    sample's cadence. Audio anchor (E) makes the speaker_wav ~10s+, so
-    the parameter became inert — users moved the slider with no audible
-    change. Doing the stretch in post-processing with librosa.phase_vocoder
-    (via ``librosa.effects.time_stretch``) keeps the pitch intact and is
-    independent of the model's whims.
+    Background: XTTS v2 never receives a ``speed`` kwarg — it is
+    silently ignored when the speaker_wav is long enough that the model
+    "locks onto" the sample's cadence (audio anchor makes it ~10s+), and
+    its quality is poor when it does act. Speed is always resolved here,
+    in post, with ``pedalboard.time_stretch`` (Rubber Band): a single
+    formant-preserving pass, independent of the model's whims and far
+    above phase-vocoder quality.
     """
     if abs(rate - 1.0) < 0.01:
         return False
+    rate = clamp_stretch_factor(rate)
     try:
-        import librosa
-        import numpy as np
         import soundfile as sf
+        from pedalboard import time_stretch
     except Exception as exc:  # pragma: no cover — defensive
-        logger.warning("librosa/soundfile unavailable, skipping stretch: %s", exc)
+        logger.warning("pedalboard/soundfile unavailable, skipping stretch: %s", exc)
         return False
     try:
-        y, sr = librosa.load(str(audio_path), sr=None, mono=False)
+        # always_2d gives (frames, channels); pedalboard wants (channels, frames)
+        y, sr = sf.read(str(audio_path), dtype="float32", always_2d=True)
     except Exception as exc:
         logger.warning("Could not load audio for time-stretch: %s", exc)
         return False
     try:
-        if y.ndim == 2:
-            stretched = np.stack(
-                [librosa.effects.time_stretch(ch, rate=rate) for ch in y]
-            )
-            # soundfile expects (frames, channels) for multichannel
-            sf.write(str(audio_path), stretched.T, sr)
-        else:
-            stretched = librosa.effects.time_stretch(y, rate=rate)
-            sf.write(str(audio_path), stretched, sr)
-        logger.info("Time-stretched %s by rate=%.2f", audio_path.name, rate)
+        stretched = time_stretch(
+            y.T, sr,
+            stretch_factor=rate,
+            high_quality=True,
+            preserve_formants=True,
+        )
+        sf.write(str(audio_path), stretched.T, sr)
+        logger.info("Time-stretched %s by rate=%.2f (Rubber Band)", audio_path.name, rate)
         return True
     except Exception as exc:
         logger.warning("Time-stretch failed: %s", exc)

@@ -140,12 +140,12 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 | id | fase | título | estado |
 |---|---|---|---|
-| VOZ-01 | F2 | Rubber Band en voice_lab (`_apply_pitch_and_speed`) | ABIERTO |
-| VOZ-02 | F2 | Rubber Band en castilian_warmup | ABIERTO |
-| VOZ-03 | F2 | Clamp ±25% backend + zona degradada en slider | ABIERTO |
-| VOZ-04 | F2 | No reenviar `speed` a XTTS; post-stretch siempre | ABIERTO |
-| VOZ-05 | F2 | Tests de stretch/clamp/no-stacking | ABIERTO |
-| VOZ-06 | F2 | A/B de escucha 0.9×/1.15× | HUMANO-PENDIENTE |
+| VOZ-01 | F2 | Rubber Band en voice_lab (`_apply_pitch_and_speed`) | RESUELTO — una sola pasada `pedalboard.time_stretch` (pitch+speed combinados, `preserve_formants`); `_apply_pitch_shift`/`_apply_speed` borrados; orden del chain intacto (antes de EQ/comp/reverb) — F2 `fix(voz) VOZ-01..05` |
+| VOZ-02 | F2 | Rubber Band en castilian_warmup | RESUELTO — `time_stretch_wav` carga con soundfile y estira con `pedalboard.time_stretch`; docstring sin phase vocoder — F2 `fix(voz) VOZ-01..05` |
+| VOZ-03 | F2 | Clamp ±25% backend + zona degradada en slider | RESUELTO — `audio_stretch.clamp_stretch_factor` (0.75–1.25, warning al exceder) aplicado en ambos caminos DSP; Edge-TTS conserva 50–200%; slider Lab marca la zona >±25% (ámbar) con tooltip es/en `infoSpeedDegraded` — F2 `fix(voz) VOZ-01..05` |
+| VOZ-04 | F2 | No reenviar `speed` a XTTS; post-stretch siempre | RESUELTO — kwarg `speed` eliminado de `_generate_one`/`raw_synthesize`/`synthesize_chunk`; `synthesize_long` post-estira el máster concatenado una sola vez; comentario del acento sustituido por la política — F2 `fix(voz) VOZ-01..05` |
+| VOZ-05 | F2 | Tests de stretch/clamp/no-stacking | RESUELTO — `tests/test_audio_stretch.py` con pedalboard real (1 s × 0.8 ⇒ 1.25 s, no-op en epsilon, clamp+warning, spy de pasada única en `process`) + política speed-nunca-a-XTTS en `test_clone_engine.py` — F2 `fix(voz) VOZ-01..05` |
+| VOZ-06 | F2 | A/B de escucha 0.9×/1.15× | HUMANO-PENDIENTE (listo para escuchar: F2 mergeado) |
 | VOZ-07 | F9 | resemble-enhance como op Studio | DIFERIDO (opcional; tras F8) |
 | VOZ-08 | F2b | Re-ranking candidatos con ASR (`intelligibility.py`) | ABIERTO |
 | VOZ-09 | F2b | Reabrir sampler XTTS (tras VOZ-08; A/B HUMANO) | ABIERTO |

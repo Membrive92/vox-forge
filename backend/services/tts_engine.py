@@ -391,8 +391,9 @@ class TTSEngine:
     def _apply_volume(path: Path, volume: int) -> None:
         """Apply volume adjustment to a generated audio file.
 
-        XTTS v2 doesn't support volume natively. Speed is handled
-        by the model's native `speed` parameter.
+        XTTS v2 doesn't support volume natively. Speed is resolved as a
+        Rubber Band post-stretch inside ``CloneEngine.synthesize_long``
+        (never via the model's ``speed`` kwarg — see VOZ-04 policy).
         Volume: 80 = default (0dB), 0 = -40dB, 100 = +10dB.
 
         Preserves codec and bitrate parameters from AUDIO_FORMATS
@@ -462,7 +463,9 @@ class TTSEngine:
         chunks = split_into_clone_chunks(request.text)
         logger.info("Text split into %d clone chunks (clause-level, no internal punctuation)", len(chunks))
         fmt_cfg = AUDIO_FORMATS[request.output_format]
-        # XTTS v2 speed param: 1.0 = normal. Convert from our 50-200% scale.
+        # Clone speed: 1.0 = normal, converted from our 50-200% scale.
+        # Applied as a Rubber Band post-stretch on natural-cadence output
+        # (clamped to ±25% downstream) — XTTS never sees a speed kwarg.
         xtts_speed = request.speed / 100.0
 
         if job_id:

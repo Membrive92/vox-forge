@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import { colors, fonts, typography } from "@/theme/tokens";
 
+const DEGRADED_COLOR = "#f59e0b";
+
 interface SliderProps {
   label: string;
   value: number;
@@ -11,6 +13,12 @@ interface SliderProps {
   step?: number;
   unit?: string;
   info?: string | undefined;
+  /** Values below this are marked as a quality-degraded zone. */
+  degradedBelow?: number;
+  /** Values above this are marked as a quality-degraded zone. */
+  degradedAbove?: number;
+  /** Warning shown while the value sits inside a degraded zone. */
+  degradedInfo?: string;
 }
 
 export function Slider({
@@ -22,9 +30,17 @@ export function Slider({
   step = 1,
   unit = "",
   info,
+  degradedBelow,
+  degradedAbove,
+  degradedInfo,
 }: SliderProps) {
   const pct = ((value - min) / (max - min)) * 100;
   const [showInfo, setShowInfo] = useState(false);
+
+  const toPct = (v: number): number => ((v - min) / (max - min)) * 100;
+  const isDegraded =
+    (degradedBelow !== undefined && value < degradedBelow) ||
+    (degradedAbove !== undefined && value > degradedAbove);
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -59,7 +75,7 @@ export function Slider({
         <span
           style={{
             fontSize: typography.size.sm,
-            color: colors.text,
+            color: isDegraded ? DEGRADED_COLOR : colors.text,
             fontFamily: fonts.mono,
             fontWeight: 600,
           }}
@@ -84,7 +100,52 @@ export function Slider({
           {info}
         </div>
       )}
+      {isDegraded && degradedInfo && (
+        <div
+          role="alert"
+          style={{
+            fontSize: typography.size.xs,
+            color: DEGRADED_COLOR,
+            background: "rgba(245,158,11,0.08)",
+            border: "1px solid rgba(245,158,11,0.35)",
+            borderRadius: 6,
+            padding: "8px 10px",
+            marginBottom: 8,
+            lineHeight: 1.5,
+          }}
+        >
+          {degradedInfo}
+        </div>
+      )}
       <div style={{ position: "relative", height: 6, background: colors.textDark, borderRadius: 3 }}>
+        {degradedBelow !== undefined && degradedBelow > min && (
+          <div
+            data-testid="slider-degraded-low"
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              height: "100%",
+              width: `${toPct(degradedBelow)}%`,
+              background: "rgba(245,158,11,0.3)",
+              borderRadius: "3px 0 0 3px",
+            }}
+          />
+        )}
+        {degradedAbove !== undefined && degradedAbove < max && (
+          <div
+            data-testid="slider-degraded-high"
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 0,
+              height: "100%",
+              width: `${100 - toPct(degradedAbove)}%`,
+              background: "rgba(245,158,11,0.3)",
+              borderRadius: "0 3px 3px 0",
+            }}
+          />
+        )}
         <div
           style={{
             position: "absolute",
@@ -92,7 +153,9 @@ export function Slider({
             top: 0,
             height: "100%",
             width: `${pct}%`,
-            background: `linear-gradient(90deg, ${colors.primary}, ${colors.primaryLight})`,
+            background: isDegraded
+              ? `linear-gradient(90deg, ${colors.primary}, ${DEGRADED_COLOR})`
+              : `linear-gradient(90deg, ${colors.primary}, ${colors.primaryLight})`,
             borderRadius: 3,
             transition: "width 0.15s ease",
           }}
@@ -123,10 +186,10 @@ export function Slider({
             left: `${pct}%`,
             width: 14,
             height: 14,
-            background: colors.primary,
+            background: isDegraded ? DEGRADED_COLOR : colors.primary,
             borderRadius: "50%",
             transform: "translate(-50%, -50%)",
-            boxShadow: "0 0 8px rgba(59,130,246,0.5)",
+            boxShadow: isDegraded ? "0 0 8px rgba(245,158,11,0.5)" : "0 0 8px rgba(59,130,246,0.5)",
             transition: "left 0.15s ease",
             border: `2px solid ${colors.text}`,
             pointerEvents: "none",

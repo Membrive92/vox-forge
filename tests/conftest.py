@@ -177,6 +177,10 @@ def _install_stubs() -> None:
     if "torch" not in sys.modules:
         torch = types.ModuleType("torch")
         torch.cuda = _FakeTorch.cuda  # type: ignore[attr-defined]
+        # scipy's array-API compat probes torch.Tensor when "torch" is
+        # importable (librosa.load → scipy resample path). Provide a real
+        # class so ``issubclass`` checks work against the stub.
+        torch.Tensor = type("Tensor", (), {})  # type: ignore[attr-defined]
         sys.modules["torch"] = torch
 
     # Stub openvoice so convert_engine can import without the full package

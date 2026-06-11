@@ -158,8 +158,9 @@ async def _generate_take(
     clone = engine._get_clone_engine()
     # Always synthesize at natural cadence and stretch in post. XTTS's
     # native ``speed`` kwarg gets ignored when speaker_wav is long (e.g.
-    # with audio anchor), so the slider felt dead. librosa.time_stretch
-    # in post is independent of the model and preserves pitch.
+    # with audio anchor), so the slider felt dead. The Rubber Band
+    # post-stretch (pedalboard.time_stretch) is independent of the model
+    # and preserves pitch and formants.
     await clone.raw_synthesize(
         text=synth_text,
         speaker_wav=str(speaker_wav),
@@ -170,12 +171,12 @@ async def _generate_take(
     if castilian_warmup and use_text_warmup:
         trim_warmup_audio(output_wav)
 
-    # Apply user-requested speed via post-processing time-stretch.
+    # Apply user-requested speed via Rubber Band post-stretch.
     # speed_pct=100 → rate=1.0 → no-op. <100 = slower, >100 = faster.
     rate = speed_pct / 100.0
     if abs(rate - 1.0) >= 0.01:
-        # librosa rate semantics: rate>1 makes audio shorter (faster).
-        # speed_pct=150 should also be faster → rate=1.5. Same direction.
+        # rate>1 makes audio shorter (faster) — same direction as
+        # speed_pct. The helper clamps to the safe ±25% range.
         time_stretch_wav(output_wav, rate)
 
     # Format conversion

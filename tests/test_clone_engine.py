@@ -595,26 +595,24 @@ class TestCloneAPI:
 
 
 # ---------------------------------------------------------------------------
-# 4. Speed parameter regression tests
+# 4. Speed policy regression tests (VOZ-04)
 #
-# These exist because cross-lingual synthesis silently dropped the ``speed``
-# kwarg, forcing users to slow audio down via pydub speedup which mangled
-# the pitch ("drunk narrator" effect). Verify the parameter actually reaches
-# tts_to_file in both raw and chunked paths.
+# XTTS's native ``speed`` kwarg is NEVER forwarded: with long speaker_wavs
+# the model silently ignores it, and when it acts the quality is poor (and
+# it nudges Spanish toward a Latin American accent). Clone speed is always
+# resolved as a Rubber Band post-stretch over natural-cadence output.
 # ---------------------------------------------------------------------------
 
 
-class TestSpeedParameterPlumbing:
-    """Verify the ``speed`` kwarg flows from raw_synthesize -> tts_to_file."""
+class TestSpeedNeverReachesXtts:
+    """No path may forward a ``speed`` kwarg to ``tts_to_file``."""
 
     @pytest.mark.asyncio
-    async def test_raw_synthesize_passes_speed_to_model(self, tmp_path) -> None:
-        """raw_synthesize must forward ``speed`` so XTTS slows down naturally."""
+    async def test_raw_synthesize_never_forwards_speed(self, tmp_path) -> None:
         from backend.services.clone_engine import CloneEngine
 
         engine = CloneEngine()
         engine._device = "cpu"
-
         captured_kwargs: dict = {}
 
         def fake_tts_to_file(text, speaker_wav, language, file_path, **kwargs):
@@ -638,57 +636,99 @@ class TestSpeedParameterPlumbing:
                 speaker_wav=str(ref_wav),
                 language="es",
                 output_path=out_wav,
-                speed=0.75,
             )
 
-        assert captured_kwargs.get("speed") == 0.75, (
-            "raw_synthesize dropped the speed kwarg — cross-lingual mode will "
-            "fall back to post-processing speedup which mangles pitch."
+        assert "speed" not in captured_kwargs, (
+            "raw_synthesize must never forward speed to XTTS — speed is a "
+            "Rubber Band post-stretch concern (VOZ-04)."
         )
 
     @pytest.mark.asyncio
-    async def test_raw_synthesize_omits_speed_when_default(self, tmp_path) -> None:
-        """When speed=1.0 (the default), the kwarg must NOT be forwarded.
-
-        Background: passing ``speed=1.0`` to XTTS routes through a code
-        path that subtly shifts Spanish accent toward Latin American.
-        Omitting the kwarg restores the model's native behavior, which
-        is what the user originally relied on for a Castilian-leaning
-        cross-lingual output.
-        """
+    async def test_generate_one_never_forwards_speed(self, tmp_path) -> None:
+        """The candidates path must also synthesize at natural cadence."""
         from backend.services.clone_engine import CloneEngine
 
         engine = CloneEngine()
-        engine._device = "cpu"
         captured_kwargs: dict = {}
 
-        def fake_tts_to_file(text, speaker_wav, language, file_path, **kwargs):
+        def fake_tts_to_file(**kwargs):
             captured_kwargs.update(kwargs)
-            Path(file_path).write_bytes(b"RIFF" + b"\x00" * 100)
+            Path(str(kwargs["file_path"])).write_bytes(b"RIFF" + b"\x00" * 100)
 
         fake_model = MagicMock()
         fake_model.tts_to_file = fake_tts_to_file
         engine._model = fake_model
 
-        ref_wav = tmp_path / "ref.wav"
-        ref_wav.write_bytes(b"RIFF" + b"\x00" * 100)
-        out_wav = tmp_path / "out.wav"
-
-        with patch.object(
-            type(engine), "is_available",
-            new_callable=lambda: property(lambda self: True),
-        ):
-            await engine.raw_synthesize(
-                text="Hi.",
-                speaker_wav=str(ref_wav),
-                language="es",
-                output_path=out_wav,
-            )
+        await engine._generate_one("hola", "ref.wav", "es", tmp_path / "o.wav")
 
         assert "speed" not in captured_kwargs, (
-            "speed=1.0 should NOT be forwarded to tts_to_file — see "
-            "raw_synthesize for the accent-regression rationale."
+            "_generate_one must never forward speed to XTTS (VOZ-04)."
         )
+
+    @pytest.mark.asyncio
+    async def test_synthesize_long_post_stretches_master(self, tmp_path) -> None:
+        """speed != 1.0 ⇒ exactly one Rubber Band pass over the master."""
+        from backend.services import clone_engine
+
+        engine = clone_engine.CloneEngine()
+
+        async def fake_chunk(text, speaker_wav, language, cancel_token=None):
+            p = tmp_path / f"chunk_{len(text)}.wav"
+            p.write_bytes(b"RIFF" + b"\x00" * 100)
+            return p
+
+        engine.synthesize_chunk = fake_chunk  # type: ignore[method-assign]
+
+        stretch_calls: list[float] = []
+
+        def fake_stretch(path: Path, rate: float) -> bool:
+            stretch_calls.append(rate)
+            return True
+
+        with patch.object(clone_engine, "time_stretch_wav", fake_stretch):
+            path, count = await engine.synthesize_long(
+                chunks=["Hola mundo."],
+                speaker_wav=tmp_path / "ref.wav",
+                language="es",
+                output_format="mp3",
+                format_config={"format": "mp3", "codec": None, "parameters": []},
+                speed=0.8,
+            )
+
+        assert stretch_calls == [0.8], (
+            "synthesize_long must post-stretch the concatenated master "
+            "exactly once with the requested rate."
+        )
+        assert count == 1
+        path.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_synthesize_long_skips_stretch_at_natural_speed(
+        self, tmp_path
+    ) -> None:
+        from backend.services import clone_engine
+
+        engine = clone_engine.CloneEngine()
+
+        async def fake_chunk(text, speaker_wav, language, cancel_token=None):
+            p = tmp_path / "chunk.wav"
+            p.write_bytes(b"RIFF" + b"\x00" * 100)
+            return p
+
+        engine.synthesize_chunk = fake_chunk  # type: ignore[method-assign]
+
+        with patch.object(clone_engine, "time_stretch_wav") as stretch_spy:
+            path, _ = await engine.synthesize_long(
+                chunks=["Hola."],
+                speaker_wav=tmp_path / "ref.wav",
+                language="es",
+                output_format="mp3",
+                format_config={"format": "mp3", "codec": None, "parameters": []},
+                speed=1.0,
+            )
+
+        stretch_spy.assert_not_called()
+        path.unlink(missing_ok=True)
 
 
 class TestExperimentalEndpointSpeed:

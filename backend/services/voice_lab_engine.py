@@ -21,10 +21,12 @@ from pedalboard import (
     Pedalboard,
     PeakFilter,
     Reverb,
+    time_stretch,
 )
 
 from ..exceptions import SynthesisError
 from ..paths import OUTPUT_DIR, TEMP_DIR
+from .audio_stretch import clamp_stretch_factor
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,9 @@ class VoiceLabParams:
     # Reverb wet/dry mix 0-100.
     reverb: float = 0.0
 
-    # Speed multiplier (0.5 to 2.0). 1.0 = normal.
+    # Speed multiplier. 1.0 = normal. Effective stretch is clamped to
+    # the safe 0.75-1.25 range (see audio_stretch) — narrator cadence,
+    # not listener speed.
     speed: float = 1.0
 
 
@@ -291,18 +295,29 @@ class VoiceLabEngine:
         return shifted.values[0]
 
     @staticmethod
-    def _apply_pitch_shift(audio: np.ndarray, sr: int, semitones: float) -> np.ndarray:
-        """Shift pitch without changing speed."""
-        if abs(semitones) < 0.1:
-            return audio
-        return librosa.effects.pitch_shift(y=audio, sr=sr, n_steps=semitones)
+    def _apply_pitch_and_speed(audio: np.ndarray, sr: int,
+                               semitones: float, speed: float) -> np.ndarray:
+        """Shift pitch and change speed in a single Rubber Band pass.
 
-    @staticmethod
-    def _apply_speed(audio: np.ndarray, speed: float) -> np.ndarray:
-        """Change speed without changing pitch."""
-        if abs(speed - 1.0) < 0.01:
+        One ``pedalboard.time_stretch`` call handles both knobs — never
+        two stacked passes (each pass costs quality; the old stacked
+        phase-vocoder passes were what made the voice metallic). The
+        stretch factor is clamped to the safe ±25% range (see
+        ``audio_stretch``); pitch shifting is independent of speed and
+        formants are preserved.
+        """
+        speed = clamp_stretch_factor(speed)
+        if abs(semitones) < 0.01 and abs(speed - 1.0) < 0.01:
             return audio
-        return librosa.effects.time_stretch(y=audio, rate=speed)
+        stretched = time_stretch(
+            audio.astype(np.float32), sr,
+            stretch_factor=speed,
+            pitch_shift_in_semitones=semitones,
+            high_quality=True,
+            preserve_formants=True,
+        )
+        # pedalboard returns (channels, samples); the engine works in mono.
+        return stretched[0] if audio.ndim == 1 else stretched
 
     @staticmethod
     def _apply_pedalboard_effects(
@@ -371,9 +386,9 @@ class VoiceLabEngine:
         Applies effects in optimal order:
         0. Noise reduction (clean background first)
         1. Formant shift (changes resonance)
-        2. Pitch shift (changes fundamental frequency)
-        3. Speed change (time stretch)
-        4. EQ, compression, reverb (pedalboard)
+        2. Pitch + speed (one Rubber Band pass — before reverb so
+           tails aren't stretched)
+        3. EQ, compression, reverb (pedalboard)
 
         Returns path to processed audio file.
         """
@@ -403,21 +418,18 @@ class VoiceLabEngine:
                 )
                 logger.info("Formant shift applied: %.1f st", params.formant_shift)
 
-            # 2. Pitch shift
-            if abs(params.pitch_semitones) > 0.1:
+            # 2. Pitch + speed in a single Rubber Band pass (no stacking)
+            if abs(params.pitch_semitones) > 0.01 or abs(params.speed - 1.0) > 0.01:
                 audio = await asyncio.to_thread(
-                    self._apply_pitch_shift, audio, sr, params.pitch_semitones,
+                    self._apply_pitch_and_speed, audio, sr,
+                    params.pitch_semitones, params.speed,
                 )
-                logger.info("Pitch shift applied: %.1f st", params.pitch_semitones)
-
-            # 3. Speed change
-            if abs(params.speed - 1.0) > 0.01:
-                audio = await asyncio.to_thread(
-                    self._apply_speed, audio, params.speed,
+                logger.info(
+                    "Pitch+speed applied: %.1f st, %.2fx",
+                    params.pitch_semitones, params.speed,
                 )
-                logger.info("Speed applied: %.2fx", params.speed)
 
-            # 4. Pedalboard effects (EQ, compression, reverb)
+            # 3. Pedalboard effects (EQ, compression, reverb)
             audio = await asyncio.to_thread(
                 self._apply_pedalboard_effects, audio, sr, params,
             )

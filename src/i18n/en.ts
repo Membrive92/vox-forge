@@ -150,6 +150,7 @@ export const en: Record<TranslationKey, string> = {
   infoCompression: "Evens out volume: quiet parts get louder, loud parts get softer. Gives a more professional and consistent sound. High values may sound artificial.",
   infoReverb: "Add a sense of space, as if narrating in a room. Low reverb (5-15%) gives studio presence, high (50%+) sounds like a cathedral or cave.",
   infoSpeed: "Change speech speed without altering pitch. Useful for adjusting narrative rhythm. Values below 1.0 slow down, above 1.0 speed up.",
+  infoSpeedDegraded: "Beyond ±25% the voice degrades and the server clamps the stretch to 0.75-1.25x. Listening speed belongs to the player (0.75-2x, reversible); this control adjusts the narrator's cadence: ±10-15% is the useful range.",
   expTitle: "Cross-lingual cloning",
   expDesc: "Try generating text in one language using the timbre of a voice in another language. Variable results.",
   expText: "Text to synthesize",

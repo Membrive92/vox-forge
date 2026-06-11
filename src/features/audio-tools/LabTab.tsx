@@ -178,7 +178,19 @@ export function LabTab({ t, onToast }: LabTabProps) {
           <Slider label={t.labWarmth} value={params.warmth_db} onChange={(v) => setParam("warmth_db", v)} min={-3} max={6} step={0.5} unit="dB" info={t.infoWarmth} />
           <Slider label={t.labCompression} value={params.compression} onChange={(v) => setParam("compression", v)} min={0} max={100} unit="%" info={t.infoCompression} />
           <Slider label={t.labReverb} value={params.reverb} onChange={(v) => setParam("reverb", v)} min={0} max={100} unit="%" info={t.infoReverb} />
-          <Slider label={t.labSpeed} value={params.speed} onChange={(v) => setParam("speed", v)} min={0.5} max={2.0} step={0.05} unit="x" info={t.infoSpeed} />
+          <Slider
+            label={t.labSpeed}
+            value={params.speed}
+            onChange={(v) => setParam("speed", v)}
+            min={0.5}
+            max={2.0}
+            step={0.05}
+            unit="x"
+            info={t.infoSpeed}
+            degradedBelow={0.75}
+            degradedAbove={1.25}
+            degradedInfo={t.infoSpeedDegraded}
+          />
 
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             {/* Format selector */}

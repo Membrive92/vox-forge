@@ -25,4 +25,41 @@ describe("Slider", () => {
     fireEvent.change(input, { target: { value: "5" } });
     expect(onChange).toHaveBeenCalledWith(5);
   });
+
+  it("marks the degraded zones on the track", () => {
+    render(
+      <Slider
+        label="Speed"
+        value={1}
+        onChange={() => {}}
+        min={0.5}
+        max={2}
+        degradedBelow={0.75}
+        degradedAbove={1.25}
+        degradedInfo="Voice degrades beyond this range"
+      />,
+    );
+    expect(screen.getByTestId("slider-degraded-low")).toBeInTheDocument();
+    expect(screen.getByTestId("slider-degraded-high")).toBeInTheDocument();
+    // Value inside the safe range -> no warning shown
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows the degraded warning when the value leaves the safe range", () => {
+    render(
+      <Slider
+        label="Speed"
+        value={1.6}
+        onChange={() => {}}
+        min={0.5}
+        max={2}
+        degradedBelow={0.75}
+        degradedAbove={1.25}
+        degradedInfo="Voice degrades beyond this range"
+      />,
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Voice degrades beyond this range",
+    );
+  });
 });
