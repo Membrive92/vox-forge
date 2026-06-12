@@ -1,22 +1,17 @@
 /**
- * Sprint A wrapper — combines the existing VoicesUnifiedTab (gallery + create
- * + compare) with the QuickSynthTab (standard + cross-lingual lab) under a
- * single "Mis voces" destination.
+ * "Mis voces" destination: the voices gallery (system voices + profile
+ * creation + profile cards) stacked over the lab section (Quick Synth +
+ * cross-lingual mode).
  *
- * This is intentionally a *thin* composition: no behavior changes, just
- * stacks the two existing components with a divider. Sprint C will fold
- * them into a unified panel and remove the duplication.
+ * The synth-form state (voice, sliders, draft, preview players) lives in
+ * SynthFormContext (BAJO-30) — this component only composes layout.
  */
-import type { CreateProfileInput } from "@/api/profiles";
-import type { SamplePlayerState } from "@/hooks/useSamplePlayer";
-import type { VoicePreviewState } from "@/hooks/useVoicePreview";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
-import type { Profile } from "@/types/domain";
 
-import type { ProfileDraft, SynthSettings } from "../state";
 import { QuickSynthTab } from "../quick-synth/QuickSynthTab";
 
+import { useSynthForm } from "./synthFormContext";
 import { VoicesUnifiedTab } from "./VoicesUnifiedTab";
 
 /** DOM id of the lab (Quick Synth) section, where the resume-jobs UI
@@ -26,44 +21,15 @@ export const VOICES_LAB_SECTION_ID = "vf-voices-lab-section";
 
 interface Props {
   t: Translations;
-  settings: SynthSettings;
-  draft: ProfileDraft;
-  profiles: readonly Profile[];
-  dragOver: boolean;
-  setDragOver: (v: boolean) => void;
-  onSaveProfile: () => void | Promise<void>;
-  onUseProfile: (profile: Profile) => void;
-  onEditProfile: (profile: Profile) => void;
-  onDeleteProfile: (profileId: string) => void;
-  onToggleCastilianAnchor: (profileId: string, value: boolean) => void;
   onToast: (msg: string) => void;
-  voicePreview: VoicePreviewState;
-  samplePlayer: SamplePlayerState;
-  // Lab section
-  text: string;
-  setText: (v: string) => void;
-  onCreateProfile: (input: CreateProfileInput) => Promise<unknown>;
 }
 
-export function VoicesPlusLab(props: Props) {
+export function VoicesPlusLab({ t, onToast }: Props) {
+  const synth = useSynthForm();
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-      <VoicesUnifiedTab
-        t={props.t}
-        settings={props.settings}
-        draft={props.draft}
-        profiles={props.profiles}
-        dragOver={props.dragOver}
-        setDragOver={props.setDragOver}
-        onSaveProfile={props.onSaveProfile}
-        onUseProfile={props.onUseProfile}
-        onEditProfile={props.onEditProfile}
-        onDeleteProfile={props.onDeleteProfile}
-        onToggleCastilianAnchor={props.onToggleCastilianAnchor}
-        onToast={props.onToast}
-        voicePreview={props.voicePreview}
-        samplePlayer={props.samplePlayer}
-      />
+      <VoicesUnifiedTab t={t} onToast={onToast} />
 
       {/* Anchor target for the Workbench "resume jobs" banner: the
           incomplete-jobs UI lives at the top of the lab section, far
@@ -72,15 +38,15 @@ export function VoicesPlusLab(props: Props) {
         id={VOICES_LAB_SECTION_ID}
         style={{ display: "flex", flexDirection: "column", gap: 32 }}
       >
-        <SectionDivider label={props.t.voicesLabSectionTitle} />
+        <SectionDivider label={t.voicesLabSectionTitle} />
 
         <QuickSynthTab
-          t={props.t}
-          text={props.text}
-          setText={props.setText}
-          settings={props.settings}
-          onToast={props.onToast}
-          onCreateProfile={props.onCreateProfile}
+          t={t}
+          text={synth.text}
+          setText={synth.setText}
+          settings={synth.settings}
+          onToast={onToast}
+          onCreateProfile={synth.createProfile}
         />
       </div>
     </div>

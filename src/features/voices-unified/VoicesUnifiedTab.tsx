@@ -7,6 +7,10 @@
  *    runs inline when a sample is uploaded).
  * 2. My profiles — saved cloned-voice cards.
  *
+ * Form state and profile handlers come from SynthFormContext (BAJO-30);
+ * the profile list comes from the shared ProfilesContext. The leaves
+ * below stay prop-driven — they are the consumers, not the drillers.
+ *
  * The Compare panel was removed in Sprint C — undiscoverable, mostly
  * unused, and overlapped with the per-card preview buttons. Quick
  * cross-voice trials happen in the Lab section (VoicesPlusLab).
@@ -14,41 +18,39 @@
 import { useState } from "react";
 
 import { analyzeSample, type SampleAnalysis } from "@/api/analyze";
-import type { SamplePlayerState } from "@/hooks/useSamplePlayer";
-import type { VoicePreviewState } from "@/hooks/useVoicePreview";
+import { useSharedProfiles } from "@/hooks/profilesContext";
 import type { Translations } from "@/i18n";
 import { colors, fonts, typography } from "@/theme/tokens";
-import type { Profile, UploadedSample } from "@/types/domain";
+import type { UploadedSample } from "@/types/domain";
 
-import type { ProfileDraft, SynthSettings } from "../state";
+import type { ProfileDraft } from "../state";
 
 import { ProfilesTab } from "./ProfilesTab";
 import { QualityFeedback } from "./QualityFeedback";
+import { useSynthForm } from "./synthFormContext";
 import { VoicesTab } from "./VoicesTab";
 
 interface Props {
   t: Translations;
-  settings: SynthSettings;
-  draft: ProfileDraft;
-  profiles: readonly Profile[];
-  dragOver: boolean;
-  setDragOver: (v: boolean) => void;
-  onSaveProfile: () => void | Promise<void>;
-  onUseProfile: (profile: Profile) => void;
-  onEditProfile: (profile: Profile) => void;
-  onDeleteProfile: (profileId: string) => void;
-  onToggleCastilianAnchor: (profileId: string, value: boolean) => void;
   onToast: (msg: string) => void;
-  voicePreview: VoicePreviewState;
-  samplePlayer: SamplePlayerState;
 }
 
-export function VoicesUnifiedTab({
-  t, settings, draft, profiles, dragOver, setDragOver,
-  onSaveProfile, onUseProfile, onEditProfile, onDeleteProfile,
-  onToggleCastilianAnchor,
-  onToast, voicePreview, samplePlayer,
-}: Props) {
+export function VoicesUnifiedTab({ t, onToast }: Props) {
+  const {
+    settings,
+    draft,
+    dragOver,
+    setDragOver,
+    saveProfile,
+    useProfile,
+    editProfile,
+    deleteProfile,
+    toggleCastilianAnchor,
+    voicePreview,
+    samplePlayer,
+  } = useSynthForm();
+  const { profiles } = useSharedProfiles();
+
   const [analysis, setAnalysis] = useState<SampleAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
@@ -88,7 +90,7 @@ export function VoicesUnifiedTab({
           draft={wrappedDraft}
           dragOver={dragOver}
           setDragOver={setDragOver}
-          onSaveProfile={onSaveProfile}
+          onSaveProfile={saveProfile}
           onToast={onToast}
           voicePreview={voicePreview}
         />
@@ -104,21 +106,16 @@ export function VoicesUnifiedTab({
         <ProfilesTab
           t={t}
           profiles={profiles}
-          onUse={onUseProfile}
-          onEdit={onEditProfile}
-          onDelete={onDeleteProfile}
-          onToggleCastilianAnchor={onToggleCastilianAnchor}
+          onUse={useProfile}
+          onEdit={editProfile}
+          onDelete={(id) => void deleteProfile(id)}
+          onToggleCastilianAnchor={(id, v) => void toggleCastilianAnchor(id, v)}
           onNew={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           onToast={onToast}
           samplePlayer={samplePlayer}
           voicePreview={voicePreview}
         />
       </Section>
-
-      {/* Compare (A/B) panel removed — it was collapsed by default,
-          undiscoverable, and overlapped with the per-card preview
-          buttons. The lab section in VoicesPlusLab covers the
-          "try a voice quickly" need. */}
     </div>
   );
 }

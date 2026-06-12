@@ -2,30 +2,25 @@ import { useEffect, useRef, useState } from "react";
 
 import { Toast } from "@/components/Toast";
 import * as Icons from "@/components/icons";
-import { VOICES } from "@/constants/voices";
 import { ActivityTab } from "@/features/activity/ActivityTab";
 import { AudioToolsTab } from "@/features/audio-tools/AudioToolsTab";
 import { WorkbenchTab } from "@/features/projects/WorkbenchTab";
 import { StudioTab } from "@/features/studio/StudioTab";
 import { VOICES_LAB_SECTION_ID, VoicesPlusLab } from "@/features/voices-unified/VoicesPlusLab";
+import { SynthFormProvider, useSynthForm } from "@/features/voices-unified/synthFormContext";
 import { useErrorBadge } from "@/hooks/useErrorBadge";
-import type { ProfileDraft, SynthSettings } from "@/features/state";
 import { ProfilesContext } from "@/hooks/profilesContext";
-import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useToast } from "@/hooks/useToast";
-import { useSamplePlayer } from "@/hooks/useSamplePlayer";
-import { useVoicePreview } from "@/hooks/useVoicePreview";
 import { getTranslations } from "@/i18n";
 import { colors, fonts, fontsHref, typography } from "@/theme/tokens";
-import type { AudioFormat, Language, Profile, UploadedSample } from "@/types/domain";
+import type { Language } from "@/types/domain";
 
 type Tab = "quick-synth" | "workbench" | "voices" | "audio-tools" | "studio" | "activity";
 
 export default function App() {
   const [lang, setLang] = useState<Language>("es");
   const [tab, setTab] = useState<Tab>("workbench");
-  const [text, setText] = useState("");
 
   // Keep tabs mounted after first visit so in-flight jobs (synth, render,
   // transcribe) aren't wiped when the user navigates away mid-work. The
@@ -63,129 +58,25 @@ export default function App() {
     }, 60);
   };
 
-  const esVoices = VOICES.es;
-  const initialVoice = esVoices[0]?.id ?? "";
-  const [selectedVoice, setSelectedVoice] = useState<string>(initialVoice);
-  const [format, setFormat] = useState<AudioFormat>("mp3");
-  const [speed, setSpeed] = useState(100);
-  const [pitch, setPitch] = useState(0);
-  const [volume, setVolume] = useState(80);
-  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
-
-  const [newProfileName, setNewProfileName] = useState("");
-  const [uploadedFile, setUploadedFile] = useState<UploadedSample | null>(null);
-  const [editingProfile, setEditingProfile] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-
   // Name of the currently-open project, surfaced into the global header
   // so the user always knows what they're editing.
   const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
 
   const toast = useToast();
   const errorBadge = useErrorBadge();
-  useDraftPersistence({ key: "voxforge.draft.synth", value: text, onRestore: setText });
   const profilesState = useProfiles();
-  const { profiles, create, update, remove } = profilesState;
-  const voicePreview = useVoicePreview();
-  const samplePlayer = useSamplePlayer();
+  const { profiles } = profilesState;
   const t = getTranslations(lang);
-
-  const settings: SynthSettings = {
-    lang, setLang,
-    selectedVoice, setSelectedVoice,
-    format, setFormat,
-    speed, setSpeed,
-    pitch, setPitch,
-    volume, setVolume,
-    activeProfileId, setActiveProfileId,
-  };
-
-  const draft: ProfileDraft = {
-    name: newProfileName, setName: setNewProfileName,
-    uploadedFile, setUploadedFile,
-    editingId: editingProfile, setEditingId: setEditingProfile,
-  };
-
-  const handleToggleLang = (): void => {
-    const next: Language = lang === "es" ? "en" : "es";
-    setLang(next);
-    const firstVoice = VOICES[next][0];
-    if (firstVoice) setSelectedVoice(firstVoice.id);
-  };
-
-  const handleSaveProfile = async (): Promise<void> => {
-    if (!newProfileName.trim()) return;
-    try {
-      if (editingProfile) {
-        await update(editingProfile, {
-          name: newProfileName,
-          voiceId: selectedVoice,
-          language: lang,
-          speed, pitch, volume,
-        });
-        setEditingProfile(null);
-      } else {
-        await create({
-          name: newProfileName,
-          voiceId: selectedVoice,
-          language: lang,
-          speed, pitch, volume,
-          sampleFile: uploadedFile?.file ?? null,
-        });
-      }
-      setNewProfileName("");
-      setUploadedFile(null);
-      toast.show(t.profileSaved);
-    } catch (e) {
-      toast.show(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
-    }
-  };
-
-  const handleUseProfile = (p: Profile): void => {
-    setSelectedVoice(p.voiceId);
-    setSpeed(p.speed);
-    setPitch(p.pitch);
-    setVolume(p.volume);
-    setLang(p.lang);
-    setActiveProfileId(p.id);
-    // Quick Synth no longer has its own nav entry; it's rendered inside
-    // the "voices" tab as the lab section. Stay on the same tab so the
-    // user sees the profile becomes the active one in the lab below.
-    setTab("voices");
-  };
-
-  const handleEditProfile = (p: Profile): void => {
-    setEditingProfile(p.id);
-    setNewProfileName(p.name);
-    setSpeed(p.speed);
-    setPitch(p.pitch);
-    setVolume(p.volume);
-    setSelectedVoice(p.voiceId);
-    setTab("voices");
-    // Scroll to editing section (upload card at top of voices section)
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }, 0);
-  };
-
-  const handleDeleteProfile = async (id: string): Promise<void> => {
-    try {
-      await remove(id);
-    } catch (e) {
-      toast.show(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
-    }
-  };
-
-  const handleToggleCastilianAnchor = async (id: string, value: boolean): Promise<void> => {
-    try {
-      await update(id, { castilianAnchor: value });
-    } catch (e) {
-      toast.show(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
-    }
-  };
 
   return (
     <ProfilesContext.Provider value={profilesState}>
+    <SynthFormProvider
+      lang={lang}
+      setLang={setLang}
+      t={t}
+      onToast={toast.show}
+      onShowVoices={() => setTab("voices")}
+    >
     <div
       style={{
         minHeight: "100vh",
@@ -201,10 +92,9 @@ export default function App() {
       <BackgroundTexture />
       <Toast toasts={toast.toasts} onDismiss={toast.dismiss} dismissLabel={t.toastDismiss} />
 
-      <Header
+      <AppHeader
         t={t}
         lang={lang}
-        onToggleLang={handleToggleLang}
         activeProjectName={tab === "workbench" ? activeProjectName : null}
       />
       <TabsNav t={t} tab={tab} setTab={setTab} errorCount={errorBadge} />
@@ -226,25 +116,7 @@ export default function App() {
         )}
         {visitedTabs.has("voices") && (
           <TabHost active={tab === "voices"}>
-            <VoicesPlusLab
-              t={t}
-              settings={settings}
-              draft={draft}
-              profiles={profiles}
-              dragOver={dragOver}
-              setDragOver={setDragOver}
-              onSaveProfile={handleSaveProfile}
-              onUseProfile={handleUseProfile}
-              onEditProfile={handleEditProfile}
-              onDeleteProfile={(id) => void handleDeleteProfile(id)}
-              onToggleCastilianAnchor={(id, v) => void handleToggleCastilianAnchor(id, v)}
-              onToast={toast.show}
-              voicePreview={voicePreview}
-              samplePlayer={samplePlayer}
-              text={text}
-              setText={setText}
-              onCreateProfile={create}
-            />
+            <VoicesPlusLab t={t} onToast={toast.show} />
           </TabHost>
         )}
         {visitedTabs.has("audio-tools") && (
@@ -269,8 +141,23 @@ export default function App() {
         )}
       </main>
     </div>
+    </SynthFormProvider>
     </ProfilesContext.Provider>
   );
+}
+
+interface AppHeaderProps {
+  t: ReturnType<typeof getTranslations>;
+  lang: Language;
+  activeProjectName: string | null;
+}
+
+// Thin bridge so the header's language toggle can reach the synth-form
+// context: switching the app language also resets the selected voice to
+// the new language's default (logic owned by SynthFormProvider).
+function AppHeader({ t, lang, activeProjectName }: AppHeaderProps) {
+  const { toggleLang } = useSynthForm();
+  return <Header t={t} lang={lang} onToggleLang={toggleLang} activeProjectName={activeProjectName} />;
 }
 
 interface TabHostProps {
