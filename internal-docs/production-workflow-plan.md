@@ -1,7 +1,7 @@
 # Production workflow plan — grabar, subir, editar, generar video enriquecido
 
 **Fecha**: 2026-04-22
-**Estado**: Planificado, pendiente de implementación
+**Estado** (actualizado 2026-06-12): Parcialmente implementado — A1–A3 (upload/grabación/multi-take), C1–C3 (LUFS/denoise/compresor) y B1 (slideshow) están en producción; B2 es PROD-03 del `remediation_plan/REMEDIATION_PLAN.md` (pendiente); B3 y B4 están **supersedidos** (ver cabeceras en sus secciones); A4, C4 y C5 siguen en backlog.
 **Motivación**: La app hoy produce audiolibros via TTS (síntesis + edición + video con portada estática). Para convertirla en una herramienta de producción real necesita tres piezas adicionales: (a) ingerir audio humano (grabar en-app o subir un archivo), (b) enriquecer el video con imágenes por escena, y (c) procesado de audio de nivel publicable (LUFS, denoise). Este plan cubre las tres en tres bloques independientes que se pueden mergear por separado.
 
 ---
@@ -283,6 +283,14 @@ A partir del SRT de la transcripción (B.1 del Studio plan original), agrupar l�
 
 ### B3 — Generación de imágenes via API externa (~4h)
 
+> **SUPERSEDED**: la generación de imágenes NO pasará por APIs externas
+> (Replicate/Stable Horde/DALL·E quedan descartados). La fuente de verdad del
+> stack visual es [`img_generation_module/docs/DECISIONS.md`](../img_generation_module/docs/DECISIONS.md)
+> (local, ComfyUI como proceso aparte, modelos Apache 2.0) y su integración con
+> el backend es PROD-02 de [`remediation_plan/REMEDIATION_PLAN.md`](../remediation_plan/REMEDIATION_PLAN.md) (§F7).
+> Del trabajo de esta sección sobrevive solo lo ya implementado: el endpoint
+> `POST /api/studio/generate-image` con el patrón `ImageProvider` + `PlaceholderProvider`.
+
 #### Objetivo
 Para cada escena, botón "Generar imagen" con prompt editable. Usa una API externa (usuario aporta API key). Proveedor soportado inicial: uno (probablemente Replicate o Stable Horde gratuito).
 
@@ -304,6 +312,14 @@ Para cada escena, botón "Generar imagen" con prompt editable. Usa una API exter
 ---
 
 ### B4 — Stable Diffusion local (Fase C completa del Studio) (~15-20h)
+
+> **SUPERSEDED**: no habrá difusión embebida en el backend (`diffusers`
+> in-process fue evaluado y rechazado — ADR-001). La inferencia visual local
+> corre en una instancia de ComfyUI gestionada como subproceso, con los modelos
+> y cuantizaciones decididos en
+> [`img_generation_module/docs/DECISIONS.md`](../img_generation_module/docs/DECISIONS.md)
+> (Z-Image-Turbo fp8 para imagen, Wan 2.2 I2V para vídeo — todo Apache 2.0).
+> Tampoco habrá Ollama/LLM local para prompts en v1.
 
 Ver `studio-module-plan.md § Fase C`. No se duplica aquí. Entra cuando B3 deja de cumplir (cost, latencia, privacidad). Requiere:
 - `diffusers` + SDXL en `requirements.txt`

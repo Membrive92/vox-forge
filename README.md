@@ -2,6 +2,8 @@
 
 VoxForge is a local-first audiobook production workbench for narrating fantasy stories in Spanish. It combines Microsoft's neural voices (Edge-TTS) for instant synthesis with XTTS v2 for cloning your own voice from a short sample, plus OpenVoice V2 for audio-to-audio voice conversion. Designed for texts up to 500,000 characters with automatic segmentation, natural pauses, and per-chunk regeneration.
 
+**Local-first, with one exception**: Edge-TTS synthesizes audio on Microsoft's cloud servers (text is sent over the network). Everything else — voice cloning (XTTS v2), conversion (OpenVoice V2), transcription (faster-whisper), DSP, and video rendering — runs entirely on your machine.
+
 ## Features
 
 ### Synthesis
@@ -22,6 +24,8 @@ VoxForge is a local-first audiobook production workbench for narrating fantasy s
 - **Batch export**: synthesize all chapters of a project into a numbered ZIP with ID3 tags
 - **Character casting**: `[Narrator]` / `[Kael]` markup routes each character's lines to a different voice profile
 - **Generation history**: every synthesis run is recorded with its chunks and takes in the database
+- **Human audio ingestion**: upload an audio file as a chapter take, or record one in-app (MediaRecorder with pause/resume, timer, level meter) — uploads and recordings flow through Studio and export like any synthesis
+- **Multi-take selector**: when a chapter has several generations (synthesis, upload, recording), pick which one is active for Studio and export
 
 ### Voice Tools
 - **Voice conversion** (OpenVoice V2): change the timbre of an existing recording to another voice
@@ -44,7 +48,10 @@ VoxForge is a local-first audiobook production workbench for narrating fantasy s
 - **Audio editor** (Phase A POC): load a synthesized chapter, select a region on the waveform, queue trim / delete / fade-in / fade-out / normalize operations, apply the batch, preview and download
 - **wavesurfer.js** integration with the regions plugin: drag to select, resize by edges
 - **Stateless pipeline**: operations live in client state, backend is pure (batch in → edited audio out). Output persists in `data/studio/`
-- **Planned** (Phase B and beyond): cover + Ken Burns + waveform overlay + auto-subtitles via `faster-whisper` → MP4; later phases add SD-generated imagery and generative video clips
+- **Mastering operations**: LUFS loudness normalization (ffmpeg `loudnorm`, audiobook targets -18/-16/-14), noise reduction (noisereduce) and single-knob compression, queueable like any other edit op
+- **Video render**: cover image with Ken Burns pan/zoom or multi-image slideshow with crossfades, optional waveform overlay → MP4 via ffmpeg
+- **Auto-subtitles**: speech-to-text via `faster-whisper` produces an SRT, burned-in or soft-muxed into the rendered video
+- **Planned**: locally generated imagery via ComfyUI — `POST /api/studio/generate-image` currently ships a placeholder provider; the real provider and a ComfyUI setup section in this README land with PROD-02 (`remediation_plan/REMEDIATION_PLAN.md` §F7). Generative video clips (`img_generation_module`) follow.
 
 ### UX
 - **Autosave**: draft text persisted to localStorage with 1s debounce
@@ -139,10 +146,10 @@ Open **http://localhost:5173**. The frontend proxies `/api/*` to the backend.
 ### Tests
 
 ```bash
-# Backend: 132 tests
+# Backend: 334 tests
 python -m pytest -xvs
 
-# Frontend: 46 tests
+# Frontend: 78 tests
 npm test
 
 # TypeScript strict check

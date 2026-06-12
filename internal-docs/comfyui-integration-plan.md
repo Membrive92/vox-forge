@@ -1,7 +1,7 @@
 # ComfyUI integration plan — generación de imágenes reales para escenas y portadas
 
 **Fecha**: 2026-04-24
-**Estado**: Planificado, pendiente de implementación
+**Estado** (actualizado 2026-06-12): Planificado — la **arquitectura** de este plan (provider HTTP contra un ComfyUI externo, workflows JSON parametrizados, tests con transport mockeado) sigue vigente y guía PROD-02 del `remediation_plan/REMEDIATION_PLAN.md`. La **selección de modelos** está supersedida — ver la cabecera de la tabla de modelos más abajo.
 **Motivación**: Sprint 4 (B3) dejó el endpoint `POST /api/studio/generate-image` funcional pero con un único proveedor `PlaceholderProvider` que dibuja un gradiente con el prompt escrito encima. Sirvió para validar la UX y la canalización al slideshow; no sirve para un vídeo publicable en YouTube. Este documento describe cómo sustituir/añadir un proveedor real basado en un servidor **ComfyUI** local corriendo en la misma máquina (RTX 4070S 12 GB), sin romper el placeholder y sin acoplar VoxForge a un modelo concreto.
 
 ---
@@ -48,6 +48,18 @@ ComfyUI ([github.com/comfyanonymous/ComfyUI](https://github.com/comfyanonymous/C
 Un **workflow** es un grafo JSON de "nodos" (Load Checkpoint → CLIP Encode → KSampler → VAE Decode → SaveImage). Se exporta desde la UI con el botón "Save (API Format)". Los nodos tienen IDs numéricos y nosotros sobreescribimos los campos que nos interesan (prompt text, width, height, seed) antes de enviar.
 
 ### Workflows que vamos a mantener
+
+> **SUPERSEDED (modelos)**: esta tabla — y toda mención a modelos en este
+> documento (diagrama de arquitectura, buckets SDXL, sección de instalación) —
+> ya no es la fuente de verdad. JuggernautXL/DreamShaperXL quedan descartados y
+> FLUX.1 dev está **prohibido** (licencia no comercial; regla 8 del plan de
+> remediación). El stack canónico es el de
+> [`img_generation_module/docs/DECISIONS.md`](../img_generation_module/docs/DECISIONS.md)
+> (ADR-002/003: **Z-Image-Turbo fp8** para imagen, Wan 2.2 I2V para vídeo —
+> Apache 2.0), reutilizando la MISMA instancia y workspace de ComfyUI de ese
+> módulo. Además, la parametrización es por `_meta.title` (ADR-005, como en
+> `img_generation_module/pipeline/workflows.py`), no por ID numérico como
+> muestra el ejemplo de bindings de F1.
 
 Guardados en `backend/data/comfyui_workflows/` y referenciados desde `config.py`:
 
