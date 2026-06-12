@@ -19,6 +19,11 @@ import { QuickSynthTab } from "../quick-synth/QuickSynthTab";
 
 import { VoicesUnifiedTab } from "./VoicesUnifiedTab";
 
+/** DOM id of the lab (Quick Synth) section, where the resume-jobs UI
+ * renders. App scrolls here when the user follows the Workbench
+ * "resume interrupted jobs" banner. */
+export const VOICES_LAB_SECTION_ID = "vf-voices-lab-section";
+
 interface Props {
   t: Translations;
   settings: SynthSettings;
@@ -60,16 +65,24 @@ export function VoicesPlusLab(props: Props) {
         samplePlayer={props.samplePlayer}
       />
 
-      <SectionDivider label={props.t.voicesLabSectionTitle} />
+      {/* Anchor target for the Workbench "resume jobs" banner: the
+          incomplete-jobs UI lives at the top of the lab section, far
+          below the voices gallery fold (MED-UX-3). */}
+      <div
+        id={VOICES_LAB_SECTION_ID}
+        style={{ display: "flex", flexDirection: "column", gap: 32 }}
+      >
+        <SectionDivider label={props.t.voicesLabSectionTitle} />
 
-      <QuickSynthTab
-        t={props.t}
-        text={props.text}
-        setText={props.setText}
-        settings={props.settings}
-        onToast={props.onToast}
-        onCreateProfile={props.onCreateProfile}
-      />
+        <QuickSynthTab
+          t={props.t}
+          text={props.text}
+          setText={props.setText}
+          settings={props.settings}
+          onToast={props.onToast}
+          onCreateProfile={props.onCreateProfile}
+        />
+      </div>
     </div>
   );
 }

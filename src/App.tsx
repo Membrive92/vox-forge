@@ -7,7 +7,7 @@ import { ActivityTab } from "@/features/activity/ActivityTab";
 import { AudioToolsTab } from "@/features/audio-tools/AudioToolsTab";
 import { WorkbenchTab } from "@/features/projects/WorkbenchTab";
 import { StudioTab } from "@/features/studio/StudioTab";
-import { VoicesPlusLab } from "@/features/voices-unified/VoicesPlusLab";
+import { VOICES_LAB_SECTION_ID, VoicesPlusLab } from "@/features/voices-unified/VoicesPlusLab";
 import { useErrorBadge } from "@/hooks/useErrorBadge";
 import type { ProfileDraft, SynthSettings } from "@/features/state";
 import { ProfilesContext } from "@/hooks/profilesContext";
@@ -48,6 +48,20 @@ export default function App() {
     setTab("studio");
   };
   const clearPendingStudioSource = (): void => setPendingStudioSourceId(null);
+
+  // The Workbench resume banner must land the user AT the resume UI,
+  // which lives in the lab section far below the voices gallery fold
+  // (MED-UX-3). The timeout lets the voices TabHost mount/show first;
+  // the anchor is the section itself, so it exists even before the
+  // incomplete-jobs fetch resolves.
+  const navigateToResumeJobs = (): void => {
+    setTab("voices");
+    window.setTimeout(() => {
+      document
+        .getElementById(VOICES_LAB_SECTION_ID)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  };
 
   const esVoices = VOICES.es;
   const initialVoice = esVoices[0]?.id ?? "";
@@ -203,10 +217,9 @@ export default function App() {
               onToast={toast.show}
               onOpenStudioWithSource={openStudioWithSource}
               // Sprint A: Quick Synth was absorbed into the Voices tab
-              // (gallery + lab). The incomplete-jobs banner now lands
-              // there; the lab section below picks up the in-flight
-              // jobs as before.
-              onNavigateToQuickSynth={() => setTab("voices")}
+              // (gallery + lab). The incomplete-jobs banner lands there,
+              // scrolled to the lab section where the resume UI lives.
+              onNavigateToQuickSynth={navigateToResumeJobs}
               onActiveProjectChange={setActiveProjectName}
             />
           </TabHost>

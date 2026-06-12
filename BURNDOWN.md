@@ -19,7 +19,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 **Estados**: `RESUELTO-PREVIO` · `ABIERTO` · `NO-REPRODUCIBLE` · `WONTFIX` (justificado) · `HUMANO-PENDIENTE` · `DIFERIDO` (solo §F9).
 
-**Recuento**: Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 23/33 resueltos, **10 abiertos** · Bajos 14/38 resueltos, **24 abiertos** · Nuevos (fuentes 2 y 3): **26 abiertos** (3 de ellos HUMANO).
+**Recuento** (triaje F0, actualizado tras F3): Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 32/33 resueltos, **1 abierto** (MED-ARQ-4 parcial → F4) · Bajos 18/38 resueltos, **20 abiertos** · Nuevos (fuentes 2 y 3): ver tabla (F2/F2b/F8 cerrados salvo gates HUMANO; F7/F9 pendientes).
 
 ---
 
@@ -81,15 +81,15 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | MED-A11Y-1..6 | Modales/foco/cards/filas/outline (6 items) | RESUELTO-PREVIO | useFocusTrap en 3 diálogos; activateOnKey en Lab/Ambience; sweep outline | d716024, 74c26c7 |
 | MED-UX-1 | Studio callejón sin salida | RESUELTO-PREVIO | breadcrumb "volver" en StudioTab | d716024 |
 | MED-UX-2 | Toasts ES como 'info' neutro | RESUELTO-PREVIO | markers ES en useToast (nota: F7/UX puede preferir tipo explícito) | d716024 |
-| MED-UX-3 | Banner resume lejos del fold | **ABIERTO** | App.tsx:209 navega sin scroll a la sección resume | — |
+| MED-UX-3 | Banner resume lejos del fold | RESUELTO | ancla `VOICES_LAB_SECTION_ID` en la sección lab de VoicesPlusLab (donde vive el IncompleteJobsBanner) + `navigateToResumeJobs` en App: cambia a Voices y hace `scrollIntoView` suave tras montar el TabHost; el ancla es la sección (existe antes de que resuelva el fetch de jobs) | F3 |
 | MED-UX-4 | Delete render sin confirmación | RESUELTO-PREVIO | ConfirmDialog en RecentRenders:248 | d716024 |
-| MED-UX-5 | Indicador "edited" no-op sin genId | **ABIERTO** | ChunkMap.tsx:137-158 | — |
+| MED-UX-5 | Indicador "edited" no-op sin genId | RESUELTO | el chip "N edited" solo es `<button>` (deep-link a Studio) cuando hay `genId`; sin generación se renderiza como `<span>` informativo con el mismo estilo (`editedChipStyle` compartido) — nada clicable que no haga nada | F3 |
 | MED-I18N-1..8 | InteractivePlayer/Pronunciation/Settings/toasts/Toast (8 items) | RESUELTO-PREVIO | claves t.* cableadas (defaults EN de InteractivePlayer → BAJO-36) | 36d44a5..d48eaab |
 | MED-TIPOS-1..3 | response_model projects/analyze/chunk-map | RESUELTO-PREVIO | response_model en los 3; tipos regenerados | 6553c2d |
 | MED-TEST-1 | Test regen débil | RESUELTO-PREVIO | (= ALTO-12) | 6553c2d |
 | MED-ARQ-1 | `tabs.ts` divergente | RESUELTO-PREVIO | borrado | d716024 |
 | MED-ARQ-2 | useProfiles ×4 | RESUELTO-PREVIO | (= ALTO-03) | d716024 |
-| MED-ARQ-3 | setState durante render (VideoRenderPanel) | **ABIERTO** | VideoRenderPanel.tsx:71 | — |
+| MED-ARQ-3 | setState durante render (VideoRenderPanel) | RESUELTO | el reset de `subsMode` a "none" al perder el transcript vive en `useEffect([hasTranscript])` (remedio sugerido por el audit), no en el cuerpo del render | F3 |
 | MED-ARQ-4 | useStudioSession god-hook | **ABIERTO (parcial)** | apply/applyPreview colapsados (0a1df73); falta partir en 3 hooks | 0a1df73 parcial |
 | MED-ARQ-5 | activity/stats/experimental/ambience dict crudo | RESUELTO-PREVIO | response_model en los 4 | 1466001 |
 

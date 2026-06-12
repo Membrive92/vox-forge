@@ -28,6 +28,21 @@ interface Props {
   onOpenStudioWithSource: (generationId: string) => void;
 }
 
+// Shared look of the "N edited" chip — interactive (button) and
+// informational (span) variants must stay visually identical.
+const editedChipStyle: React.CSSProperties = {
+  padding: "3px 8px",
+  fontSize: 10,
+  fontWeight: 700,
+  fontFamily: fonts.mono,
+  borderRadius: radii.sm,
+  background: "rgba(139,92,246,0.15)",
+  color: "#a78bfa",
+  border: "1px solid rgba(139,92,246,0.3)",
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
+};
+
 export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWithSource }: Props) {
   const [chunks, setChunks] = useState<ChunkInfo[]>([]);
   const [genId, setGenId] = useState<string | null>(null);
@@ -171,27 +186,27 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
           <h4 style={{ margin: 0, fontSize: typography.size.base, fontWeight: 700 }}>
             {t.chunkMapTitle} — {chapterTitle}
           </h4>
+          {/* With a generation the chip deep-links into Studio; without
+              one there is nothing to open, so it renders as plain text
+              instead of a button that silently does nothing (MED-UX-5). */}
           {studioEdits.length > 0 && (
-            <button
-              type="button"
-              onClick={() => genId && onOpenStudioWithSource(genId)}
-              title={t.chunkOpenInStudio}
-              style={{
-                padding: "3px 8px",
-                fontSize: 10,
-                fontWeight: 700,
-                fontFamily: fonts.mono,
-                borderRadius: radii.sm,
-                background: "rgba(139,92,246,0.15)",
-                color: "#a78bfa",
-                border: "1px solid rgba(139,92,246,0.3)",
-                cursor: genId ? "pointer" : "default",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-              }}
-            >
-              {t.chunkEditedCount.replace("{n}", String(studioEdits.length))}
-            </button>
+            genId ? (
+              <button
+                type="button"
+                onClick={() => onOpenStudioWithSource(genId)}
+                title={t.chunkOpenInStudio}
+                style={{
+                  ...editedChipStyle,
+                  cursor: "pointer",
+                }}
+              >
+                {t.chunkEditedCount.replace("{n}", String(studioEdits.length))}
+              </button>
+            ) : (
+              <span style={editedChipStyle}>
+                {t.chunkEditedCount.replace("{n}", String(studioEdits.length))}
+              </span>
+            )
           )}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

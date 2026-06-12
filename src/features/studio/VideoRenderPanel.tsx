@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { generateImage, uploadCover } from "@/api/studio";
 import type {
@@ -69,10 +69,12 @@ export function VideoRenderPanel({
   const [sceneGeneratingIdx, setSceneGeneratingIdx] = useState<number | null>(null);
 
   // If the user removes the transcript, reset subs to none so we don't
-  // send an invalid request.
-  if (!hasTranscript && subsMode !== "none") {
-    setSubsMode("none");
-  }
+  // send an invalid request. In an effect, not during render — calling
+  // a setState while rendering forces React to restart the render and
+  // is unsupported outside the same-component bail-out (MED-ARQ-3).
+  useEffect(() => {
+    if (!hasTranscript) setSubsMode("none");
+  }, [hasTranscript]);
 
   const handleFile = (file: File | undefined): void => {
     if (!file) return;
