@@ -71,9 +71,13 @@ function detectCharacters(text: string): string[] {
 
 export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete, onToast, onOpenStudioWithSource }: ChapterCardProps) {
   const confirm = useConfirm();
-  const [collapsed, setCollapsed] = useState(false);
+  // Collapsed by default (MED-PERF-F3): a project with dozens of
+  // chapters must not pay N × (generations + renders + chunk map)
+  // fetches and a full card subtree per chapter on open.
+  const [collapsed, setCollapsed] = useState(true);
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [renders, setRenders] = useState<StudioRender[]>([]);
+  const [statusLoaded, setStatusLoaded] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
@@ -89,10 +93,16 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
       ]);
       setGenerations(gens);
       setRenders(rnds);
-    } catch { /* non-critical */ }
+    } catch { /* non-critical */ } finally {
+      setStatusLoaded(true);
+    }
   }, [chapter.id]);
 
-  useEffect(() => { void loadStatus(); }, [loadStatus]);
+  // Status (and the ChunkMap in the body) only load once the card is
+  // expanded; re-expanding refreshes so the chips never go stale.
+  useEffect(() => {
+    if (!collapsed) void loadStatus();
+  }, [collapsed, loadStatus]);
   useEffect(() => () => { renderAbortRef.current?.abort(); }, []);
 
   const latestDoneGen = generations.find((g) => g.status === "done" && g.file_path);
@@ -123,6 +133,9 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
 
   const togglePanel = (key: Exclude<PanelKey, null>): void => {
+    // Panels live in the card body — opening one on a collapsed card
+    // must expand it, or the toggle would appear to do nothing.
+    setCollapsed(false);
     setActivePanel((prev) => (prev === key ? null : key));
   };
 
@@ -328,35 +341,42 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
           flexWrap: "wrap",
         }}
       >
-        <StatusChip
-          label={t.chapterStatusSynth}
-          active={latestDoneGen !== undefined}
-          color={colors.primary}
-        />
-        {hasGenError && (
-          <StatusChip
-            label={t.chapterStatusError}
-            active
-            color="#f87171"
-            onClick={() => setActivePanel("chunks")}
-          />
+        {/* Chips only render once the deferred status fetch resolved —
+            a collapsed card that never loaded must not show "inactive"
+            chips for audio that actually exists. */}
+        {statusLoaded && (
+          <>
+            <StatusChip
+              label={t.chapterStatusSynth}
+              active={latestDoneGen !== undefined}
+              color={colors.primary}
+            />
+            {hasGenError && (
+              <StatusChip
+                label={t.chapterStatusError}
+                active
+                color="#f87171"
+                onClick={() => setActivePanel("chunks")}
+              />
+            )}
+            <StatusChip
+              label={t.chapterStatusEdits.replace("{n}", String(audioEditCount))}
+              active={audioEditCount > 0}
+              color="#a78bfa"
+              {...(audioEditCount > 0 && latestDoneGen
+                ? { onClick: (() => {
+                    const g = latestDoneGen;
+                    return () => onOpenStudioWithSource(g.id);
+                  })() }
+                : {})}
+            />
+            <StatusChip
+              label={t.chapterStatusVideos.replace("{n}", String(videoRenderCount))}
+              active={videoRenderCount > 0}
+              color="#f59e0b"
+            />
+          </>
         )}
-        <StatusChip
-          label={t.chapterStatusEdits.replace("{n}", String(audioEditCount))}
-          active={audioEditCount > 0}
-          color="#a78bfa"
-          {...(audioEditCount > 0 && latestDoneGen
-            ? { onClick: (() => {
-                const g = latestDoneGen;
-                return () => onOpenStudioWithSource(g.id);
-              })() }
-            : {})}
-        />
-        <StatusChip
-          label={t.chapterStatusVideos.replace("{n}", String(videoRenderCount))}
-          active={videoRenderCount > 0}
-          color="#f59e0b"
-        />
         {characters.length > 0 && (
           <button
             type="button"

@@ -17,6 +17,12 @@ export interface AudioPlayerState {
   setIsPlaying: (v: boolean) => void;
 }
 
+// How often ``currentTime`` state commits during playback. ``timeupdate``
+// fires 4-66Hz per element and every consumer of the hook re-renders its
+// whole subtree on each commit (MED-PERF-F2). Same pattern as the
+// wavesurfer throttle in StudioWaveform.
+const TIMEUPDATE_THROTTLE_MS = 150;
+
 export function useAudioPlayer(): AudioPlayerState {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -25,6 +31,8 @@ export function useAudioPlayer(): AudioPlayerState {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const currentUrlRef = useRef<string | null>(null);
+  const latestTimeRef = useRef(0);
+  const throttleTimerRef = useRef<number | null>(null);
 
   // Revoke any remaining URL on unmount
   useEffect(() => {
@@ -40,7 +48,18 @@ export function useAudioPlayer(): AudioPlayerState {
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
-    const onTime = (): void => setCurrentTime(el.currentTime);
+    const onTime = (): void => {
+      latestTimeRef.current = el.currentTime;
+      // Track every event in the ref but commit state at most every
+      // TIMEUPDATE_THROTTLE_MS; the trailing timeout always publishes
+      // the latest value, so the final position is never lost.
+      if (throttleTimerRef.current === null) {
+        throttleTimerRef.current = window.setTimeout(() => {
+          throttleTimerRef.current = null;
+          setCurrentTime(latestTimeRef.current);
+        }, TIMEUPDATE_THROTTLE_MS);
+      }
+    };
     const onMeta = (): void => {
       if (Number.isFinite(el.duration) && el.duration > 0) setDuration(el.duration);
     };
@@ -51,6 +70,10 @@ export function useAudioPlayer(): AudioPlayerState {
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("loadedmetadata", onMeta);
       el.removeEventListener("durationchange", onMeta);
+      if (throttleTimerRef.current !== null) {
+        window.clearTimeout(throttleTimerRef.current);
+        throttleTimerRef.current = null;
+      }
     };
   }, [url]);
 

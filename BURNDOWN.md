@@ -76,8 +76,8 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | MED-INT-2 | split_text_into_chapters sin cleanup/transacción | RESUELTO-PREVIO | project_manager.py:274-286 collect+unlink | 6553c2d |
 | MED-INT-3 | `studio_renders` huérfanos | RESUELTO-PREVIO | DELETE studio_renders en cascade (project_manager.py:229,232) | 6553c2d |
 | MED-PERF-F1 | Fetch duplicado renders 4×N | RESUELTO-PREVIO | ChunkMap.tsx:58 fetch único por capítulo | d716024 |
-| MED-PERF-F2 | `timeupdate` re-renderiza lista entera | **ABIERTO** | useAudioPlayer.ts:43 sin throttle | — |
-| MED-PERF-F3 | Workbench sin virtualización/colapso | **ABIERTO** | WorkbenchTab.tsx render eager de cards | — |
+| MED-PERF-F2 | `timeupdate` re-renderiza lista entera | RESUELTO | commits de `currentTime` acotados a 150ms con trailing timeout (patrón StudioWaveform): el ref registra cada evento, el estado publica como máximo cada `TIMEUPDATE_THROTTLE_MS` y el último valor nunca se pierde; `seek`/`skip`/`stop` siguen síncronos así que el scrub del InteractivePlayer no pierde suavidad; timer limpiado en el cleanup del efecto | F3 |
+| MED-PERF-F3 | Workbench sin virtualización/colapso | RESUELTO | ChapterCard colapsada por defecto; `loadStatus` (generations+renders) y el cuerpo entero (ChunkMap con sus 2 fetches, textarea, pickers) solo se montan al expandir, con refresh en cada expansión; los StatusChips se ocultan hasta el primer load (no mienten "sin audio"); abrir un panel (preview/cast/ambient) expande la card para que el toggle nunca parezca muerto; sin lib de virtualización (enfoque barato del plan) | F3 |
 | MED-A11Y-1..6 | Modales/foco/cards/filas/outline (6 items) | RESUELTO-PREVIO | useFocusTrap en 3 diálogos; activateOnKey en Lab/Ambience; sweep outline | d716024, 74c26c7 |
 | MED-UX-1 | Studio callejón sin salida | RESUELTO-PREVIO | breadcrumb "volver" en StudioTab | d716024 |
 | MED-UX-2 | Toasts ES como 'info' neutro | RESUELTO-PREVIO | markers ES en useToast (nota: F7/UX puede preferir tipo explícito) | d716024 |
