@@ -15,27 +15,29 @@ const PLAYBACK_RATE_STEP = 0.05;
 interface Props {
   player: AudioPlayerState;
   disabled?: boolean;
-  playLabel?: string;
-  pauseLabel?: string;
-  stopLabel?: string;
-  skipBackLabel?: string;
-  skipForwardLabel?: string;
-  rateLabel?: string;
-  resetRateLabel?: string;
-  seekLabel?: string;
+  // Labels are required on purpose: hardcoded English defaults would leak
+  // into the Spanish UI (BAJO-36). Pass the t.player* keys.
+  playLabel: string;
+  pauseLabel: string;
+  stopLabel: string;
+  skipBackLabel: string;
+  skipForwardLabel: string;
+  rateLabel: string;
+  resetRateLabel: string;
+  seekLabel: string;
 }
 
 export function InteractivePlayer({
   player,
   disabled = false,
-  playLabel = "Play",
-  pauseLabel = "Pause",
-  stopLabel = "Stop",
-  skipBackLabel = "Skip back 10 seconds",
-  skipForwardLabel = "Skip forward 10 seconds",
-  rateLabel = "Playback rate",
-  resetRateLabel = "Reset playback rate to 1×",
-  seekLabel = "Seek",
+  playLabel,
+  pauseLabel,
+  stopLabel,
+  skipBackLabel,
+  skipForwardLabel,
+  rateLabel,
+  resetRateLabel,
+  seekLabel,
 }: Props) {
   const ready = !disabled && player.url !== null;
   const progress = player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0;

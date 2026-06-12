@@ -432,7 +432,6 @@ export const en: Record<TranslationKey, string> = {
   playerRate: "Playback rate",
   playerResetRate: "Reset playback rate to 1×",
   playerSeek: "Seek",
-  playerPlaybackRate: "Playback rate {r}x",
 
   // ── Lab custom preset dialog ─────────────────────────────────────
   labSavePresetTitle: "Save custom preset",
@@ -569,6 +568,8 @@ export const en: Record<TranslationKey, string> = {
 
   // Fix #4: Confirmation dialogs
   studioConfirmClearQueue: "Clear all {n} operations?",
+  studioConfirmClearQueueMsg: "This will remove {n} operations from the queue.",
+  studioConfirmClearQueueMsgOne: "This will remove 1 operation from the queue.",
   studioConfirmRemoveOp: "Remove this operation?",
   studioConfirmCancel: "Cancel",
   studioConfirmApply: "Yes, clear",

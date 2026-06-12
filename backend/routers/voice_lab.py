@@ -31,7 +31,7 @@ class PresetResponse(BaseModel):
     name: str
     description: str
     category: str
-    params: dict
+    params: dict[str, float]
 
 
 class PresetsListResponse(BaseModel):

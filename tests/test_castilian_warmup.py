@@ -225,6 +225,10 @@ class TestReferenceVoiceEndpoint:
         assert r.status_code == 200
         body = r.json()
         assert body["configured"] is False
+        # response_model keeps the shape stable: optional fields are
+        # null, never absent (the generated TS type relies on this).
+        assert body["filename"] is None
+        assert body["duration_s"] is None
 
     def test_reports_configured_with_filename(
         self, client, tmp_path, monkeypatch
@@ -241,6 +245,7 @@ class TestReferenceVoiceEndpoint:
         body = r.json()
         assert body["configured"] is True
         assert body["filename"] == "alvaro_castellano.wav"
+        assert isinstance(body["duration_s"], (int, float))
 
 
 # ── Plumbing: warmup wraps text before synthesis ────────────────────

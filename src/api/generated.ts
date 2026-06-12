@@ -2023,7 +2023,7 @@ export interface components {
             category: string;
             /** Params */
             params: {
-                [key: string]: unknown;
+                [key: string]: number;
             };
         };
         /** PresetsListResponse */
@@ -2162,6 +2162,18 @@ export interface components {
             };
             /** Count */
             count: number;
+        };
+        /**
+         * ReferenceVoiceStatusResponse
+         * @description Availability of the operator-configured Castilian reference voice.
+         */
+        ReferenceVoiceStatusResponse: {
+            /** Configured */
+            configured: boolean;
+            /** Filename */
+            filename?: string | null;
+            /** Duration S */
+            duration_s?: number | null;
         };
         /**
          * RenderVideoRequest
@@ -3366,9 +3378,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ReferenceVoiceStatusResponse"];
                 };
             };
         };

@@ -149,7 +149,7 @@ export const es = {
   infoReverb: "Añade sensación de espacio, como si narraras en una sala. Poco reverb (5-15%) da presencia de estudio, mucho (50%+) suena a catedral o cueva.",
   infoSpeed: "Cambia la velocidad de habla sin alterar el tono. Útil para ajustar el ritmo narrativo. Valores por debajo de 1.0 ralentizan, por encima aceleran.",
   infoSpeedDegraded: "Más allá de ±25% la voz se degrada y el servidor limita el estiramiento a 0.75–1.25×. La velocidad de escucha pertenece al reproductor (0.75–2×, reversible); este control ajusta la cadencia del narrador: ±10–15% es el rango útil.",
-  expTitle: "Clonacion cross-lingual",
+  expTitle: "Clonación cross-lingual",
   expDesc: "Prueba a generar texto en un idioma usando el timbre de una voz en otro idioma. Resultados variables.",
   expText: "Texto a sintetizar",
   expTextPlaceholder: "Escribe el texto que quieres generar con la voz de la muestra...",
@@ -430,7 +430,6 @@ export const es = {
   playerRate: "Velocidad de reproducción",
   playerResetRate: "Restablecer velocidad a 1×",
   playerSeek: "Buscar",
-  playerPlaybackRate: "Velocidad de reproducción {r}x",
 
   // ── Lab custom preset dialog ─────────────────────────────────────
   labSavePresetTitle: "Guardar preset personalizado",
@@ -567,6 +566,8 @@ export const es = {
 
   // Fix #4: Confirmation dialogs
   studioConfirmClearQueue: "¿Limpiar todas las {n} operaciones?",
+  studioConfirmClearQueueMsg: "Se quitarán {n} operaciones de la cola.",
+  studioConfirmClearQueueMsgOne: "Se quitará 1 operación de la cola.",
   studioConfirmRemoveOp: "¿Eliminar esta operación?",
   studioConfirmCancel: "Cancelar",
   studioConfirmApply: "Sí, limpiar",

@@ -132,8 +132,8 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-33 | Rama fallo `_run_command` sin test | RESUELTO | test_studio.py: exit!=0 con extracto de cola de stderr, ffmpeg ausente, y render sin output file — F1 `test(audit-bajo) BAJO-33` |
 | BAJO-34 | Concat character-cast sin test | RESUELTO | test_workbench.py: spy sobre `AudioSegment.silent` (600ms switch / 300ms mismo personaje, verificado vía X-Audio-Duration) + cleanup de temporales en éxito y en fallo — F1 `test(audit-bajo) BAJO-34` |
 | BAJO-35 | Invariante semáforo sin test | RESUELTO-PREVIO | test_clone_engine: holds_gpu_semaphore — a614a96 |
-| BAJO-36 | Defaults EN en InteractivePlayer | **ABIERTO** (→F6) | InteractivePlayer.tsx:24-31 props opcionales |
-| BAJO-37 | Acentos es.ts convert/lab | **ABIERTO (resto mínimo)** | 1 cadena sospechosa restante en es.ts |
+| BAJO-36 | Defaults EN en InteractivePlayer | RESUELTO | Los 8 label props son requeridos (sin defaults hardcodeados); los 5 call sites (SynthTab, QuickPreview, ChunkMap, CharacterCasting, AmbienceMixer) ya pasaban `t.player*` — el audit contaba 6 pero uno se retiró con CompareTab en F4; clave muerta `playerPlaybackRate` borrada de es/en (cero usos); de propina: mensaje EN hardcodeado del ConfirmDialog de vaciar cola (EditOperationsPanel) → claves `studioConfirmClearQueueMsg/MsgOne` es/en — F6 |
+| BAJO-37 | Acentos es.ts convert/lab | RESUELTO | El bloque convert/lab ya estaba corregido en campañas previas; barrido sistemático (script de sospechosos sin tilde sobre todos los valores de es.ts: clonacion/conversion/reduccion/compresion/anade/util/mas/... ~80 formas) ⇒ 1 única coincidencia real, `expTitle` "Clonacion"→"Clonación"; test de paridad i18n verde — F6 |
 | BAJO-38 | `relativeWhen` 'ahora' hardcodeado | RESUELTO-PREVIO | workbenchHelpers.relativeTime(iso, t) — 4ba952e |
 
 ## Nuevos — fuentes 2 y 3 (REMEDIATION_PLAN §F2/F2b/F7/F8/F9)
@@ -178,6 +178,10 @@ Herramientas: `vulture backend/ --min-confidence 90` (pip, dev-only, NO añadido
 **Falsos positivos (no re-investigar)**: `metadata.py:33 import mutagen` — sonda deliberada de disponibilidad en try/except ImportError · `generated.ts paths/webhooks/$defs` — fichero AUTO, nunca se edita · `i18n/index.ts getTranslations` — usado en App/ErrorBoundary; ts-prune no resuelve bien el alias `@/i18n`.
 
 **TODO/FIXME/XXX**: grep en `src/` y `backend/` ⇒ cero coincidencias; nada que convertir en ids.
+
+## F6 — Contratos (2026-06-12)
+
+- **Cero `{[key: string]: unknown}` estructurales en `src/api/generated.ts`**: el único endpoint de datos que emitía dict crudo era `GET /api/experimental/reference-voice` → `ReferenceVoiceStatusResponse` (response_model; campos opcionales como null estables, test de contrato en test_castilian_warmup); `PresetResponse.params` estrechado de `dict` a `dict[str, float]` (los 8 params DSP son numéricos). `src/api/experimental.ts` ahora deriva el tipo wire de `components["schemas"]` y normaliza null→omitido. Los `"application/json": unknown` restantes (18) son endpoints de streaming binario (audio/vídeo/zip/logs vía FileResponse), no recursos de datos — sin acción.
 
 ## F5 — Accesibilidad (2026-06-12)
 

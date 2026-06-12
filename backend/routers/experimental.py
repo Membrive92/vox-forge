@@ -48,6 +48,14 @@ class CandidatesResponse(BaseModel):
     castilian_warmup: bool
     castilian_reference: bool
 
+
+class ReferenceVoiceStatusResponse(BaseModel):
+    """Availability of the operator-configured Castilian reference voice."""
+
+    configured: bool
+    filename: str | None = None
+    duration_s: float | None = None
+
 _ALLOWED_LANGUAGES = {"es", "en", "fr", "de", "it", "pt", "pl", "tr", "ru", "nl", "cs", "ar", "zh", "ja", "hu", "ko"}
 _MAX_CANDIDATES = 3
 
@@ -372,19 +380,23 @@ async def reference_voice_audio() -> FileResponse:
     return FileResponse(path=str(ref), media_type=media_type, filename=ref.name)
 
 
-@router.get("/reference-voice", summary="Check if a Castilian reference voice is configured")
-async def reference_voice_status() -> dict:
+@router.get(
+    "/reference-voice",
+    summary="Check if a Castilian reference voice is configured",
+    response_model=ReferenceVoiceStatusResponse,
+)
+async def reference_voice_status() -> ReferenceVoiceStatusResponse:
     """Tell the frontend whether the D1 toggle should be available."""
     ref = get_reference_voice()
     if ref is None:
-        return {"configured": False}
+        return ReferenceVoiceStatusResponse(configured=False)
     try:
         seg = AudioSegment.from_file(str(ref))
         duration = round(len(seg) / 1000.0, 2)
     except Exception:
         duration = 0.0
-    return {
-        "configured": True,
-        "filename": ref.name,
-        "duration_s": duration,
-    }
+    return ReferenceVoiceStatusResponse(
+        configured=True,
+        filename=ref.name,
+        duration_s=duration,
+    )

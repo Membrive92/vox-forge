@@ -476,7 +476,11 @@ export function EditOperationsPanel({
       <ConfirmDialog
         open={showClearConfirm}
         title={t.studioConfirmClearQueue.replace("{n}", String(operations.length))}
-        message={`This will remove ${operations.length} ${operations.length === 1 ? "operation" : "operations"} from the queue.`}
+        message={
+          operations.length === 1
+            ? t.studioConfirmClearQueueMsgOne
+            : t.studioConfirmClearQueueMsg.replace("{n}", String(operations.length))
+        }
         confirmText={t.studioConfirmApply}
         confirmVariant="danger"
         cancelText={t.studioConfirmCancel}

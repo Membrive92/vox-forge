@@ -910,9 +910,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Reference Voice Status Api Experimental Reference Voice Get"
+                  "$ref": "#/components/schemas/ReferenceVoiceStatusResponse"
                 }
               }
             }
@@ -4735,7 +4733,9 @@
             "title": "Category"
           },
           "params": {
-            "additionalProperties": true,
+            "additionalProperties": {
+              "type": "number"
+            },
             "type": "object",
             "title": "Params"
           }
@@ -5188,6 +5188,42 @@
           "count"
         ],
         "title": "PronunciationListResponse"
+      },
+      "ReferenceVoiceStatusResponse": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          }
+        },
+        "type": "object",
+        "required": [
+          "configured"
+        ],
+        "title": "ReferenceVoiceStatusResponse",
+        "description": "Availability of the operator-configured Castilian reference voice."
       },
       "RenderVideoRequest": {
         "properties": {

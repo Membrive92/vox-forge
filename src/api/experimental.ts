@@ -1,6 +1,7 @@
 /** Experimental cross-lingual endpoint. */
 
 import { API_BASE, ApiError, getJson } from "./client";
+import type { components } from "./generated";
 
 export interface CrossLingualOptions {
   language?: string;
@@ -136,11 +137,11 @@ export async function fetchReferenceVoiceAudio(): Promise<{ blob: Blob; filename
 }
 
 export function getReferenceVoiceStatus(): Promise<ReferenceVoiceStatus> {
-  return getJson<{ configured: boolean; filename?: string; duration_s?: number }>(
+  return getJson<components["schemas"]["ReferenceVoiceStatusResponse"]>(
     "/experimental/reference-voice",
   ).then((r) => ({
     configured: r.configured,
-    ...(r.filename !== undefined && { filename: r.filename }),
-    ...(r.duration_s !== undefined && { durationS: r.duration_s }),
+    ...(r.filename != null && { filename: r.filename }),
+    ...(r.duration_s != null && { durationS: r.duration_s }),
   }));
 }
