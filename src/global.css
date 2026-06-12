@@ -92,6 +92,15 @@ select:focus:not(:focus-visible),
   to   { width: 0%; }
 }
 
+/* ─── Indeterminate sweep (jobs aggregate bar, UX-01) ───────────────
+   The fill is 40% of the track wide; translateX is relative to the
+   fill's own width, so -100% → 350% carries it fully across. */
+
+@keyframes vf-progress-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(350%); }
+}
+
 /* ─── Respect user motion preferences ───────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {

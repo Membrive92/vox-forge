@@ -585,4 +585,18 @@ export const en: Record<TranslationKey, string> = {
 
   // Fix #8: Video render success toast
   studioVideoRenderSuccess: "Video rendered successfully",
+
+  // UX-01: global job tray + aggregate progress + tab badges
+  jobsTrayLabel: "Active jobs",
+  jobsRunning: "Running",
+  jobsDone: "Done",
+  jobsGoToOrigin: "Go to the originating tab",
+  jobsTabBadge: "{n} running",
+  jobsAggregateLabel: "Active jobs progress",
+  jobKindQuickSynth: "Quick synth",
+  jobKindChapterSynth: "Chapter synthesis",
+  jobKindConversion: "Voice conversion",
+  jobKindVideoRender: "Video render",
+  jobKindTranscription: "Transcription",
+  jobKindCrossLingual: "Cross-lingual cloning",
 };

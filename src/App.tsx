@@ -8,14 +8,29 @@ import { WorkbenchTab } from "@/features/projects/WorkbenchTab";
 import { StudioTab } from "@/features/studio/StudioTab";
 import { VOICES_LAB_SECTION_ID, VoicesPlusLab } from "@/features/voices-unified/VoicesPlusLab";
 import { SynthFormProvider, useSynthForm } from "@/features/voices-unified/synthFormContext";
+import { JobsProgressBar } from "@/components/JobsProgressBar";
+import { JobsTray } from "@/components/JobsTray";
 import { useErrorBadge } from "@/hooks/useErrorBadge";
-import { JobsProvider } from "@/hooks/jobsContext";
+import { JobsProvider, useJobs } from "@/hooks/jobsContext";
 import { ProfilesContext } from "@/hooks/profilesContext";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useToast } from "@/hooks/useToast";
 import { getTranslations } from "@/i18n";
 import { colors, fonts, fontsHref, typography } from "@/theme/tokens";
 import type { Language, TabId } from "@/types/domain";
+
+/**
+ * Cross-tab navigation intents (UX-01). Generalizes the old
+ * `pendingStudioSourceId` one-off: any chrome (job tray, deep links,
+ * resume banner) expresses WHERE it wants to land and App resolves the
+ * tab switch plus any payload/side effect in one place.
+ */
+type NavigationIntent =
+  | { kind: "tab"; tab: TabId }
+  // Open Studio with a specific generation pre-selected.
+  | { kind: "studio-source"; sourceId: string }
+  // Land at the resume UI inside the Voices lab section (MED-UX-3).
+  | { kind: "resume-jobs" };
 
 export default function App() {
   const [lang, setLang] = useState<Language>("es");
@@ -31,30 +46,34 @@ export default function App() {
     setVisitedTabs((prev) => (prev.has(tab) ? prev : new Set([...prev, tab])));
   }, [tab]);
 
-  // Cross-tab navigation intent. When the Workbench triggers "Edit in
-  // Studio" on a chapter, it stashes the generation id here + switches
-  // tab. StudioTab reads it on mount/change, selects the matching
-  // source, then calls ``clearPendingStudioSource`` so it doesn't
-  // re-fire if the user navigates back and forth.
+  // "studio-source" intent payload. StudioTab reads it on mount/change,
+  // selects the matching source, then calls ``clearPendingStudioSource``
+  // so it doesn't re-fire if the user navigates back and forth.
   const [pendingStudioSourceId, setPendingStudioSourceId] = useState<string | null>(null);
-  const openStudioWithSource = (sourceId: string): void => {
-    setPendingStudioSourceId(sourceId);
-    setTab("studio");
-  };
   const clearPendingStudioSource = (): void => setPendingStudioSourceId(null);
 
-  // The Workbench resume banner must land the user AT the resume UI,
-  // which lives in the lab section far below the voices gallery fold
-  // (MED-UX-3). The timeout lets the voices TabHost mount/show first;
-  // the anchor is the section itself, so it exists even before the
-  // incomplete-jobs fetch resolves.
-  const navigateToResumeJobs = (): void => {
-    setTab("voices");
-    window.setTimeout(() => {
-      document
-        .getElementById(VOICES_LAB_SECTION_ID)
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 60);
+  const navigate = (intent: NavigationIntent): void => {
+    switch (intent.kind) {
+      case "tab":
+        setTab(intent.tab);
+        return;
+      case "studio-source":
+        setPendingStudioSourceId(intent.sourceId);
+        setTab("studio");
+        return;
+      case "resume-jobs":
+        // Land AT the resume UI, which lives in the lab section far below
+        // the voices gallery fold (MED-UX-3). The timeout lets the voices
+        // TabHost mount/show first; the anchor is the section itself, so
+        // it exists even before the incomplete-jobs fetch resolves.
+        setTab("voices");
+        window.setTimeout(() => {
+          document
+            .getElementById(VOICES_LAB_SECTION_ID)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 60);
+        return;
+    }
   };
 
   // Name of the currently-open project, surfaced into the global header
@@ -96,8 +115,10 @@ export default function App() {
         t={t}
         lang={lang}
         activeProjectName={tab === "workbench" ? activeProjectName : null}
+        onNavigateTab={(target) => navigate({ kind: "tab", tab: target })}
       />
       <TabsNav t={t} tab={tab} setTab={setTab} errorCount={errorBadge} />
+      <JobsProgressBar label={t.jobsAggregateLabel} />
 
       <main className="vf-main-narrow" style={{ position: "relative", zIndex: 10, padding: 28, maxWidth: 1400, margin: "0 auto" }}>
         {visitedTabs.has("workbench") && (
@@ -105,11 +126,11 @@ export default function App() {
             <WorkbenchTab
               t={t}
               onToast={toast.show}
-              onOpenStudioWithSource={openStudioWithSource}
+              onOpenStudioWithSource={(sourceId) => navigate({ kind: "studio-source", sourceId })}
               // Sprint A: Quick Synth was absorbed into the Voices tab
               // (gallery + lab). The incomplete-jobs banner lands there,
               // scrolled to the lab section where the resume UI lives.
-              onNavigateToQuickSynth={navigateToResumeJobs}
+              onNavigateToQuickSynth={() => navigate({ kind: "resume-jobs" })}
               onActiveProjectChange={setActiveProjectName}
             />
           </TabHost>
@@ -151,14 +172,23 @@ interface AppHeaderProps {
   t: ReturnType<typeof getTranslations>;
   lang: Language;
   activeProjectName: string | null;
+  onNavigateTab: (tab: TabId) => void;
 }
 
 // Thin bridge so the header's language toggle can reach the synth-form
 // context: switching the app language also resets the selected voice to
 // the new language's default (logic owned by SynthFormProvider).
-function AppHeader({ t, lang, activeProjectName }: AppHeaderProps) {
+function AppHeader({ t, lang, activeProjectName, onNavigateTab }: AppHeaderProps) {
   const { toggleLang } = useSynthForm();
-  return <Header t={t} lang={lang} onToggleLang={toggleLang} activeProjectName={activeProjectName} />;
+  return (
+    <Header
+      t={t}
+      lang={lang}
+      onToggleLang={toggleLang}
+      activeProjectName={activeProjectName}
+      onNavigateTab={onNavigateTab}
+    />
+  );
 }
 
 interface TabHostProps {
@@ -222,14 +252,18 @@ interface HeaderProps {
    * in the header so the user knows what they're editing without
    * having to glance at the sidebar. Null hides the badge. */
   activeProjectName: string | null;
+  /** Navigation intent fired by the job tray (UX-01). */
+  onNavigateTab: (tab: TabId) => void;
 }
 
-function Header({ t, lang, onToggleLang, activeProjectName }: HeaderProps) {
+function Header({ t, lang, onToggleLang, activeProjectName, onNavigateTab }: HeaderProps) {
   return (
     <header
       style={{
         position: "relative",
-        zIndex: 10,
+        // Above the tab nav / main (both z 10) so the job tray dropdown
+        // isn't covered by the sibling stacking contexts below it.
+        zIndex: 20,
         padding: "20px 28px",
         display: "flex",
         alignItems: "center",
@@ -325,29 +359,32 @@ function Header({ t, lang, onToggleLang, activeProjectName }: HeaderProps) {
         </div>
       )}
 
-      <button
-        onClick={onToggleLang}
-        aria-label={t.language}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          background: "rgba(30,41,59,0.8)",
-          border: "1px solid rgba(148,163,184,0.15)",
-          borderRadius: 8,
-          padding: "8px 14px",
-          color: colors.text,
-          cursor: "pointer",
-          fontSize: typography.size.sm,
-          fontWeight: 500,
-          fontFamily: fonts.sans,
-          transition: "all 0.2s",
-        }}
-      >
-        <Icons.Globe />
-        {lang === "es" ? "ES" : "EN"}
-        <Icons.ChevDown />
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <JobsTray t={t} onNavigate={onNavigateTab} />
+        <button
+          onClick={onToggleLang}
+          aria-label={t.language}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "rgba(30,41,59,0.8)",
+            border: "1px solid rgba(148,163,184,0.15)",
+            borderRadius: 8,
+            padding: "8px 14px",
+            color: colors.text,
+            cursor: "pointer",
+            fontSize: typography.size.sm,
+            fontWeight: 500,
+            fontFamily: fonts.sans,
+            transition: "all 0.2s",
+          }}
+        >
+          <Icons.Globe />
+          {lang === "es" ? "ES" : "EN"}
+          <Icons.ChevDown />
+        </button>
+      </div>
     </header>
   );
 }
@@ -360,6 +397,10 @@ interface TabsNavProps {
 }
 
 function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
+  // Running jobs put a small count badge on their origin tab (UX-01,
+  // same idea as the error badge on Activity). Studio jobs have no nav
+  // entry to badge — the header tray still covers them.
+  const jobs = useJobs();
   // Visible destinations: Workbench, Voices, Audio Tools, Activity. Quick
   // Synth lives inside Voices (the lab section) and Studio opens as a panel
   // from a chapter, so neither needs its own nav entry. Audio Tools (Change
@@ -402,6 +443,9 @@ function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
     >
       {tabs.map((tb, idx) => {
         const active = tab === tb.id;
+        const jobCount = jobs.filter(
+          (j) => j.status === "running" && j.originTab === tb.id,
+        ).length;
         return (
           <button
             key={tb.id}
@@ -429,6 +473,27 @@ function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
           >
             {tb.icon}
             <span className="vf-tab-label">{tb.label}</span>
+            {jobCount > 0 && (
+              <span
+                aria-label={t.jobsTabBadge.replace("{n}", String(jobCount))}
+                style={{
+                  minWidth: 16,
+                  height: 16,
+                  padding: "0 4px",
+                  borderRadius: 8,
+                  background: colors.primary,
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  fontFamily: fonts.mono,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {jobCount}
+              </span>
+            )}
           </button>
         );
       })}

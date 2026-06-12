@@ -583,6 +583,20 @@ export const es = {
 
   // Fix #8: Video render success toast
   studioVideoRenderSuccess: "Vídeo renderizado correctamente",
+
+  // UX-01: global job tray + aggregate progress + tab badges
+  jobsTrayLabel: "Trabajos en curso",
+  jobsRunning: "En curso",
+  jobsDone: "Completado",
+  jobsGoToOrigin: "Ir a la pestaña de origen",
+  jobsTabBadge: "{n} en curso",
+  jobsAggregateLabel: "Progreso de trabajos en curso",
+  jobKindQuickSynth: "Síntesis rápida",
+  jobKindChapterSynth: "Síntesis de capítulo",
+  jobKindConversion: "Conversión de voz",
+  jobKindVideoRender: "Render de vídeo",
+  jobKindTranscription: "Transcripción",
+  jobKindCrossLingual: "Clonación cross-lingual",
 } as const;
 
 export type TranslationKey = keyof typeof es;
