@@ -316,6 +316,13 @@ export const en: Record<TranslationKey, string> = {
   chunkRegenerating: "...",
   chunkOpenInStudio: "Edit in Studio",
   chunkEditedCount: "{n} edits",
+  chunkQcRun: "Audio QC",
+  chunkQcRunning: "Analyzing audio...",
+  chunkQcToast: "QC: {flagged} of {scored} chunks flagged",
+  chunkQcBadge: "QC {score}%",
+  chunkQcBadgeHint: "Transcript doesn't match the text — click to compare",
+  chunkQcExpected: "Expected",
+  chunkQcTranscribed: "Transcribed",
 
   // ── Character casting ────────────────────────────────────────────
   castingNoTagsFound: "No character tags found. Use [Name] markup at the start of lines.",

@@ -21,7 +21,7 @@ DB_PATH: Path = DATA_DIR / "voxforge.db"
 
 # Bump when the schema changes; stamped into ``PRAGMA user_version`` after
 # migrations run so future versions can branch on it.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Single source of truth for every column added *after* the initial schema.
 # ``CREATE TABLE IF NOT EXISTS`` is a no-op on a pre-existing table, so any
@@ -34,6 +34,10 @@ _MIGRATION_COLUMNS: tuple[str, ...] = (
     "ALTER TABLE chapters ADD COLUMN profile_id TEXT DEFAULT NULL",
     "ALTER TABLE chapters ADD COLUMN active_generation_id TEXT DEFAULT NULL",
     "ALTER TABLE generations ADD COLUMN engine TEXT NOT NULL DEFAULT 'edge-tts'",
+    # v3 — automatic audio QC via ASR-diff (QC-01): per-chunk
+    # intelligibility score and the transcript that produced it.
+    "ALTER TABLE takes ADD COLUMN qc_score REAL DEFAULT NULL",
+    "ALTER TABLE takes ADD COLUMN qc_transcript TEXT DEFAULT NULL",
 )
 
 _SCHEMA_SQL = """
@@ -95,7 +99,9 @@ CREATE TABLE IF NOT EXISTS generations (
     updated_at      TEXT NOT NULL
 );
 
--- Individual chunk takes within a generation
+-- Individual chunk takes within a generation. ``qc_score`` /
+-- ``qc_transcript`` are filled by the ASR-diff QC pass (QC-01):
+-- NULL means "not QC'd yet" (or no per-chunk audio was available).
 CREATE TABLE IF NOT EXISTS takes (
     id              TEXT PRIMARY KEY,
     generation_id   TEXT NOT NULL REFERENCES generations(id) ON DELETE CASCADE,
@@ -105,6 +111,8 @@ CREATE TABLE IF NOT EXISTS takes (
     duration        REAL NOT NULL DEFAULT 0,
     score           REAL NOT NULL DEFAULT 0,
     status          TEXT NOT NULL DEFAULT 'pending',
+    qc_score        REAL DEFAULT NULL,
+    qc_transcript   TEXT DEFAULT NULL,
     created_at      TEXT NOT NULL
 );
 

@@ -1,6 +1,6 @@
 /** Chapter-level synthesis + chunk regen + audio upload API. */
 
-import { API_BASE, ApiError, getJson, postForm } from "./client";
+import { API_BASE, ApiError, getJson, postForm, postJson } from "./client";
 
 export interface ChunkInfo {
   index: number;
@@ -8,6 +8,11 @@ export interface ChunkInfo {
   status: string;
   take_id: string | null;
   duration: number;
+  /** ASR-diff QC score in [0,1]; null until a QC pass runs (or when no
+   * per-chunk audio was available to transcribe). */
+  qc_score: number | null;
+  qc_flagged: boolean;
+  qc_transcript: string | null;
 }
 
 export interface ChunkMapResponse {
@@ -49,6 +54,39 @@ export async function synthesizeChapter(
 
 export function getChunkMap(chapterId: string): Promise<ChunkMapResponse> {
   return getJson<ChunkMapResponse>(`/chapters/${chapterId}/chunks`);
+}
+
+export interface ChunkQCInfo {
+  index: number;
+  qc_score: number | null;
+  qc_flagged: boolean;
+  expected_text: string;
+  transcript: string | null;
+}
+
+export interface ChapterQCResponse {
+  generation_id: string;
+  threshold: number;
+  total: number;
+  scored: number;
+  flagged: number;
+  skipped: number;
+  chunks: ChunkQCInfo[];
+}
+
+/** Run ASR-diff QC on the chapter's completed generation: transcribe
+ * each chunk and flag the ones whose transcript diverges from the
+ * chapter text. Scores persist server-side — `getChunkMap` reflects
+ * them on every subsequent load. */
+export function runChapterQC(
+  chapterId: string,
+  signal?: AbortSignal,
+): Promise<ChapterQCResponse> {
+  return postJson<ChapterQCResponse, Record<string, never>>(
+    `/chapters/${chapterId}/qc`,
+    {},
+    signal,
+  );
 }
 
 export interface RegenChunkResult {

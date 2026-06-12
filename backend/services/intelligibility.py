@@ -90,6 +90,25 @@ def text_similarity(expected: str, transcribed: str) -> float:
     return fuzz.ratio(norm_expected, norm_transcribed) / 100.0
 
 
+async def transcribe(
+    audio_path: Path,
+    *,
+    language: str | None = None,
+    transcriber: TranscriberFn | None = None,
+) -> str:
+    """Transcribe ``audio_path`` under the shared GPU semaphore.
+
+    One CUDA inference at a time across all engines. ``transcriber`` is
+    injectable for tests and alternative backends; the default is the
+    cached faster-whisper singleton. The chapter QC pass (QC-01) uses
+    this directly because it needs the transcript itself, not just a
+    similarity score.
+    """
+    transcribe_fn = transcriber if transcriber is not None else _whisper_transcribe
+    async with gpu_semaphore:
+        return await asyncio.to_thread(transcribe_fn, audio_path, language)
+
+
 async def score_intelligibility(
     audio_path: Path,
     expected_text: str,
@@ -99,15 +118,10 @@ async def score_intelligibility(
 ) -> float:
     """Score how intelligibly ``audio_path`` speaks ``expected_text``.
 
-    Transcribes the audio (under the shared GPU semaphore — one CUDA
-    inference at a time across all engines) and returns the normalized
-    similarity in ``[0.0, 1.0]``. ``transcriber`` is injectable for
-    tests and alternative backends; the default is the cached
-    faster-whisper singleton.
+    Transcribes the audio (see ``transcribe``) and returns the
+    normalized similarity in ``[0.0, 1.0]``.
     """
-    transcribe = transcriber if transcriber is not None else _whisper_transcribe
-    async with gpu_semaphore:
-        transcribed = await asyncio.to_thread(transcribe, audio_path, language)
+    transcribed = await transcribe(audio_path, language=language, transcriber=transcriber)
     score = text_similarity(expected_text, transcribed)
     logger.debug(
         "Intelligibility %.3f for %s (expected %d chars, transcribed %d chars)",

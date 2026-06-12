@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getChunkMap,
   regenerateChunk,
+  runChapterQC,
   synthesizeChapter,
   type ChapterSynthResult,
   type ChunkInfo,
@@ -34,13 +35,17 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
   const [loading, setLoading] = useState(true);
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
   const [studioEdits, setStudioEdits] = useState<StudioRender[]>([]);
+  const [qcRunning, setQcRunning] = useState(false);
+  const [expandedQcIndex, setExpandedQcIndex] = useState<number | null>(null);
   const synthAbortRef = useRef<AbortController | null>(null);
   const regenAbortRef = useRef<AbortController | null>(null);
+  const qcAbortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
 
   useEffect(() => () => {
     synthAbortRef.current?.abort();
     regenAbortRef.current?.abort();
+    qcAbortRef.current?.abort();
   }, []);
 
   const loadMap = useCallback(async () => {
@@ -120,6 +125,28 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
     regenAbortRef.current?.abort();
   };
 
+  const handleQC = async (): Promise<void> => {
+    const controller = new AbortController();
+    qcAbortRef.current = controller;
+    setQcRunning(true);
+    try {
+      const result = await runChapterQC(chapterId, controller.signal);
+      onToast(
+        t.chunkQcToast
+          .replace("{flagged}", String(result.flagged))
+          .replace("{scored}", String(result.scored)),
+      );
+      await loadMap();
+    } catch (e) {
+      if (!isAbortError(e)) {
+        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+      }
+    } finally {
+      setQcRunning(false);
+      if (qcAbortRef.current === controller) qcAbortRef.current = null;
+    }
+  };
+
   return (
     <div
       style={{
@@ -168,6 +195,16 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
           )}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {genId && !synthesizing ? (
+            <Button
+              variant="secondary"
+              icon={<Icons.Check />}
+              loading={qcRunning}
+              onClick={() => void handleQC()}
+            >
+              {qcRunning ? t.chunkQcRunning : t.chunkQcRun}
+            </Button>
+          ) : null}
           {genId && !synthesizing ? (
             <Button
               variant="secondary"
@@ -229,6 +266,7 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
         <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 500, overflowY: "auto" }}>
           {chunks.map((chunk) => {
             const isRegen = regenIndex === chunk.index;
+            const isQcExpanded = expandedQcIndex === chunk.index;
             const statusColor =
               chunk.status === "done" ? "#34d399"
               : chunk.status === "error" ? "#f87171"
@@ -238,78 +276,134 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
                 key={chunk.index}
                 style={{
                   display: "flex",
-                  alignItems: "flex-start",
-                  gap: 12,
+                  flexDirection: "column",
+                  gap: 8,
                   padding: "10px 12px",
                   background: colors.surfaceSubtle,
-                  border: `1px solid ${colors.borderFaint}`,
+                  border: chunk.qc_flagged
+                    ? "1px solid rgba(245,158,11,0.45)"
+                    : `1px solid ${colors.borderFaint}`,
                   borderRadius: radii.sm,
                 }}
               >
-                <div
-                  style={{
-                    minWidth: 28,
-                    height: 28,
-                    borderRadius: "50%",
-                    background: `${statusColor}22`,
-                    color: statusColor,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: typography.size.xs,
-                    fontWeight: 700,
-                    fontFamily: fonts.mono,
-                    flexShrink: 0,
-                  }}
-                >
-                  {chunk.index + 1}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div
                     style={{
-                      margin: 0,
+                      minWidth: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: `${statusColor}22`,
+                      color: statusColor,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                       fontSize: typography.size.xs,
-                      color: colors.textDim,
-                      lineHeight: 1.5,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
+                      fontWeight: 700,
+                      fontFamily: fonts.mono,
+                      flexShrink: 0,
                     }}
                   >
-                    {chunk.text}
-                  </p>
+                    {chunk.index + 1}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: typography.size.xs,
+                        color: colors.textDim,
+                        lineHeight: 1.5,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {chunk.text}
+                    </p>
+                  </div>
+                  {chunk.qc_flagged && (
+                    <button
+                      onClick={() =>
+                        setExpandedQcIndex(isQcExpanded ? null : chunk.index)
+                      }
+                      title={t.chunkQcBadgeHint}
+                      aria-expanded={isQcExpanded}
+                      style={{
+                        padding: "6px 10px",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        fontFamily: fonts.mono,
+                        background: "rgba(245,158,11,0.18)",
+                        color: "#f59e0b",
+                        border: "1px solid rgba(245,158,11,0.45)",
+                        borderRadius: radii.sm,
+                        cursor: "pointer",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {t.chunkQcBadge.replace(
+                        "{score}",
+                        String(Math.round((chunk.qc_score ?? 0) * 100)),
+                      )}
+                    </button>
+                  )}
+                  <button
+                    onClick={() =>
+                      isRegen ? handleCancelRegen() : void handleRegen(chunk.index)
+                    }
+                    disabled={!isRegen && !genId}
+                    title={
+                      isRegen
+                        ? t.cancel
+                        : `Regenerate chunk ${chunk.index + 1}`
+                    }
+                    style={{
+                      padding: "6px 12px",
+                      fontSize: typography.size.xs,
+                      fontWeight: 600,
+                      background: isRegen
+                        ? "rgba(248,113,113,0.15)"
+                        : "rgba(245,158,11,0.1)",
+                      color: isRegen ? colors.danger : "#f59e0b",
+                      border: isRegen
+                        ? `1px solid ${colors.dangerBorder}`
+                        : "1px solid rgba(245,158,11,0.2)",
+                      borderRadius: radii.sm,
+                      cursor: !isRegen && !genId ? "default" : "pointer",
+                      fontFamily: fonts.sans,
+                      opacity: genId ? 1 : 0.3,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isRegen ? t.cancel : t.chunkRegen}
+                  </button>
                 </div>
-                <button
-                  onClick={() =>
-                    isRegen ? handleCancelRegen() : void handleRegen(chunk.index)
-                  }
-                  disabled={!isRegen && !genId}
-                  title={
-                    isRegen
-                      ? t.cancel
-                      : `Regenerate chunk ${chunk.index + 1}`
-                  }
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: typography.size.xs,
-                    fontWeight: 600,
-                    background: isRegen
-                      ? "rgba(248,113,113,0.15)"
-                      : "rgba(245,158,11,0.1)",
-                    color: isRegen ? colors.danger : "#f59e0b",
-                    border: isRegen
-                      ? `1px solid ${colors.dangerBorder}`
-                      : "1px solid rgba(245,158,11,0.2)",
-                    borderRadius: radii.sm,
-                    cursor: !isRegen && !genId ? "default" : "pointer",
-                    fontFamily: fonts.sans,
-                    opacity: genId ? 1 : 0.3,
-                    flexShrink: 0,
-                  }}
-                >
-                  {isRegen ? t.cancel : t.chunkRegen}
-                </button>
+                {chunk.qc_flagged && isQcExpanded && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      padding: "8px 10px",
+                      background: "rgba(245,158,11,0.06)",
+                      border: "1px solid rgba(245,158,11,0.2)",
+                      borderRadius: radii.sm,
+                      fontSize: typography.size.xs,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <p style={{ margin: 0, color: colors.textDim }}>
+                      <strong style={{ color: "#34d399" }}>{t.chunkQcExpected}:</strong>{" "}
+                      {chunk.text}
+                    </p>
+                    <p style={{ margin: 0, color: colors.textDim }}>
+                      <strong style={{ color: "#f59e0b" }}>{t.chunkQcTranscribed}:</strong>{" "}
+                      {chunk.qc_transcript ?? "—"}
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })}

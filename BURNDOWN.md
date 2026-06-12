@@ -151,7 +151,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | VOZ-09 | F2b | Reabrir sampler XTTS (tras VOZ-08; A/B HUMANO) | ABIERTO |
 | VOZ-10 | F2b | Conditioning multi-muestra (schema+UI+migración) | ABIERTO |
 | VOZ-11 | F2b | Fine-tuning: script + doc (entrena HUMANO) | ABIERTO (prep) |
-| QC-01 | F8 | QC ASR-diff por chunk + badges en ChunkMap | ABIERTO |
+| QC-01 | F8 | QC ASR-diff por chunk + badges en ChunkMap | RESUELTO — `services/qc.py` consume el núcleo VOZ-08 (`intelligibility.transcribe` bajo `gpu_semaphore` por chunk + `text_similarity` con `normalize_for_tts`); `POST /api/chapters/{id}/qc` puntúa cada chunk de la última generación done y persiste `qc_score`/`qc_transcript` en `takes` (migración SCHEMA_VERSION=3); el chunk map expone `qc_score`/`qc_flagged`/`qc_transcript` (flag calculado en lectura contra `settings.intelligibility_threshold` 0.90, así cambiar el umbral re-evalúa sin re-ASR) y regenerar un chunk limpia su veredicto obsoleto; resolución de audio por chunk: `take.file_path` → mp3 del job dir (solo edge-tts; los WAV clause-level de XTTS no se usan, índices distintos ⇒ skip antes que falso flag) → audio completo si chunk único; UI: botón "QC de audio" con loading en ChunkMap + badge ámbar con score y expansión esperado-vs-transcrito, i18n es/en; tests backend (8: saboteado ⇒ solo ese chunk marcado, "Dr." vs "Doctor" sin falso positivo, skip de clones multi-chunk, regen resetea QC, 404/400, migración v3) + 3 de UI (badge/expansión/flujo de botón) — F8 `feat(qc) QC-01` |
 | PROD-01 | F7 | `POST /api/engines/unload` (política GPU inter-proceso) | ABIERTO |
 | PROD-02 | F7 | ComfyUIProvider real (stack Apache, títulos, settings) | ABIERTO |
 | PROD-03 | F7 | Detección de escenas desde SRT | ABIERTO |

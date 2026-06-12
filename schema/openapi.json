@@ -1534,6 +1534,49 @@
         }
       }
     },
+    "/api/chapters/{chapter_id}/qc": {
+      "post": {
+        "tags": [
+          "chapter-synth"
+        ],
+        "summary": "Run ASR-diff QC on the chapter's completed generation",
+        "description": "Transcribe each chunk of the latest done generation and flag the\nones whose transcript diverges from the chapter text (QC-01).\n\nSynchronous like chapter synthesis: the response carries the full\nverdict. Transcription holds the shared GPU semaphore per chunk, so\nit serializes with XTTS/OpenVoice inference on CUDA. Scores persist\non the takes — the chunk map shows them on every subsequent load.",
+        "operationId": "qc_chapter_api_chapters__chapter_id__qc_post",
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chapter Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterQCResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chapters/{chapter_id}/upload-audio": {
       "post": {
         "tags": [
@@ -3610,6 +3653,52 @@
         "type": "object",
         "title": "ChapterCreate"
       },
+      "ChapterQCResponse": {
+        "properties": {
+          "generation_id": {
+            "type": "string",
+            "title": "Generation Id"
+          },
+          "threshold": {
+            "type": "number",
+            "title": "Threshold"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "scored": {
+            "type": "integer",
+            "title": "Scored"
+          },
+          "flagged": {
+            "type": "integer",
+            "title": "Flagged"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/ChunkQCInfo"
+            },
+            "type": "array",
+            "title": "Chunks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generation_id",
+          "threshold",
+          "total",
+          "scored",
+          "flagged",
+          "skipped",
+          "chunks"
+        ],
+        "title": "ChapterQCResponse"
+      },
       "ChapterResponse": {
         "properties": {
           "id": {
@@ -3820,6 +3909,33 @@
           "duration": {
             "type": "number",
             "title": "Duration"
+          },
+          "qc_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qc Score"
+          },
+          "qc_flagged": {
+            "type": "boolean",
+            "title": "Qc Flagged",
+            "default": false
+          },
+          "qc_transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qc Transcript"
           }
         },
         "type": "object",
@@ -3862,6 +3978,51 @@
           "total"
         ],
         "title": "ChunkMapResponse"
+      },
+      "ChunkQCInfo": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "qc_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qc Score"
+          },
+          "qc_flagged": {
+            "type": "boolean",
+            "title": "Qc Flagged"
+          },
+          "expected_text": {
+            "type": "string",
+            "title": "Expected Text"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "qc_flagged",
+          "expected_text"
+        ],
+        "title": "ChunkQCInfo"
       },
       "CoverUploadResponse": {
         "properties": {

@@ -629,6 +629,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapter_id}/qc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run ASR-diff QC on the chapter's completed generation
+         * @description Transcribe each chunk of the latest done generation and flag the
+         *     ones whose transcript diverges from the chapter text (QC-01).
+         *
+         *     Synchronous like chapter synthesis: the response carries the full
+         *     verdict. Transcription holds the shared GPU semaphore per chunk, so
+         *     it serializes with XTTS/OpenVoice inference on CUDA. Scores persist
+         *     on the takes � the chunk map shows them on every subsequent load.
+         */
+        post: operations["qc_chapter_api_chapters__chapter_id__qc_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chapters/{chapter_id}/upload-audio": {
         parameters: {
             query?: never;
@@ -1593,6 +1619,23 @@ export interface components {
             /** Profile Id */
             profile_id?: string | null;
         };
+        /** ChapterQCResponse */
+        ChapterQCResponse: {
+            /** Generation Id */
+            generation_id: string;
+            /** Threshold */
+            threshold: number;
+            /** Total */
+            total: number;
+            /** Scored */
+            scored: number;
+            /** Flagged */
+            flagged: number;
+            /** Skipped */
+            skipped: number;
+            /** Chunks */
+            chunks: components["schemas"]["ChunkQCInfo"][];
+        };
         /** ChapterResponse */
         ChapterResponse: {
             /** Id */
@@ -1655,6 +1698,15 @@ export interface components {
             take_id?: string | null;
             /** Duration */
             duration: number;
+            /** Qc Score */
+            qc_score?: number | null;
+            /**
+             * Qc Flagged
+             * @default false
+             */
+            qc_flagged: boolean;
+            /** Qc Transcript */
+            qc_transcript?: string | null;
         };
         /** ChunkMapResponse */
         ChunkMapResponse: {
@@ -1664,6 +1716,19 @@ export interface components {
             chunks: components["schemas"]["ChunkInfo"][];
             /** Total */
             total: number;
+        };
+        /** ChunkQCInfo */
+        ChunkQCInfo: {
+            /** Index */
+            index: number;
+            /** Qc Score */
+            qc_score?: number | null;
+            /** Qc Flagged */
+            qc_flagged: boolean;
+            /** Expected Text */
+            expected_text: string;
+            /** Transcript */
+            transcript?: string | null;
         };
         /** CoverUploadResponse */
         CoverUploadResponse: {
@@ -3696,6 +3761,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChunkMapResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    qc_chapter_api_chapters__chapter_id__qc_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChapterQCResponse"];
                 };
             };
             /** @description Validation Error */

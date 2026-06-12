@@ -462,7 +462,9 @@ async def create_takes(generation_id: str, takes: list[dict[str, Any]]) -> None:
 
 
 async def update_take(take_id: str, **fields: Any) -> None:
-    allowed = {"file_path", "duration", "score", "status"}
+    # ``qc_score`` / ``qc_transcript`` accept None on purpose: a chunk
+    # regen must clear its stale QC result (the audio changed).
+    allowed = {"file_path", "duration", "score", "status", "qc_score", "qc_transcript"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return

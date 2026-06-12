@@ -22,10 +22,12 @@ from pydub import AudioSegment
 
 from ..cancellation import create_cancellation_token
 from ..catalogs import AUDIO_FORMATS
+from ..config import settings
 from ..dependencies import get_tts_engine
 from ..exceptions import UnsupportedFormatError
 from ..paths import OUTPUT_DIR, TEMP_DIR
 from ..services import project_manager as pm
+from ..services import qc as qc_service
 from ..services.metadata import AudioMetadata, embed_metadata
 from ..services.progress import registry as progress_registry
 from ..services.tts_engine import TTSEngine, split_into_chunks
@@ -43,12 +45,35 @@ class ChunkInfo(BaseModel):
     status: str
     take_id: str | None = None
     duration: float
+    # ASR-diff QC (QC-01). ``qc_score`` is None until a QC pass runs
+    # (or when no per-chunk audio was available to transcribe).
+    qc_score: float | None = None
+    qc_flagged: bool = False
+    qc_transcript: str | None = None
 
 
 class ChunkMapResponse(BaseModel):
     generation_id: str | None = None
     chunks: list[ChunkInfo]
     total: int
+
+
+class ChunkQCInfo(BaseModel):
+    index: int
+    qc_score: float | None = None
+    qc_flagged: bool
+    expected_text: str
+    transcript: str | None = None
+
+
+class ChapterQCResponse(BaseModel):
+    generation_id: str
+    threshold: float
+    total: int
+    scored: int
+    flagged: int
+    skipped: int
+    chunks: list[ChunkQCInfo]
 
 
 class UploadedChapterGenerationResponse(BaseModel):
@@ -236,7 +261,11 @@ async def regenerate_chunk(
     takes = await pm.list_takes(gen_id)
     existing = next((t for t in takes if t["chunk_index"] == chunk_index), None)
     if existing:
-        await pm.update_take(existing["id"], file_path=str(chunk_audio), status="done")
+        # New audio invalidates any previous QC verdict for this chunk.
+        await pm.update_take(
+            existing["id"], file_path=str(chunk_audio), status="done",
+            qc_score=None, qc_transcript=None,
+        )
     else:
         await pm.create_take(
             generation_id=gen_id,
@@ -334,18 +363,73 @@ async def get_chunk_map(chapter_id: str) -> dict:
     result = []
     for i, text in enumerate(chunks):
         take = take_map.get(i)
+        qc_score = take.get("qc_score") if take else None
+        transcript = take.get("qc_transcript") if take else None
         result.append({
             "index": i,
             "text": text[:200],
             "status": take["status"] if take else "pending",
             "take_id": take["id"] if take else None,
             "duration": take["duration"] if take else 0,
+            "qc_score": qc_score,
+            # Flag computed at read time so changing the threshold
+            # setting re-evaluates stored scores without re-running ASR.
+            "qc_flagged": qc_score is not None and qc_score < settings.intelligibility_threshold,
+            "qc_transcript": transcript[:200] if transcript else None,
         })
 
     return {
         "generation_id": gen["id"],
         "chunks": result,
         "total": len(chunks),
+    }
+
+
+@router.post(
+    "/{chapter_id}/qc",
+    summary="Run ASR-diff QC on the chapter's completed generation",
+    response_model=ChapterQCResponse,
+)
+async def qc_chapter(chapter_id: str) -> dict:
+    """Transcribe each chunk of the latest done generation and flag the
+    ones whose transcript diverges from the chapter text (QC-01).
+
+    Synchronous like chapter synthesis: the response carries the full
+    verdict. Transcription holds the shared GPU semaphore per chunk, so
+    it serializes with XTTS/OpenVoice inference on CUDA. Scores persist
+    on the takes — the chunk map shows them on every subsequent load.
+    """
+    chapter = await pm.get_chapter(chapter_id)
+    if chapter is None:
+        raise HTTPException(404, "Chapter not found")
+
+    gens = await pm.list_generations(chapter_id)
+    gen = next((g for g in gens if g["status"] == "done"), None)
+    if gen is None:
+        raise HTTPException(400, "No completed generation to QC")
+
+    project = await pm.get_project(chapter["project_id"])
+    language = project["language"] if project else None
+
+    outcomes = await qc_service.run_chapter_qc(chapter, gen, language=language)
+
+    return {
+        "generation_id": gen["id"],
+        "threshold": settings.intelligibility_threshold,
+        "total": len(outcomes),
+        "scored": sum(1 for o in outcomes if o.score is not None),
+        "flagged": sum(1 for o in outcomes if o.flagged),
+        "skipped": sum(1 for o in outcomes if o.score is None),
+        "chunks": [
+            {
+                "index": o.index,
+                "qc_score": o.score,
+                "qc_flagged": o.flagged,
+                "expected_text": o.expected_text[:200],
+                "transcript": o.transcript[:200] if o.transcript else None,
+            }
+            for o in outcomes
+        ],
     }
 
 

@@ -314,6 +314,13 @@ export const es = {
   chunkRegenerating: "...",
   chunkOpenInStudio: "Editar en Studio",
   chunkEditedCount: "{n} ediciones",
+  chunkQcRun: "QC de audio",
+  chunkQcRunning: "Analizando audio...",
+  chunkQcToast: "QC: {flagged} de {scored} fragmentos marcados",
+  chunkQcBadge: "QC {score}%",
+  chunkQcBadgeHint: "La transcripción no coincide con el texto — pulsa para comparar",
+  chunkQcExpected: "Esperado",
+  chunkQcTranscribed: "Transcrito",
 
   // ── Character casting ────────────────────────────────────────────
   castingNoTagsFound: "No se han encontrado etiquetas de personajes. Usa [Nombre] al inicio de las líneas.",
