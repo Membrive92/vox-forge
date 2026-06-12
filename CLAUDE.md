@@ -212,9 +212,13 @@ src/
 │   ├── ErrorBoundary.tsx      # Friendly crash UI (navigator.language → locale)
 │   ├── AudioRecorder.tsx      # Microphone recording (MediaRecorder API)
 │   ├── Toast.tsx              # Toast stack with per-type icons + progress bar
+│   ├── JobsTray.tsx           # Header dropdown of tracked jobs (UX-01)
+│   ├── JobsProgressBar.tsx    # Thin aggregate bar under the tab nav (UX-01)
 │   └── icons.tsx              # Inline SVGs
 ├── hooks/
 │   ├── useProfiles.ts         # Load + remote CRUD
+│   ├── jobsRegistry.ts        # Pure reducer of tracked background jobs (UX-01)
+│   ├── jobsContext.tsx        # JobsProvider + useJobs/useJobMirror (UX-01)
 │   ├── useSynthesis.ts        # Progress polling + API call + engine tracking
 │   ├── useAudioPlayer.ts      # Blob URL + play/pause/stop/seek/skip/rate
 │   ├── useDraftPersistence.ts # Autosave text to localStorage
