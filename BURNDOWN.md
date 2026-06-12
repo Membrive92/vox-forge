@@ -19,7 +19,9 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 **Estados**: `RESUELTO-PREVIO` · `ABIERTO` · `NO-REPRODUCIBLE` · `WONTFIX` (justificado) · `HUMANO-PENDIENTE` · `DIFERIDO` (solo §F9).
 
-**Recuento** (triaje F0, actualizado tras F4): Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios **33/33 resueltos** (MED-ARQ-4 cerrado en F4) · Bajos 25/38 resueltos, **13 abiertos** (BAJO-16/27/28/29/30/31/32 cerrados en F4; quedan los de F5/F6 y varios menores) · Nuevos (fuentes 2 y 3): ver tabla (F2/F2b/F8 cerrados salvo gates HUMANO; F7/F9 pendientes).
+**Recuento** (actualizado tras F1–F8 + F7/UX, 2026-06-12): Críticos 3/3 · Altos 13/13 · Medios **33/33** · Bajos 26/38 — **12 abiertos** (menores misceláneos: BAJO-1,4,5,6,7,8,10,11,12,13,14,15; barrido final pendiente) · Nuevos: F2/F2b/F8 y F7 (PROD-01..04, UX-01/02) **cerrados** salvo gates HUMANO (VOZ-06, VOZ-09 A/B, PROD-05); F9 DIFERIDO.
+
+**Gates post-ejecución (verificados 2026-06-12)**: backend **386 passed** · frontend **100 passed** (18 ficheros) · typecheck limpio · e2e 12+3 (corrido en UX-01) · phase vocoder: **0 referencias** · WorkbenchTab: **568 líneas** (<600) · 33 commits en `remediation`, árbol limpio.
 
 ---
 
