@@ -6,11 +6,8 @@ import {
   type Generation,
   type Project,
 } from "@/api/projects";
-import { uploadChapterAudio } from "@/api/chapterSynth";
-import { isAbortError } from "@/api/client";
 import {
   listStudioRenders,
-  renderVideo,
   type StudioRender,
 } from "@/api/studio";
 import { Button } from "@/components/Button";
@@ -18,18 +15,17 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
 import { logger } from "@/logging/logger";
-import { ALL_VOICES, VOICES } from "@/constants/voices";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, space, transitions, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
 
 import { AmbienceMixer } from "./AmbienceMixer";
-import { ChapterRecorder } from "./ChapterRecorder";
+import { ChapterAudioPanel } from "./ChapterAudioPanel";
+import { ChapterVideoActions } from "./ChapterVideoActions";
+import { ChapterVoicePicker } from "./ChapterVoicePicker";
 import { CharacterCasting } from "./CharacterCasting";
 import { ChunkMap } from "./ChunkMap";
 import { QuickPreview } from "./QuickPreview";
-import { relativeTime } from "./workbenchHelpers";
-import { getGenerationAudioUrl } from "@/api/studio";
 
 // ── ChapterCard + its private subcomponents ──────────────────────
 
@@ -80,12 +76,6 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
   const [renders, setRenders] = useState<StudioRender[]>([]);
   const [statusLoaded, setStatusLoaded] = useState(false);
   const [statusError, setStatusError] = useState(false);
-  const [isRendering, setIsRendering] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [recorderOpen, setRecorderOpen] = useState(false);
-  const [isSavingRecording, setIsSavingRecording] = useState(false);
-  const uploadInputRef = useRef<HTMLInputElement>(null);
-  const renderAbortRef = useRef<AbortController | null>(null);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -114,7 +104,6 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
   useEffect(() => {
     if (!collapsed) void loadStatus();
   }, [collapsed, loadStatus]);
-  useEffect(() => () => { renderAbortRef.current?.abort(); }, []);
 
   const latestDoneGen = generations.find((g) => g.status === "done" && g.file_path);
   // ``generations`` is sorted newest-first; if the newest hasn't
@@ -148,75 +137,6 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
     // must expand it, or the toggle would appear to do nothing.
     setCollapsed(false);
     setActivePanel((prev) => (prev === key ? null : key));
-  };
-
-  const handleRenderVideo = async (): Promise<void> => {
-    // Use the chapter's active take, falling back to newest done.
-    const source = chapter.active_generation_id
-      ? generations.find((g) => g.id === chapter.active_generation_id) ?? latestDoneGen
-      : latestDoneGen;
-    if (!source?.file_path) return;
-    if (!project.cover_path) {
-      onToast(t.workbenchNeedCoverFirst);
-      return;
-    }
-    const controller = new AbortController();
-    renderAbortRef.current = controller;
-    setIsRendering(true);
-    try {
-      await renderVideo(
-        {
-          audio_path: source.file_path,
-          cover_path: project.cover_path,
-          project_id: project.id,
-          chapter_id: chapter.id,
-          options: { title_text: chapter.title, subtitles_mode: "none" },
-        },
-        controller.signal,
-      );
-      onToast(t.workbenchVideoReady);
-      await loadStatus();
-    } catch (e) {
-      if (isAbortError(e)) {
-        onToast(t.renderCancelled);
-      } else {
-        onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
-      }
-    } finally {
-      setIsRendering(false);
-      if (renderAbortRef.current === controller) renderAbortRef.current = null;
-    }
-  };
-
-  const handleCancelRender = (): void => {
-    renderAbortRef.current?.abort();
-  };
-
-  const handleUploadAudio = async (file: File): Promise<void> => {
-    setIsUploading(true);
-    try {
-      await uploadChapterAudio(chapter.id, file);
-      onToast(t.chapterUploadSuccess);
-      await loadStatus();
-    } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleSaveRecording = async (file: File): Promise<void> => {
-    setIsSavingRecording(true);
-    try {
-      await uploadChapterAudio(chapter.id, file);
-      onToast(t.chapterUploadSuccess);
-      setRecorderOpen(false);
-      await loadStatus();
-    } catch (e) {
-      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
-    } finally {
-      setIsSavingRecording(false);
-    }
   };
 
   const handleSetActiveGeneration = async (genId: string | null): Promise<void> => {
@@ -430,22 +350,14 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
         )}
         <div style={{ flex: 1 }} />
         {latestDoneGen && (
-          isRendering ? (
-            <Button variant="danger" size="sm" onClick={handleCancelRender}>
-              {t.cancel}
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Icons.Mic />}
-              onClick={() => void handleRenderVideo()}
-              disabled={!project.cover_path}
-              title={!project.cover_path ? t.workbenchNeedCoverFirst : undefined}
-            >
-              {t.workbenchRenderVideo}
-            </Button>
-          )
+          <ChapterVideoActions
+            t={t}
+            chapter={chapter}
+            project={project}
+            source={activeGen}
+            onToast={onToast}
+            onReloadStatus={loadStatus}
+          />
         )}
       </div>
 
@@ -483,145 +395,16 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
             }}
           />
 
-          {/* Audio playback panel for uploaded/recorded/synthesized audio */}
-          {activeGen?.status === "done" && activeGen?.file_path && (
-            <div
-              style={{
-                marginTop: space[3],
-                padding: space[3],
-                background: colors.surfaceAlt,
-                border: `1px solid ${colors.borderSubtle}`,
-                borderRadius: radii.md,
-                display: "flex",
-                flexDirection: "column",
-                gap: space[2],
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: space[2] }}>
-                <div style={{ flex: 1 }}>
-                  <audio
-                    controls
-                    src={getGenerationAudioUrl(activeGen.file_path)}
-                    style={{
-                      width: "100%",
-                      maxWidth: "100%",
-                    }}
-                  />
-                </div>
-                <div style={{ display: "flex", gap: space[2], flexWrap: "wrap", fontSize: typography.size.xs }}>
-                  {activeGen.duration && (
-                    <span
-                      style={{
-                        padding: "2px 8px",
-                        background: colors.primarySoft,
-                        color: colors.primaryLight,
-                        borderRadius: radii.sm,
-                        fontFamily: fonts.mono,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {activeGen.duration.toFixed(1)}s
-                    </span>
-                  )}
-                  <span
-                    style={{
-                      padding: "2px 8px",
-                      background: colors.surface,
-                      color: colors.textMuted,
-                      border: `1px solid ${colors.borderSubtle}`,
-                      borderRadius: radii.sm,
-                      fontFamily: fonts.mono,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {activeGen.engine === "upload"
-                      ? t.chapterTakeEngineUpload
-                      : activeGen.engine === "recording" || activeGen.engine === "record"
-                        ? t.chapterTakeEngineRecord
-                        : t.chapterTakeEngineTts}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={<Icons.Edit />}
-                    onClick={() => onOpenStudioWithSource(activeGen.id)}
-                  >
-                    {t.chapterEditInStudio}
-                  </Button>
-                </div>
-              </div>
-              {(activeGen.engine === "recording" || activeGen.engine === "record") && (
-                <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim }}>
-                  {t.chapterRecordedTakeNote}
-                </p>
-              )}
-              {activeGen.engine === "upload" && (
-                <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim }}>
-                  {t.chapterUploadTakeNote}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Audio source row: upload / record / pick active take */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: space[2],
-              marginTop: space[2],
-              flexWrap: "wrap",
-            }}
-          >
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept=".wav,.mp3,.ogg,.flac,.webm,.m4a"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleUploadAudio(f);
-                e.target.value = "";
-              }}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              loading={isUploading}
-              onClick={() => uploadInputRef.current?.click()}
-              icon={<Icons.Upload />}
-            >
-              {t.chapterUploadAudio}
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<Icons.Mic />}
-              onClick={() => setRecorderOpen(true)}
-            >
-              {t.chapterRecord}
-            </Button>
-            <div style={{ flex: 1 }} />
-            {generations.length > 1 && (
-              <TakeSelector
-                t={t}
-                generations={generations}
-                activeId={activeGen?.id ?? null}
-                onChange={handleSetActiveGeneration}
-              />
-            )}
-          </div>
-
-          {recorderOpen && (
-            <div style={{ marginTop: space[3] }}>
-              <ChapterRecorder
-                t={t}
-                isSaving={isSavingRecording}
-                onSave={handleSaveRecording}
-                onCancel={() => setRecorderOpen(false)}
-              />
-            </div>
-          )}
+          <ChapterAudioPanel
+            t={t}
+            chapterId={chapter.id}
+            activeGen={activeGen}
+            generations={generations}
+            onToast={onToast}
+            onOpenStudioWithSource={onOpenStudioWithSource}
+            onSetActiveGeneration={handleSetActiveGeneration}
+            onReloadStatus={loadStatus}
+          />
 
           {activePanel === "preview" && (
             <div style={{ marginTop: space[3] }}>
@@ -672,7 +455,6 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
   );
 }
 
-// Consistent toolbar button — one style for all 4 tools, only active state differs.
 // Small inline chip used in the status row. If ``onClick`` is provided
 // and ``active``, renders as a clickable link (e.g. "2 edits" jumps to
 // Studio); otherwise it's a passive indicator.
@@ -709,6 +491,7 @@ function StatusChip({
   return <span style={baseStyle}>{label}</span>;
 }
 
+// Consistent toolbar button — one style for all 3 tools, only active state differs.
 function ToolToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
@@ -732,195 +515,3 @@ function ToolToggle({ label, active, onClick }: { label: string; active: boolean
     </button>
   );
 }
-
-
-
-// ── TakeSelector ───────────────────────────────────────────────────
-
-interface TakeSelectorProps {
-  t: Translations;
-  generations: readonly Generation[];
-  activeId: string | null;
-  onChange: (genId: string | null) => Promise<void> | void;
-}
-
-function TakeSelector({ t, generations, activeId, onChange }: TakeSelectorProps) {
-  const engineLabel = (engine: string): string => {
-    if (engine === "upload") return t.chapterTakeEngineUpload;
-    if (engine === "recording" || engine === "record") return t.chapterTakeEngineRecord;
-    return t.chapterTakeEngineTts;
-  };
-
-  return (
-    <label
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: space[1],
-        fontSize: typography.size.xs,
-        color: colors.textDim,
-      }}
-    >
-      {t.chapterTakes}
-      <select
-        value={activeId ?? ""}
-        onChange={(e) => void onChange(e.target.value || null)}
-        style={{
-          padding: "4px 8px",
-          borderRadius: radii.sm,
-          background: colors.surfaceAlt,
-          border: `1px solid ${colors.border}`,
-          color: colors.text,
-          fontSize: typography.size.xs,
-          fontFamily: fonts.sans,
-          cursor: "pointer",
-        }}
-      >
-        {generations.map((g) => {
-          const dur = g.duration ? `${g.duration.toFixed(1)}s` : "—";
-          const label = t.chapterTakeLabel
-            .replace("{engine}", engineLabel(g.engine))
-            .replace("{when}", relativeTime(g.created_at, t))
-            .replace("{dur}", dur);
-          return (
-            <option key={g.id} value={g.id}>
-              {label}{g.status !== "done" ? ` · ${g.status}` : ""}
-            </option>
-          );
-        })}
-      </select>
-    </label>
-  );
-}
-
-// ── ChapterVoicePicker ──────────────────────────────────────────────
-
-interface ChapterVoicePickerProps {
-  t: Translations;
-  chapter: Chapter;
-  project: Project;
-  profiles: readonly Profile[];
-  onChange: (voiceId: string | null, profileId: string | null) => void;
-}
-
-// Small inline select that lets a chapter override its voice without
-// duplicating the full project selector. Value encoding:
-//   "inherit"          → fall back to project (both fields cleared)
-//   "voice:<id>"       → system voice override
-//   "profile:<id>"     → cloned profile override
-function ChapterVoicePicker({ t, chapter, project, profiles, onChange }: ChapterVoicePickerProps) {
-  const currentValue = chapter.profile_id
-    ? `profile:${chapter.profile_id}`
-    : chapter.voice_id
-      ? `voice:${chapter.voice_id}`
-      : "inherit";
-
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
-    const raw = e.target.value;
-    if (raw === "inherit") {
-      onChange(null, null);
-      return;
-    }
-    if (raw.startsWith("profile:")) {
-      const id = raw.slice("profile:".length);
-      const p = profiles.find((pp) => pp.id === id);
-      if (!p) return;
-      onChange(p.voiceId, p.id);
-    } else if (raw.startsWith("voice:")) {
-      onChange(raw.slice("voice:".length), null);
-    }
-  };
-
-  const profilesWithSample = profiles.filter((p) => p.samples.length > 0);
-  const isInheriting = currentValue === "inherit";
-
-  // Label shown when inheriting — derive from the project's active voice
-  // so the user sees "(heredado: Álvaro)" instead of a bare "heredar".
-  const inheritedLabel =
-    project.profile_id
-      ? profiles.find((p) => p.id === project.profile_id)?.name ?? project.voice_id
-      : ALL_VOICES.find((v) => v.id === project.voice_id)?.name ?? project.voice_id;
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: space[2],
-        marginTop: space[3],
-      }}
-    >
-      <label
-        style={{
-          fontSize: typography.size.xs,
-          color: colors.textDim,
-          fontWeight: typography.weight.semibold,
-          textTransform: "uppercase",
-          letterSpacing: "1px",
-        }}
-      >
-        {t.chapterVoice}
-      </label>
-      <select
-        value={currentValue}
-        onChange={handleChange}
-        style={{
-          padding: "4px 8px",
-          borderRadius: radii.sm,
-          background: colors.surfaceAlt,
-          border: `1px solid ${isInheriting ? colors.borderFaint : colors.primaryBorder}`,
-          color: colors.text,
-          fontSize: typography.size.xs,
-          fontFamily: fonts.sans,
-          cursor: "pointer",
-          minWidth: 220,
-        }}
-      >
-        <option value="inherit">
-          {t.chapterVoiceInherit.replace("{name}", inheritedLabel)}
-        </option>
-        {profilesWithSample.length > 0 && (
-          <optgroup label={t.castingClonedProfiles}>
-            {profilesWithSample.map((p) => (
-              <option key={p.id} value={`profile:${p.id}`}>
-                {p.name}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        <optgroup label={`${t.castingSystemVoices} — ${t.voicesLangSpanish}`}>
-          {VOICES.es.map((v) => (
-            <option key={v.id} value={`voice:${v.id}`}>
-              {v.name} · {v.accent}
-            </option>
-          ))}
-        </optgroup>
-        <optgroup label={`${t.castingSystemVoices} — ${t.voicesLangEnglish}`}>
-          {VOICES.en.map((v) => (
-            <option key={v.id} value={`voice:${v.id}`}>
-              {v.name} · {v.accent}
-            </option>
-          ))}
-        </optgroup>
-      </select>
-      {!isInheriting && (
-        <button
-          type="button"
-          onClick={() => onChange(null, null)}
-          title={t.chapterVoiceClear}
-          style={{
-            background: "none",
-            border: "none",
-            color: colors.textFaint,
-            cursor: "pointer",
-            fontSize: typography.size.xs,
-            padding: "2px 6px",
-          }}
-        >
-          ×
-        </button>
-      )}
-    </div>
-  );
-}
-
