@@ -66,6 +66,33 @@ function renderChunkMap(onToast = vi.fn()) {
   return onToast;
 }
 
+describe("ChunkMap load failures (BAJO-16)", () => {
+  it("shows an error with a retry that reloads the map", async () => {
+    let failures = 0;
+    server.use(
+      http.get("/api/chapters/:id/chunks", () => {
+        failures += 1;
+        return HttpResponse.json({ detail: "boom" }, { status: 500 });
+      }),
+      http.get("/api/studio/renders", () => HttpResponse.json({ renders: [] })),
+    );
+    renderChunkMap();
+    const user = userEvent.setup();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(es.chunkMapLoadError);
+
+    // Retry against a recovered backend renders the chunks normally.
+    mockChunkMap([chunk({ index: 0 })]);
+    await user.click(screen.getByRole("button", { name: es.retry }));
+
+    await screen.findByText("La noche era oscura y tranquila.");
+    expect(failures).toBe(1);
+    expect(screen.queryByRole("alert")).toBeNull();
+    await editsChipSettled(1);
+  });
+});
+
 describe("ChunkMap QC badges", () => {
   it("shows an amber QC badge only on flagged chunks", async () => {
     mockChunkMap([

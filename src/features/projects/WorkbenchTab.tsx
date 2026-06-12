@@ -22,6 +22,7 @@ import { useConfirm } from "@/components/ConfirmProvider";
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/Skeleton";
 import * as Icons from "@/components/icons";
+import { logger } from "@/logging/logger";
 import { ALL_VOICES, VOICES } from "@/constants/voices";
 import { useSharedProfiles } from "@/hooks/profilesContext";
 import { activateOnKey } from "@/utils/a11y";
@@ -61,11 +62,17 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
 
   // Surface interrupted synthesis jobs as a small banner so the user
   // can resume from the Workbench instead of remembering to go to Quick
-  // Synth. The full resume UI lives in SynthTab — we just nudge.
+  // Synth. The full resume UI lives in SynthTab — we just nudge. A
+  // failed probe only suppresses the nudge, but it gets logged (BAJO-16).
   useEffect(() => {
     void listIncompleteJobs()
       .then((r) => setIncompleteCount(r.count))
-      .catch(() => setIncompleteCount(0));
+      .catch((e: unknown) => {
+        setIncompleteCount(0);
+        logger.warn("Workbench: failed to probe incomplete jobs", {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      });
   }, []);
 
   const selected = projects.find((p) => p.id === selectedId) ?? null;

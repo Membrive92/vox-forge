@@ -17,6 +17,7 @@ import { Button } from "@/components/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
+import { logger } from "@/logging/logger";
 import { ALL_VOICES, VOICES } from "@/constants/voices";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, space, transitions, typography } from "@/theme/tokens";
@@ -78,6 +79,7 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [renders, setRenders] = useState<StudioRender[]>([]);
   const [statusLoaded, setStatusLoaded] = useState(false);
+  const [statusError, setStatusError] = useState(false);
   const [isRendering, setIsRendering] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
@@ -93,7 +95,16 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
       ]);
       setGenerations(gens);
       setRenders(rnds);
-    } catch { /* non-critical */ } finally {
+      setStatusError(false);
+    } catch (e) {
+      // The chips, audio panel and take selector all hang off this
+      // fetch — a failure here is real, not "no data yet" (BAJO-16).
+      setStatusError(true);
+      logger.error("ChapterCard: failed to load chapter status", {
+        chapterId: chapter.id,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
       setStatusLoaded(true);
     }
   }, [chapter.id]);
@@ -343,8 +354,26 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
       >
         {/* Chips only render once the deferred status fetch resolved —
             a collapsed card that never loaded must not show "inactive"
-            chips for audio that actually exists. */}
-        {statusLoaded && (
+            chips for audio that actually exists. A failed fetch shows a
+            retry instead of lying with empty chips (BAJO-16). */}
+        {statusLoaded && statusError && (
+          <span
+            role="alert"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: space[2],
+              fontSize: typography.size.xs,
+              color: colors.danger,
+            }}
+          >
+            {t.chapterStatusLoadError}
+            <Button variant="ghost" size="sm" onClick={() => void loadStatus()}>
+              {t.retry}
+            </Button>
+          </span>
+        )}
+        {statusLoaded && !statusError && (
           <>
             <StatusChip
               label={t.chapterStatusSynth}

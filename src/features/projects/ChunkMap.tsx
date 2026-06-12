@@ -16,6 +16,7 @@ import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Skeleton } from "@/components/Skeleton";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { logger } from "@/logging/logger";
 import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, space, typography } from "@/theme/tokens";
@@ -48,6 +49,7 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
   const [genId, setGenId] = useState<string | null>(null);
   const [synthesizing, setSynthesizing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
   const [studioEdits, setStudioEdits] = useState<StudioRender[]>([]);
   const [qcRunning, setQcRunning] = useState(false);
@@ -66,18 +68,34 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
   const loadMap = useCallback(async () => {
     setLoading(true);
     try {
+      // "No generation yet" is a 200 with an empty chunk list, so any
+      // throw here is a real failure (network/server) — surface it with
+      // a retry instead of silently rendering an empty map (BAJO-16).
       const data = await getChunkMap(chapterId);
       setChunks(data.chunks);
       setGenId(data.generation_id);
-    } catch { /* first time — no generation yet */ } finally {
+      setLoadError(false);
+    } catch (e) {
+      setLoadError(true);
+      logger.error("ChunkMap: failed to load chunk map", {
+        chapterId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
       setLoading(false);
     }
     // Studio edits linked to this chapter — used to show an indicator
-    // and to let users jump back to any past version.
+    // and to let users jump back to any past version. Decorative: a
+    // failure only hides the chip, but it still gets logged.
     try {
       const edits = await listStudioRenders({ kind: "audio", chapterId });
       setStudioEdits(edits);
-    } catch { /* non-critical */ }
+    } catch (e) {
+      logger.warn("ChunkMap: failed to load studio edits", {
+        chapterId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }, [chapterId]);
 
   useEffect(() => { void loadMap(); }, [loadMap]);
@@ -272,6 +290,24 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} height={48} radius={6} />
           ))}
+        </div>
+      ) : loadError ? (
+        <div
+          role="alert"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            padding: 20,
+            fontSize: typography.size.sm,
+            color: colors.danger,
+          }}
+        >
+          {t.chunkMapLoadError}
+          <Button variant="secondary" size="sm" onClick={() => void loadMap()}>
+            {t.retry}
+          </Button>
         </div>
       ) : chunks.length === 0 ? (
         <p style={{ fontSize: typography.size.sm, color: colors.textDim, textAlign: "center", padding: 20 }}>

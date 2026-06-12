@@ -112,7 +112,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-13 | AmbienceMixer 2 players sin throttle | **ABIERTO** | AmbienceMixer.tsx:42 (cae con MED-PERF-F2) |
 | BAJO-14 | useErrorBadge sin pausa en hidden | **ABIERTO** | useErrorBadge.ts:20 |
 | BAJO-15 | HTTPException sin mensaje amigable | **ABIERTO** | chapter_synth.py:48+ |
-| BAJO-16 | `catch {}` vacíos | **ABIERTO** | WorkbenchTab.tsx:118, ChunkMap.tsx:50,58 |
+| BAJO-16 | `catch {}` vacíos | RESUELTO | "Sin datos" ya no se confunde con fallo: el chunk-map vacío es un 200, así que el catch de `getChunkMap` es fallo real ⇒ logger.error + alerta con Reintentar; `loadStatus` de ChapterCard igual (chips/panel de audio ya no mienten en vacío); fetches decorativos (studio edits, sonda de incomplete jobs) ⇒ logger.warn con degradación explícita; test UI del branch de error+retry — F4 |
 | BAJO-17 | Resume concurrente mismo job_id | RESUELTO | resume devuelve 409 si `status=="running"` (check+start sin await, race-free); /synthesize acuña id fresco si el header está en vuelo; chunks con `os.replace` atómico — 479aafa |
 | BAJO-18 | Takes done sin file_path | RESUELTO-PREVIO | chapter_synth.py:150,239,245 persisten file_path |
 | BAJO-19 | Nav sin tablist/tab | RESUELTO-PREVIO | ARIA tabs completo (App.tsx:490+) — d6777a7 |
