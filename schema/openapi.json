@@ -2926,6 +2926,28 @@
         }
       }
     },
+    "/api/engines/unload": {
+      "post": {
+        "tags": [
+          "engines"
+        ],
+        "summary": "Unload GPU models to free VRAM for external processes",
+        "description": "Unload XTTS + OpenVoice and empty the CUDA cache.\n\nAcquires the shared GPU semaphore first so a model is never pulled\nout from under a running inference: the call waits until the GPU\nis idle, then unloads while still holding the lock.",
+        "operationId": "unload_engines_api_engines_unload_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnginesUnloadResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -4167,6 +4189,28 @@
           "database"
         ],
         "title": "DiskUsage"
+      },
+      "EnginesUnloadResponse": {
+        "properties": {
+          "unloaded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unloaded"
+          },
+          "cuda_cache_cleared": {
+            "type": "boolean",
+            "title": "Cuda Cache Cleared"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unloaded",
+          "cuda_cache_cleared"
+        ],
+        "title": "EnginesUnloadResponse",
+        "description": "Result of ``POST /api/engines/unload`` (PROD-01).\n\n``unloaded`` lists the engines that actually released a resident\nmodel (``\"xtts\"``, ``\"openvoice\"``); engines that were not loaded\nare omitted. ``cuda_cache_cleared`` is False when torch or CUDA is\nunavailable."
       },
       "ExtractCharactersRequest": {
         "properties": {

@@ -233,6 +233,19 @@ class TTSEngine:
             self._clone_engine = CloneEngine()
         return self._clone_engine
 
+    def unload_clone_engine(self) -> bool:
+        """Unload the XTTS model if the lazy clone engine holds one.
+
+        Returns True when a resident model was actually released. Used
+        by ``POST /api/engines/unload`` (PROD-01) to free VRAM before
+        heavy external GPU loads (ComfyUI). Never instantiates the
+        clone engine just to unload it.
+        """
+        if self._clone_engine is None or not self._clone_engine.is_loaded:
+            return False
+        self._clone_engine.unload_model()
+        return True
+
     def resolve_routing(self, request: SynthesisRequest) -> RoutingDecision:
         """Resolve profile data and decide which engine will handle a request.
 

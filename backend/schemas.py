@@ -116,6 +116,19 @@ class DeletedResponse(BaseModel):
     id: str
 
 
+class EnginesUnloadResponse(BaseModel):
+    """Result of ``POST /api/engines/unload`` (PROD-01).
+
+    ``unloaded`` lists the engines that actually released a resident
+    model (``"xtts"``, ``"openvoice"``); engines that were not loaded
+    are omitted. ``cuda_cache_cleared`` is False when torch or CUDA is
+    unavailable.
+    """
+
+    unloaded: list[str]
+    cuda_cache_cleared: bool
+
+
 class LogEntry(BaseModel):
     """Single parsed log line."""
 

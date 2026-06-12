@@ -1213,6 +1213,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engines/unload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unload GPU models to free VRAM for external processes
+         * @description Unload XTTS + OpenVoice and empty the CUDA cache.
+         *
+         *     Acquires the shared GPU semaphore first so a model is never pulled
+         *     out from under a running inference: the call waits until the GPU
+         *     is idle, then unloads while still holding the lock.
+         */
+        post: operations["unload_engines_api_engines_unload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1791,6 +1815,21 @@ export interface components {
             jobs: string;
             /** Database */
             database: string;
+        };
+        /**
+         * EnginesUnloadResponse
+         * @description Result of ``POST /api/engines/unload`` (PROD-01).
+         *
+         *     ``unloaded`` lists the engines that actually released a resident
+         *     model (``"xtts"``, ``"openvoice"``); engines that were not loaded
+         *     are omitted. ``cuda_cache_cleared`` is False when torch or CUDA is
+         *     unavailable.
+         */
+        EnginesUnloadResponse: {
+            /** Unloaded */
+            unloaded: string[];
+            /** Cuda Cache Cleared */
+            cuda_cache_cleared: boolean;
         };
         /** ExtractCharactersRequest */
         ExtractCharactersRequest: {
@@ -4796,6 +4835,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unload_engines_api_engines_unload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnginesUnloadResponse"];
                 };
             };
         };
