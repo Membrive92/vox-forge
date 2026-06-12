@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     # Seconds of reference audio used for GPT voice conditioning.
     xtts_gpt_cond_len: int = Field(default=30, ge=1, le=60)
 
+    # Fine-tuned XTTS checkpoint (VOZ-11). Directory produced by the
+    # Coqui/AllTalk fine-tuning pipeline, containing at least
+    # config.json + model.pth + vocab.json — see
+    # internal-docs/xtts-finetune.md. Default None = stock XTTS v2.
+    # Override via VOXFORGE_XTTS_CHECKPOINT_DIR.
+    xtts_checkpoint_dir: Path | None = None
+
     # Maintenance
     cleanup_max_age_hours: int = 24
 

@@ -910,6 +910,81 @@ class TestExperimentalEndpointSpeed:
 
 
 # ---------------------------------------------------------------------------
+# 4b. Fine-tuned checkpoint loading (VOZ-11)
+#
+# settings.xtts_checkpoint_dir points VoxForge at a fine-tuned XTTS
+# model directory (config.json + model.pth + vocab.json). Default None
+# loads the stock XTTS v2 by model name.
+# ---------------------------------------------------------------------------
+
+
+def _install_fake_tts_api(monkeypatch: pytest.MonkeyPatch, captured: dict) -> None:
+    """Inject a fake ``TTS.api`` module (coqui-tts is not installed in CI)."""
+    import sys
+    import types
+
+    class _FakeTTS:
+        def __init__(
+            self,
+            model_name: str | None = None,
+            model_path: str | None = None,
+            config_path: str | None = None,
+        ) -> None:
+            captured["model_name"] = model_name
+            captured["model_path"] = model_path
+            captured["config_path"] = config_path
+
+        def to(self, _device: str) -> "_FakeTTS":
+            return self
+
+    fake_api = types.ModuleType("TTS.api")
+    fake_api.TTS = _FakeTTS  # type: ignore[attr-defined]
+    fake_pkg = types.ModuleType("TTS")
+    fake_pkg.api = fake_api  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "TTS", fake_pkg)
+    monkeypatch.setitem(sys.modules, "TTS.api", fake_api)
+
+
+class TestFinetunedCheckpointLoading:
+    """load_model must honor settings.xtts_checkpoint_dir (VOZ-11)."""
+
+    def test_default_loads_stock_model_by_name(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from backend.config import settings
+        from backend.services.clone_engine import XTTS_MODEL_NAME, CloneEngine
+
+        assert settings.xtts_checkpoint_dir is None, "default must be stock model"
+        captured: dict = {}
+        _install_fake_tts_api(monkeypatch, captured)
+
+        engine = CloneEngine()
+        engine.load_model()
+
+        assert engine.is_loaded
+        assert captured["model_name"] == XTTS_MODEL_NAME
+        assert captured["model_path"] is None
+
+    def test_checkpoint_dir_loads_finetuned_model(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from backend.config import settings
+        from backend.services.clone_engine import CloneEngine
+
+        captured: dict = {}
+        _install_fake_tts_api(monkeypatch, captured)
+        monkeypatch.setattr(settings, "xtts_checkpoint_dir", tmp_path)
+
+        engine = CloneEngine()
+        engine.load_model()
+
+        assert engine.is_loaded
+        assert captured["model_name"] is None
+        assert captured["model_path"] == str(tmp_path)
+        assert captured["config_path"] == str(tmp_path / "config.json")
+
+
+# ---------------------------------------------------------------------------
 # 5. Sampler parameters (VOZ-09)
 #
 # The decoding params were strangled to near-greedy emergency values

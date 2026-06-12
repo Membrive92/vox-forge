@@ -1,7 +1,8 @@
 node_modules/
 dist/
 data/
-tools/
+# Bundled ffmpeg distribution (binaries) — tools/finetune/ IS tracked
+tools/ffmpeg/
 models/
 processed/
 .env

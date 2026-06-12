@@ -126,16 +126,33 @@ class CloneEngine:
 
         Called lazily on first synthesis request, or can be called
         eagerly at startup to avoid first-request latency.
+
+        When ``settings.xtts_checkpoint_dir`` is set (VOZ-11), that
+        directory is loaded as a fine-tuned XTTS checkpoint
+        (config.json + model.pth + vocab.json, as produced by the
+        Coqui/AllTalk trainer — see internal-docs/xtts-finetune.md).
+        Default ``None`` loads the stock XTTS v2 model.
         """
         if self._model is not None:
             return
 
-        logger.info("Loading XTTS v2 model on %s (this may take a moment)...", self._device)
         from TTS.api import TTS as TTSApi
 
-        self._model = TTSApi(XTTS_MODEL_NAME).to(self._device)
+        checkpoint_dir = settings.xtts_checkpoint_dir
+        if checkpoint_dir is not None:
+            logger.info(
+                "Loading fine-tuned XTTS checkpoint from %s on %s (this may take a moment)...",
+                checkpoint_dir, self._device,
+            )
+            self._model = TTSApi(
+                model_path=str(checkpoint_dir),
+                config_path=str(checkpoint_dir / "config.json"),
+            ).to(self._device)
+        else:
+            logger.info("Loading XTTS v2 model on %s (this may take a moment)...", self._device)
+            self._model = TTSApi(XTTS_MODEL_NAME).to(self._device)
         self._generation_count = 0
-        logger.info("XTTS v2 model loaded successfully on %s", self._device)
+        logger.info("XTTS model loaded successfully on %s", self._device)
 
     def unload_model(self) -> None:
         """Unload model from GPU memory."""
