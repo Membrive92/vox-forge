@@ -43,29 +43,37 @@ _CHUNK_TIMEOUT_SECONDS = 180
 # Shared GPU semaphore — only one CUDA inference at a time across all engines.
 _gpu_semaphore = gpu_semaphore
 
-# XTTS v2 generation parameters optimized for maximum quality.
-# Trade-off: ~3-5x slower than defaults, but significantly fewer artifacts.
-_XTTS_QUALITY_PARAMS = {
-    # Lower temperature = more deterministic, fewer hallucinations.
-    # Default is 0.75; 0.1 is extremely conservative.
-    "temperature": 0.1,
-    # Very narrow sampling distribution.
-    "top_p": 0.4,
-    # Restrict token choices aggressively.
-    "top_k": 20,
-    # High repetition penalty prevents loops and artifacts.
-    "repetition_penalty": 10.0,
-    # Greedy decoding. Beam search (num_beams>1) causes tensor shape
-    # errors in XTTS v2 — not stable.
-    "num_beams": 1,
-    # Use maximum reference audio for voice conditioning.
-    "gpt_cond_len": 30,
-    "gpt_cond_chunk_len": 4,
-    # Use full reference audio for speaker embedding extraction.
-    "max_ref_len": 60,
-    # Normalize reference audio levels for consistent output volume.
-    "sound_norm_refs": True,
-}
+def _xtts_quality_params() -> dict[str, float | int | bool]:
+    """XTTS v2 decoding parameters, read from settings on every call.
+
+    VOZ-09 — sampler reopened. The old emergency values
+    (``temperature=0.1, top_p=0.4, top_k=20, repetition_penalty=10.0``)
+    strangled sampling to near-greedy to compensate for a candidate
+    scorer that was blind to diction: prosody came out flat and
+    monotone, and the extreme repetition penalty distorted word endings
+    by vetoing legitimate token repeats. With the ASR re-ranker
+    (VOZ-08) as the safety net against unintelligible candidates, the
+    sampler runs near the model's stock values again. Every value comes
+    from settings (``VOXFORGE_XTTS_*`` env vars) so the HUMANO A/B
+    listening gate can iterate without code changes — the final numbers
+    are fixed by listening, not by this file.
+    """
+    return {
+        "temperature": settings.xtts_temperature,
+        "top_p": settings.xtts_top_p,
+        "top_k": settings.xtts_top_k,
+        "repetition_penalty": settings.xtts_repetition_penalty,
+        # Beam search (num_beams>1) causes tensor shape errors in
+        # XTTS v2 — not stable; keep 1.
+        "num_beams": settings.xtts_num_beams,
+        # Seconds of reference audio used for voice conditioning.
+        "gpt_cond_len": settings.xtts_gpt_cond_len,
+        "gpt_cond_chunk_len": 4,
+        # Use full reference audio for speaker embedding extraction.
+        "max_ref_len": 60,
+        # Normalize reference audio levels for consistent output volume.
+        "sound_norm_refs": True,
+    }
 
 # Candidate budget (VOZ-08 — ASR-in-the-loop re-ranking).
 #
@@ -276,7 +284,7 @@ class CloneEngine:
                     speaker_wav=speaker_wav,
                     language=language,
                     file_path=str(output_path),
-                    **_XTTS_QUALITY_PARAMS,
+                    **_xtts_quality_params(),
                 ),
                 timeout=_CHUNK_TIMEOUT_SECONDS,
             )

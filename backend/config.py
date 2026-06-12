@@ -50,6 +50,25 @@ class Settings(BaseSettings):
     # Override via VOXFORGE_INTELLIGIBILITY_THRESHOLD.
     intelligibility_threshold: float = Field(default=0.90, ge=0.0, le=1.0)
 
+    # XTTS v2 sampler (VOZ-09) — decoding parameters for voice cloning,
+    # reopened now that the ASR re-ranker (VOZ-08) catches unintelligible
+    # candidates. The FINAL numbers are fixed by the HUMANO A/B listening
+    # gate, not by this file: iterate via env (VOXFORGE_XTTS_TEMPERATURE,
+    # VOXFORGE_XTTS_TOP_P, ...) without touching code.
+    # Old emergency values (the near-greedy sampler that compensated for
+    # the diction-blind candidate scorer — flat prosody, distorted word
+    # endings): temperature=0.1, top_p=0.4, top_k=20,
+    # repetition_penalty=10.0. Use them as the "old" arm of the A/B.
+    xtts_temperature: float = Field(default=0.70, gt=0.0, le=1.5)
+    xtts_top_p: float = Field(default=0.85, gt=0.0, le=1.0)
+    xtts_top_k: int = Field(default=50, ge=1)
+    xtts_repetition_penalty: float = Field(default=6.0, ge=1.0)
+    # Beam search (num_beams > 1) triggers tensor-shape errors inside
+    # XTTS v2 — keep 1 unless that upstream bug is fixed.
+    xtts_num_beams: int = Field(default=1, ge=1)
+    # Seconds of reference audio used for GPT voice conditioning.
+    xtts_gpt_cond_len: int = Field(default=30, ge=1, le=60)
+
     # Maintenance
     cleanup_max_age_hours: int = 24
 

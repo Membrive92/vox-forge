@@ -909,6 +909,69 @@ class TestExperimentalEndpointSpeed:
         assert response.status_code != 422
 
 
+# ---------------------------------------------------------------------------
+# 5. Sampler parameters (VOZ-09)
+#
+# The decoding params were strangled to near-greedy emergency values
+# (temperature=0.1, top_p=0.4, top_k=20, repetition_penalty=10.0) while
+# candidate selection was blind to diction. With the ASR re-ranker
+# (VOZ-08) as the safety net, the sampler is reopened and every value is
+# read from settings so the HUMANO A/B can iterate via VOXFORGE_XTTS_*
+# env vars without code changes.
+# ---------------------------------------------------------------------------
+
+
+class TestSamplerParams:
+    """Decoding params come from settings, with the reopened defaults."""
+
+    def test_reopened_defaults(self) -> None:
+        from backend.config import settings
+
+        assert settings.xtts_temperature == 0.70
+        assert settings.xtts_top_p == 0.85
+        assert settings.xtts_top_k == 50
+        assert settings.xtts_repetition_penalty == 6.0
+        assert settings.xtts_num_beams == 1
+        assert settings.xtts_gpt_cond_len == 30
+
+    @pytest.mark.asyncio
+    async def test_generate_one_forwards_settings_values(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Changing settings must reach the model on the next inference —
+        no module-level snapshot frozen at import time."""
+        from backend.config import settings
+        from backend.services.clone_engine import CloneEngine
+
+        monkeypatch.setattr(settings, "xtts_temperature", 0.42)
+        monkeypatch.setattr(settings, "xtts_top_p", 0.66)
+        monkeypatch.setattr(settings, "xtts_top_k", 33)
+        monkeypatch.setattr(settings, "xtts_repetition_penalty", 4.5)
+        monkeypatch.setattr(settings, "xtts_gpt_cond_len", 12)
+
+        engine = CloneEngine()
+        captured: dict = {}
+
+        def fake_tts_to_file(**kwargs):
+            captured.update(kwargs)
+            Path(str(kwargs["file_path"])).write_bytes(b"RIFF" + b"\x00" * 100)
+
+        fake_model = MagicMock()
+        fake_model.tts_to_file = fake_tts_to_file
+        engine._model = fake_model
+
+        await engine._generate_one("hola", "ref.wav", "es", tmp_path / "o.wav")
+
+        assert captured["temperature"] == 0.42
+        assert captured["top_p"] == 0.66
+        assert captured["top_k"] == 33
+        assert captured["repetition_penalty"] == 4.5
+        assert captured["gpt_cond_len"] == 12
+        assert captured["num_beams"] == 1, (
+            "beam search is unstable in XTTS v2 — num_beams must stay 1"
+        )
+
+
 async def test_generate_one_holds_gpu_semaphore_per_inference(tmp_path) -> None:
     """The GPU semaphore is held during the inference and released after.
 
