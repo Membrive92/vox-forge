@@ -11,6 +11,7 @@ flows through Studio edit / export like any TTS output.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from pathlib import Path
@@ -20,6 +21,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from pydub import AudioSegment
 
+from ..audio_meta import duration_seconds
 from ..cancellation import create_cancellation_token
 from ..catalogs import AUDIO_FORMATS
 from ..config import settings
@@ -169,11 +171,9 @@ async def synthesize_chapter(
          for i, chunk_text in enumerate(chunks)],
     )
 
-    try:
-        audio = AudioSegment.from_file(str(result.path))
-        duration = round(len(audio) / 1000.0, 2)
-    except Exception:
-        duration = 0.0
+    # Header-based probe (mutagen) instead of decoding the whole audio
+    # just to measure it; off the event loop either way (MED-PERF-5).
+    duration = await asyncio.to_thread(duration_seconds, result.path)
 
     await pm.update_generation(
         gen_id,
@@ -229,8 +229,7 @@ async def regenerate_chunk(
         raise HTTPException(404, "Project not found")
 
     # Find the latest done generation for this chapter
-    gens = await pm.list_generations(chapter_id)
-    gen = next((g for g in gens if g["status"] == "done"), None)
+    gen = await pm.get_latest_done_generation(chapter_id)
     if gen is None:
         raise HTTPException(400, "No completed generation to regenerate from")
 
@@ -364,8 +363,7 @@ async def get_chunk_map(chapter_id: str) -> dict:
     if chapter is None:
         raise HTTPException(404, "Chapter not found")
 
-    gens = await pm.list_generations(chapter_id)
-    gen = next((g for g in gens if g["status"] == "done"), None)
+    gen = await pm.get_latest_done_generation(chapter_id)
     if gen is None:
         return {"generation_id": None, "chunks": [], "total": 0}
 
@@ -416,8 +414,7 @@ async def qc_chapter(chapter_id: str) -> dict:
     if chapter is None:
         raise HTTPException(404, "Chapter not found")
 
-    gens = await pm.list_generations(chapter_id)
-    gen = next((g for g in gens if g["status"] == "done"), None)
+    gen = await pm.get_latest_done_generation(chapter_id)
     if gen is None:
         raise HTTPException(400, "No completed generation to QC")
 
@@ -498,12 +495,9 @@ async def upload_chapter_audio(
     validate_audio_bytes(content)
     filepath.write_bytes(content)
 
-    # Best-effort duration; if ffmpeg can't decode, record 0.
-    try:
-        seg = AudioSegment.from_file(str(filepath))
-        duration = round(len(seg) / 1000.0, 2)
-    except Exception:  # noqa: BLE001
-        duration = 0.0
+    # Best-effort duration; if neither mutagen nor ffmpeg can read the
+    # container, record 0 (``duration_seconds`` handles both fallbacks).
+    duration = await asyncio.to_thread(duration_seconds, filepath)
 
     project = await pm.get_project(chapter["project_id"])
     voice_id = chapter.get("voice_id") or (project["voice_id"] if project else "")

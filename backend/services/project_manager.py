@@ -329,6 +329,22 @@ async def get_generation(gen_id: str) -> dict[str, Any] | None:
         return _row_to_dict(row) if row else None
 
 
+async def get_latest_done_generation(chapter_id: str) -> dict[str, Any] | None:
+    """Most recent completed generation of a chapter, or None.
+
+    SQL-side ``ORDER BY ... LIMIT 1`` instead of loading every
+    generation and scanning in Python (MED-PERF-4).
+    """
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM generations WHERE chapter_id = ? AND status = 'done' "
+            "ORDER BY created_at DESC LIMIT 1",
+            (chapter_id,),
+        )
+        row = await cursor.fetchone()
+        return _row_to_dict(row) if row else None
+
+
 async def create_generation(
     chapter_id: str,
     voice_id: str,

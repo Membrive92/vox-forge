@@ -102,23 +102,28 @@ async def batch_export(
                 return out
 
         # (2) Chapter's explicitly marked active generation first
-        gens = await pm.list_generations(ch["id"])
         active_id = ch.get("active_generation_id")
         if active_id:
-            active = next((g for g in gens if g.get("id") == active_id), None)
-            if active and active.get("status") == "done" and active.get("file_path"):
+            active = await pm.get_generation(active_id)
+            if (
+                active
+                and active.get("chapter_id") == ch["id"]
+                and active.get("status") == "done"
+                and active.get("file_path")
+            ):
                 out = Path(active["file_path"])
                 if out.exists():
                     return out
 
-        # (3) Otherwise, most recent ``done`` generation
-        for gen in gens:
-            if gen.get("status") == "done" and gen.get("file_path"):
-                out = Path(gen["file_path"])
-                if out.exists():
-                    return out
+        # (3) Otherwise, most recent ``done`` generation (SQL LIMIT 1
+        # instead of loading every generation — MED-PERF-4)
+        gen = await pm.get_latest_done_generation(ch["id"])
+        if gen and gen.get("file_path"):
+            out = Path(gen["file_path"])
+            if out.exists():
+                return out
 
-        # (3) Fresh synthesis
+        # (4) Fresh synthesis
         request = SynthesisRequest(
             text=ch["text"],
             voice_id=project["voice_id"],

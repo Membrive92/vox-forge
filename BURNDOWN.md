@@ -68,8 +68,8 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | MED-PERF-1 | `/analyze/sample` en el event loop | RESUELTO-PREVIO | `_analyze_bytes` vía to_thread (analyze.py:143) | 6553c2d |
 | MED-PERF-2 | N inserts secuenciales de takes | RESUELTO-PREVIO | `create_takes` executemany | 6553c2d |
 | MED-PERF-3 | PRAGMA WAL por query | RESUELTO-PREVIO | WAL una vez en init_db | 6553c2d |
-| MED-PERF-4 | "latest done generation" sin LIMIT 1 | **ABIERTO** | chapter_synth.py:175 escanea en Python | — |
-| MED-PERF-5 | Duración decodificando completo | **ABIERTO (parcial)** | `audio_meta.py` existe y cablea studio/video; falta chapter_synth.py:141 | c14f5a6 parcial |
+| MED-PERF-4 | "latest done generation" sin LIMIT 1 | RESUELTO | `pm.get_latest_done_generation(chapter_id)` (`status='done' ORDER BY created_at DESC LIMIT 1`) sustituye los 3 escaneos de chapter_synth (regen/chunk-map/qc) y el de batch_export (que ahora resuelve la activa vía `get_generation(id)`); tests: el helper ignora errores más nuevos y devuelve None sin done; export reutiliza la última done sin re-sintetizar (spy en `TTSEngine.synthesize` + bytes del ZIP) | F3 |
+| MED-PERF-5 | Duración decodificando completo | RESUELTO | resto cerrado: las 2 sondas de chapter_synth (post-síntesis y upload-audio) usan `audio_meta.duration_seconds` vía `asyncio.to_thread` (mutagen primero, pydub como fallback); el decode real solo queda donde el audio se procesa de verdad (`_resplice_chapter`) | c14f5a6 + F3 |
 | MED-ERR-1 | Sin cleanup si bookkeeping post-síntesis falla | RESUELTO-PREVIO | chapter_synth.py:124-131 try/except + finish() | 6553c2d |
 | MED-ERR-2 | `InvalidSampleError` reusada (mensaje engañoso) | RESUELTO | `PathNotAllowedError` (400, `path_not_allowed`) e `InvalidParameterError` (400, `invalid_parameter`) + entradas en `_USER_FRIENDLY_MESSAGES`; sustituidas en studio.py (edit/transcribe/render-video paths, aspect ratio, cover-or-images, kind) y experimental.py (idioma); `InvalidSampleError` queda solo para validación real de muestras (uploads, audio_editor, video_renderer); 6 asserts de tests actualizados al código honesto | F3 |
 | MED-INT-1 | Escrituras atómicas sin fsync | RESUELTO-PREVIO | `atomic_io.write_text_atomic` con fsync | 6553c2d |
@@ -122,7 +122,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-23 | Anchor de descarga duplicado | RESUELTO-PREVIO | utils/download.ts — d6777a7 |
 | BAJO-24 | `<audio>` oculto duplicado | RESUELTO-PREVIO | components/HiddenAudio.tsx — 9f5bf26 |
 | BAJO-25 | Duración duplicada backend | RESUELTO-PREVIO | audio_meta.py — c14f5a6 (resto en MED-PERF-5) |
-| BAJO-26 | latest-done inline duplicado | **ABIERTO** | chapter_synth.py:176 (= MED-PERF-4) |
+| BAJO-26 | latest-done inline duplicado | RESUELTO | = MED-PERF-4: los 4 call sites consumen `pm.get_latest_done_generation` — F3 |
 | BAJO-27 | ALLOWED_AUDIO_EXTS duplicada | **ABIERTO** | chapter_synth.py:270 vs upload_utils.py:52 |
 | BAJO-28 | Re-import local SynthesisRequest | **ABIERTO** | chapter_synth.py:88,195 |
 | BAJO-29 | WorkbenchTab sobredimensionado | **ABIERTO (parcial)** | 1745→883 (4ba952e); objetivo F4 <600 + partir ChapterCard |

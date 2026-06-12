@@ -362,6 +362,87 @@ def test_failed_clone_chapter_records_real_engine_and_chunk_count(client) -> Non
     assert gens[0]["chunks_total"] == 3
 
 
+# ── MED-PERF-4: latest done generation resolved with SQL LIMIT 1 ─────
+
+
+def test_get_latest_done_generation_returns_newest_done(client) -> None:
+    """The helper must pick the most recent ``done`` generation, ignoring
+    newer rows that errored, and return None when nothing completed."""
+    import asyncio
+
+    from backend.services import project_manager as pm
+
+    project = _create_project(client, "LatestDone")
+    chapter = _create_chapter(client, project["id"])
+    cid = chapter["id"]
+
+    async def seed() -> tuple[str, str]:
+        assert await pm.get_latest_done_generation(cid) is None
+        old_done = await pm.create_generation(cid, voice_id="v", engine="edge-tts")
+        await pm.update_generation(old_done["id"], status="done", file_path="/a.mp3")
+        new_done = await pm.create_generation(cid, voice_id="v", engine="edge-tts")
+        await pm.update_generation(new_done["id"], status="done", file_path="/b.mp3")
+        newer_error = await pm.create_generation(cid, voice_id="v", engine="edge-tts")
+        await pm.update_generation(newer_error["id"], status="error", error="boom")
+        return old_done["id"], new_done["id"]
+
+    loop = asyncio.new_event_loop()
+    try:
+        _old_id, new_id = loop.run_until_complete(seed())
+        latest = loop.run_until_complete(pm.get_latest_done_generation(cid))
+    finally:
+        loop.close()
+
+    assert latest is not None
+    assert latest["id"] == new_id
+
+
+def test_batch_export_reuses_latest_done_generation(client, monkeypatch) -> None:
+    """Export must bundle the newest completed generation's audio without
+    re-synthesizing when one exists on disk."""
+    import asyncio
+    import io
+    import zipfile
+
+    from backend.paths import OUTPUT_DIR
+    from backend.services import project_manager as pm
+    from backend.services.tts_engine import TTSEngine
+
+    project = _create_project(client, "ExportReuse")
+    chapter = _create_chapter(client, project["id"])
+    cid = chapter["id"]
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    old_audio = OUTPUT_DIR / "export_old.mp3"
+    old_audio.write_bytes(b"OLD-GEN-AUDIO")
+    new_audio = OUTPUT_DIR / "export_new.mp3"
+    new_audio.write_bytes(b"NEW-GEN-AUDIO")
+
+    async def seed() -> None:
+        old = await pm.create_generation(cid, voice_id="v", engine="edge-tts")
+        await pm.update_generation(old["id"], status="done", file_path=str(old_audio))
+        new = await pm.create_generation(cid, voice_id="v", engine="edge-tts")
+        await pm.update_generation(new["id"], status="done", file_path=str(new_audio))
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(seed())
+    finally:
+        loop.close()
+
+    async def must_not_synthesize(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("export re-synthesized a chapter that has audio")
+
+    monkeypatch.setattr(TTSEngine, "synthesize", must_not_synthesize)
+
+    response = client.post(f"/api/export/{project['id']}")
+    assert response.status_code == 200, response.text
+    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+        audio_entries = [n for n in zf.namelist() if n.startswith("audio/")]
+        assert len(audio_entries) == 1
+        assert zf.read(audio_entries[0]) == b"NEW-GEN-AUDIO"
+
+
 # ── Character casting ────────────────────────────────────────────────
 
 def test_extract_characters(client) -> None:
