@@ -1161,6 +1161,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/image-provider/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health of the configured image provider
+         * @description Cheap probe used by the generation dialog (PROD-02, plan F2):
+         *     ``placeholder`` is always available; ``comfyui`` verifies the
+         *     workflow export exists and pings ``/system_stats`` (2s timeout).
+         */
+        get: operations["image_provider_status_api_studio_image_provider_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/render-video": {
         parameters: {
             query?: never;
@@ -1249,9 +1271,8 @@ export interface paths {
          * Unload GPU models to free VRAM for external processes
          * @description Unload XTTS + OpenVoice and empty the CUDA cache.
          *
-         *     Acquires the shared GPU semaphore first so a model is never pulled
-         *     out from under a running inference: the call waits until the GPU
-         *     is idle, then unloads while still holding the lock.
+         *     Waits for the GPU semaphore so a model is never pulled out from
+         *     under a running inference (see ``services.engine_unload``).
          */
         post: operations["unload_engines_api_engines_unload_post"];
         delete?: never;
@@ -1990,6 +2011,25 @@ export interface components {
             };
             /** Formats */
             formats: string[];
+        };
+        /**
+         * ImageProviderStatusResponse
+         * @description Health of the configured image provider (PROD-02, plan F2).
+         *
+         *     ``placeholder`` is always available; ``comfyui`` verifies the
+         *     workflow export exists and probes ``GET /system_stats`` with a
+         *     short timeout. ``error`` carries the actionable reason when
+         *     ``available`` is False.
+         */
+        ImageProviderStatusResponse: {
+            /** Name */
+            name: string;
+            /** Available */
+            available: boolean;
+            /** Server Url */
+            server_url?: string | null;
+            /** Error */
+            error?: string | null;
         };
         /** IncompleteJobSummary */
         IncompleteJobSummary: {
@@ -4795,6 +4835,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    image_provider_status_api_studio_image_provider_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageProviderStatusResponse"];
                 };
             };
         };

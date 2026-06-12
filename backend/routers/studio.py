@@ -7,6 +7,8 @@ Endpoints:
 - ``POST /api/studio/transcribe``     speech-to-text → SRT (Phase B.1)
 - ``POST /api/studio/scenes/detect``  group an SRT into image-slot scenes (PROD-03)
 - ``POST /api/studio/upload-cover``   upload cover image for video render (Phase B.2)
+- ``POST /api/studio/generate-image`` scene image from a prompt (Phase B.3 / PROD-02)
+- ``GET  /api/studio/image-provider/status``  image provider health (PROD-02)
 - ``POST /api/studio/render-video``   compose MP4 via ffmpeg (Phase B.2)
 - ``GET  /api/studio/renders``        list persisted renders (Phase B.2)
 - ``DELETE /api/studio/renders/{id}`` remove a render record (Phase B.2)
@@ -41,6 +43,7 @@ from ..schemas import (
     DetectScenesResponse,
     GenerateImageRequest,
     GenerateImageResponse,
+    ImageProviderStatusResponse,
     RenderVideoRequest,
     SrtEntry,
     StudioEditRequest,
@@ -336,6 +339,24 @@ async def generate_image(request: GenerateImageRequest) -> GenerateImageResponse
         aspect_ratio=request.aspect_ratio,
         seed=seed,
         size_kb=size_kb,
+    )
+
+
+@router.get(
+    "/image-provider/status",
+    summary="Health of the configured image provider",
+    response_model=ImageProviderStatusResponse,
+)
+async def image_provider_status() -> ImageProviderStatusResponse:
+    """Cheap probe used by the generation dialog (PROD-02, plan F2):
+    ``placeholder`` is always available; ``comfyui`` verifies the
+    workflow export exists and pings ``/system_stats`` (2s timeout)."""
+    status = await image_gen.get_provider().status_async()
+    return ImageProviderStatusResponse(
+        name=status.name,
+        available=status.available,
+        server_url=status.server_url,
+        error=status.error,
     )
 
 

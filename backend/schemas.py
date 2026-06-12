@@ -375,3 +375,18 @@ class GenerateImageResponse(BaseModel):
     aspect_ratio: str
     seed: int
     size_kb: float
+
+
+class ImageProviderStatusResponse(BaseModel):
+    """Health of the configured image provider (PROD-02, plan F2).
+
+    ``placeholder`` is always available; ``comfyui`` verifies the
+    workflow export exists and probes ``GET /system_stats`` with a
+    short timeout. ``error`` carries the actionable reason when
+    ``available`` is False.
+    """
+
+    name: str
+    available: bool
+    server_url: Optional[str] = None
+    error: Optional[str] = None

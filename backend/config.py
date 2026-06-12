@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -75,6 +76,21 @@ class Settings(BaseSettings):
     # internal-docs/xtts-finetune.md. Default None = stock XTTS v2.
     # Override via VOXFORGE_XTTS_CHECKPOINT_DIR.
     xtts_checkpoint_dir: Path | None = None
+
+    # Image generation (PROD-02). "comfyui" talks HTTP to the SAME
+    # ComfyUI instance/workspace that img_generation_module provisions
+    # (the backend never runs diffusion itself); "placeholder" renders a
+    # deterministic text-on-gradient PNG and needs nothing external.
+    image_provider: Literal["placeholder", "comfyui"] = "placeholder"
+    comfyui_url: str = "http://127.0.0.1:8188"
+    # Whole-job budget: submit + queue + diffusion + download.
+    comfyui_timeout_s: float = Field(default=120.0, gt=0)
+    # Workflow JSON (ComfyUI "Save (API Format)" export, parametrized by
+    # reserved _meta.title nodes). Relative paths resolve against
+    # ``base_dir``. The default is the img_generation_module's canonical
+    # Z-Image-Turbo t2i export — a HUMAN step (PROD-05) produces it; the
+    # provider fails with the instructions until then.
+    comfyui_workflow_path: Path = Path("img_generation_module/workflows/zimage_t2i_fp8.api.json")
 
     # Maintenance
     cleanup_max_age_hours: int = 24

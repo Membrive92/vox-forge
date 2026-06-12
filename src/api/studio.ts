@@ -216,6 +216,20 @@ export interface GenerateImageResult {
   size_kb: number;
 }
 
+export interface ImageProviderStatus {
+  name: string;
+  available: boolean;
+  server_url: string | null;
+  error: string | null;
+}
+
+/** Probe the configured image provider (PROD-02, plan F2). The
+ * generation dialog warns up front instead of letting the user write a
+ * prompt that is guaranteed to fail. */
+export function getImageProviderStatus(signal?: AbortSignal): Promise<ImageProviderStatus> {
+  return getJson<ImageProviderStatus>("/studio/image-provider/status", signal);
+}
+
 export function generateImage(
   prompt: string,
   aspectRatio: ImageAspectRatio = "16:9",

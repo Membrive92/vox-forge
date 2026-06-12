@@ -64,6 +64,33 @@ class SynthesisError(DomainError):
     code = "synthesis_failed"
 
 
+# Image generation (PROD-02). These three carry per-instance actionable
+# messages (which ComfyUI URL to start, which workflow file to export and
+# how) — deliberately NOT in ``_USER_FRIENDLY_MESSAGES`` so the handler's
+# fallback surfaces the instance message to the UI instead of flattening
+# it into a generic string.
+
+class ImageProviderUnavailableError(DomainError):
+    """The configured image provider cannot be reached right now."""
+
+    status_code = 503
+    code = "image_provider_unavailable"
+
+
+class ImageWorkflowError(DomainError):
+    """The ComfyUI workflow template is missing, malformed or rejected."""
+
+    status_code = 503
+    code = "image_workflow_invalid"
+
+
+class ImageGenerationError(DomainError):
+    """The image job was accepted but failed or timed out upstream."""
+
+    status_code = 502
+    code = "image_generation_failed"
+
+
 _USER_FRIENDLY_MESSAGES: dict[str, str] = {
     "profile_not_found": "The voice profile was not found. It may have been deleted.",
     "unsupported_voice": "The selected voice is not available. Try a different one.",

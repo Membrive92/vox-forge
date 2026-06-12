@@ -51,7 +51,8 @@ VoxForge is a local-first audiobook production workbench for narrating fantasy s
 - **Mastering operations**: LUFS loudness normalization (ffmpeg `loudnorm`, audiobook targets -18/-16/-14), noise reduction (noisereduce) and single-knob compression, queueable like any other edit op
 - **Video render**: cover image with Ken Burns pan/zoom or multi-image slideshow with crossfades, optional waveform overlay → MP4 via ffmpeg
 - **Auto-subtitles**: speech-to-text via `faster-whisper` produces an SRT, burned-in or soft-muxed into the rendered video
-- **Planned**: locally generated imagery via ComfyUI — `POST /api/studio/generate-image` currently ships a placeholder provider; the real provider and a ComfyUI setup section in this README land with PROD-02 (`remediation_plan/REMEDIATION_PLAN.md` §F7). Generative video clips (`img_generation_module`) follow.
+- **Scene image generation**: `POST /api/studio/generate-image` with two providers — `placeholder` (default, offline text-on-gradient preview) and `comfyui` (real images via a local ComfyUI instance running the Apache 2.0 Z-Image-Turbo stack; see [ComfyUI image generation](#comfyui-image-generation-optional)). Before each diffusion job the backend unloads its own GPU models (`POST /api/engines/unload` policy) so both fit on one card
+- **Planned**: generative video clips as B-roll (`img_generation_module`, gated by its benchmark)
 
 ### UX
 - **Autosave**: draft text persisted to localStorage with 1s debounce
@@ -143,6 +144,33 @@ npm run dev
 
 Open **http://localhost:5173**. The frontend proxies `/api/*` to the backend.
 
+### ComfyUI image generation (optional)
+
+Scene images can be generated locally through ComfyUI instead of the
+built-in placeholder. VoxForge does **not** run diffusion itself — it
+talks HTTP to the same ComfyUI instance/workspace that
+`img_generation_module` provisions (Z-Image-Turbo, Apache 2.0):
+
+```bash
+# 1. Provision + start the engine (see img_generation_module/docs/SETUP_PROVISIONING.md)
+cd img_generation_module
+python -m pipeline engine up       # ComfyUI on 127.0.0.1:8188
+
+# 2. One-time human step: export the t2i workflow from the GUI in API format
+#    to img_generation_module/workflows/zimage_t2i_fp8.api.json with the
+#    reserved node titles (PROMPT_POSITIVE/PROMPT_NEGATIVE/SEED/SIZE/SAVE).
+#    Details: SETUP_PROVISIONING.md §5.
+
+# 3. Point VoxForge at it (.env)
+VOXFORGE_IMAGE_PROVIDER=comfyui
+```
+
+The generation dialog shows the provider status (`GET
+/api/studio/image-provider/status`) and every failure carries the exact
+fix in its message. Before submitting a job, the backend unloads XTTS +
+OpenVoice and empties the CUDA cache so the diffusion model fits on the
+shared GPU; the TTS models lazy-reload on the next synthesis.
+
 ### Tests
 
 ```bash
@@ -193,6 +221,9 @@ npm run openapi   # export schema + regenerate TS types
 | GET | `/api/studio/sources` | List chapters editable in Studio |
 | POST | `/api/studio/edit` | Apply a batch of edit operations |
 | GET | `/api/studio/audio?path=...` | Serve an audio file (path-traversal protected) |
+| POST | `/api/studio/generate-image` | Scene image from a prompt (placeholder or ComfyUI) |
+| GET | `/api/studio/image-provider/status` | Image provider health check |
+| POST | `/api/engines/unload` | Free GPU VRAM for external processes (ComfyUI) |
 | POST | `/api/analyze/sample` | Voice sample quality analysis |
 | GET/POST/DELETE | `/api/pronunciations` | Pronunciation dictionary CRUD |
 | POST | `/api/preprocess` | Text normalization |
@@ -209,6 +240,10 @@ VOXFORGE_MAX_TEXT_LENGTH=500000
 VOXFORGE_CHUNK_MAX_CHARS=3000
 VOXFORGE_CLEANUP_MAX_AGE_HOURS=24
 VOXFORGE_LOG_LEVEL=INFO
+VOXFORGE_IMAGE_PROVIDER=placeholder   # or "comfyui"
+VOXFORGE_COMFYUI_URL=http://127.0.0.1:8188
+VOXFORGE_COMFYUI_TIMEOUT_S=120
+VOXFORGE_COMFYUI_WORKFLOW_PATH=img_generation_module/workflows/zimage_t2i_fp8.api.json
 VITE_API_BASE=/api
 ```
 

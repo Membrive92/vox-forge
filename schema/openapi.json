@@ -2760,6 +2760,28 @@
         }
       }
     },
+    "/api/studio/image-provider/status": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Health of the configured image provider",
+        "description": "Cheap probe used by the generation dialog (PROD-02, plan F2):\n``placeholder`` is always available; ``comfyui`` verifies the\nworkflow export exists and pings ``/system_stats`` (2s timeout).",
+        "operationId": "image_provider_status_api_studio_image_provider_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageProviderStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/render-video": {
       "post": {
         "tags": [
@@ -2974,7 +2996,7 @@
           "engines"
         ],
         "summary": "Unload GPU models to free VRAM for external processes",
-        "description": "Unload XTTS + OpenVoice and empty the CUDA cache.\n\nAcquires the shared GPU semaphore first so a model is never pulled\nout from under a running inference: the call waits until the GPU\nis idle, then unloads while still holding the lock.",
+        "description": "Unload XTTS + OpenVoice and empty the CUDA cache.\n\nWaits for the GPU semaphore so a model is never pulled out from\nunder a running inference (see ``services.engine_unload``).",
         "operationId": "unload_engines_api_engines_unload_post",
         "responses": {
           "200": {
@@ -4594,6 +4616,47 @@
           "formats"
         ],
         "title": "HealthResponse"
+      },
+      "ImageProviderStatusResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "server_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Url"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "available"
+        ],
+        "title": "ImageProviderStatusResponse",
+        "description": "Health of the configured image provider (PROD-02, plan F2).\n\n``placeholder`` is always available; ``comfyui`` verifies the\nworkflow export exists and probes ``GET /system_stats`` with a\nshort timeout. ``error`` carries the actionable reason when\n``available`` is False."
       },
       "IncompleteJobSummary": {
         "properties": {

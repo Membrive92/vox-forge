@@ -78,13 +78,13 @@ def test_unload_skips_instantiated_but_unloaded_clone_engine(client, monkeypatch
 async def test_unload_waits_for_gpu_semaphore(app, monkeypatch):
     """While an inference holds the GPU semaphore the unload must block;
     it completes as soon as the semaphore is released."""
-    from backend.routers import engines
+    from backend.services import engine_unload
 
     # Fresh semaphore so this test never binds the shared global to a
     # per-test event loop (asyncio primitives latch the loop on first
     # contended acquire).
     sem = asyncio.Semaphore(1)
-    monkeypatch.setattr(engines, "gpu_semaphore", sem)
+    monkeypatch.setattr(engine_unload, "gpu_semaphore", sem)
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:

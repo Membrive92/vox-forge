@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { generateImage, uploadCover } from "@/api/studio";
+import { generateImage, getImageProviderStatus, uploadCover } from "@/api/studio";
 import type {
   CoverUploadResult,
   GenerateImageResult,
   ImageAspectRatio,
+  ImageProviderStatus,
   SrtEntry,
   VideoImage,
   VideoOptions,
 } from "@/api/studio";
+import { isAbortError } from "@/api/client";
 import { Button } from "@/components/Button";
 import * as Icons from "@/components/icons";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { logger } from "@/logging/logger";
 import { formatClock } from "@/utils/format";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
@@ -664,8 +667,27 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
   const [prompt, setPrompt] = useState(defaultPrompt);
   const [aspect, setAspect] = useState<ImageAspectRatio>("16:9");
   const [seedText, setSeedText] = useState("");
+  // Provider health (PROD-02, plan F2): warn before the user invests in
+  // a prompt that is guaranteed to fail. Fails open — if the probe
+  // itself errors, the dialog behaves as before and the generation
+  // toast still reports the real error.
+  const [providerStatus, setProviderStatus] = useState<ImageProviderStatus | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   useFocusTrap(formRef, true);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    getImageProviderStatus(ctrl.signal)
+      .then(setProviderStatus)
+      .catch((e) => {
+        if (!isAbortError(e)) {
+          logger.warn("Image provider status probe failed", {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      });
+    return () => ctrl.abort();
+  }, []);
 
   const submit = (): void => {
     const trimmed = prompt.trim();
@@ -791,9 +813,28 @@ function ImageGenDialog({ t, defaultPrompt, isGenerating, onCancel, onConfirm }:
         <p style={{ margin: "0 0 12px", fontSize: typography.size.xs, color: colors.textFaint }}>
           {t.studioScenesGenSeedHint}
         </p>
-        <p style={{ margin: "0 0 16px", fontSize: typography.size.xs, color: colors.textFaint }}>
-          {t.studioScenesGenNote}
-        </p>
+        {providerStatus?.name === "placeholder" ? (
+          <p style={{ margin: "0 0 16px", fontSize: typography.size.xs, color: colors.textFaint }}>
+            {t.studioScenesGenNote}
+          </p>
+        ) : null}
+        {providerStatus !== null && !providerStatus.available ? (
+          <p
+            role="alert"
+            style={{
+              margin: "0 0 16px",
+              padding: "8px 10px",
+              fontSize: typography.size.xs,
+              color: colors.warning,
+              background: colors.warningSoft,
+              border: `1px solid ${colors.warningBorder}`,
+              borderRadius: radii.sm,
+            }}
+          >
+            {t.studioImageProviderOffline}
+            {providerStatus.error ? ` — ${providerStatus.error}` : ""}
+          </p>
+        ) : null}
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Button variant="ghost" type="button" onClick={onCancel} disabled={isGenerating}>
