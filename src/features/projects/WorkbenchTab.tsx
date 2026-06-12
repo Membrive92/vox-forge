@@ -54,6 +54,8 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
   const [renaming, setRenaming] = useState(false);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [incompleteCount, setIncompleteCount] = useState(0);
+  // UX-02: run the mastering preset over every chapter while exporting.
+  const [masterOnExport, setMasterOnExport] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const bulkTextRef = useRef<HTMLTextAreaElement>(null);
   const { profiles } = useSharedProfiles();
@@ -243,7 +245,8 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
 
   const handleExportAll = (): void => {
     if (!selectedId) return;
-    const url = `${API_BASE}/export/${selectedId}`;
+    // Anchor download (GET) so the browser streams the ZIP to disk.
+    const url = `${API_BASE}/export/${selectedId}${masterOnExport ? "?master=true" : ""}`;
     downloadUrl(url, `${projectName || "project"}_export.zip`);
     onToast(t.workbenchExportStarted);
   };
@@ -401,9 +404,29 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
               )}
               <div style={{ flex: 1 }} />
               {chapters.length > 0 && (
-                <Button variant="secondary" icon={<Icons.Download />} onClick={handleExportAll}>
-                  {t.workbenchExportAll}
-                </Button>
+                <>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: space[1],
+                      fontSize: typography.size.xs,
+                      color: colors.textDim,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={masterOnExport}
+                      onChange={(e) => setMasterOnExport(e.target.checked)}
+                    />
+                    {t.workbenchMasterOnExport}
+                  </label>
+                  <Button variant="secondary" icon={<Icons.Download />} onClick={handleExportAll}>
+                    {t.workbenchExportAll}
+                  </Button>
+                </>
               )}
             </div>
 

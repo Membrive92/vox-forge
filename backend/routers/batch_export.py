@@ -7,7 +7,7 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
 from ..cancellation import create_cancellation_token
@@ -15,8 +15,10 @@ from ..catalogs import AUDIO_FORMATS
 from ..dependencies import get_tts_engine
 from ..paths import OUTPUT_DIR
 from ..schemas import SynthesisRequest
+from ..services import mastering
 from ..services import project_manager as pm
 from ..services import studio_store
+from ..services.export_source import resolve_export_source
 from ..services.metadata import AudioMetadata, embed_metadata
 from ..services.tts_engine import TTSEngine
 from ..utils import cleanup_old_files
@@ -53,21 +55,34 @@ def _build_zip(
             zf.write(vpath, f"videos/{vpath.name}")
 
 
-@router.post("/{project_id}", summary="Export all chapters as ZIP")
+@router.get("/{project_id}", summary="Export all chapters as ZIP")
 async def batch_export(
     project_id: str,
     http_request: Request,
     background_tasks: BackgroundTasks,
+    master: bool = Query(
+        default=False,
+        description="Master every chapter (denoise + loudness + compressor) "
+        "before bundling; already-mastered Studio edits are reused as-is.",
+    ),
     engine: TTSEngine = Depends(get_tts_engine),
 ) -> FileResponse:
     """Build a ZIP with the best available audio per chapter.
 
-    Preference order for each chapter:
-      1. Latest Studio edit (``studio_renders`` kind="audio") — the user's
-         polished version.
-      2. Latest completed ``generation`` file on disk — cheaper than
-         re-synthesizing and preserves exactly what the user heard.
-      3. Fresh synthesis — only when neither of the above exists.
+    GET (not POST) on purpose: the frontend triggers the download with a
+    plain anchor so the browser streams the ZIP to disk, and anchors can
+    only issue GET.
+
+    The per-chapter preference order lives in
+    ``services.export_source.resolve_export_source`` (UX-02) — the same
+    helper the Workbench uses to display "this audio will export", so
+    the label and the bundle can't diverge:
+      1. Latest Studio edit (manual or one-click master).
+      2. The chapter's active take, then the latest completed generation.
+      3. Fresh synthesis — only when nothing usable exists on disk.
+
+    With ``master=true`` every chapter is run through the mastering
+    preset first (skipping Studio edits that already are masters).
 
     In addition, if the project has persisted video renders they are
     bundled under a ``videos/`` folder so the export is a complete
@@ -94,36 +109,23 @@ async def batch_export(
     temp_files: list[Path] = []
 
     async def _resolve_audio(ch: dict, idx: int) -> Path:
-        # (1) Latest Studio edit for this chapter
-        edits = await studio_store.list_renders(kind="audio", chapter_id=ch["id"], limit=1)
-        if edits:
-            out = Path(edits[0]["output_path"])
-            if out.exists():
-                return out
+        # Shared priority: Studio edit > active take > latest done
+        # generation > fresh synthesis (services.export_source, UX-02).
+        src = await resolve_export_source(ch)
+        if src.path is not None:
+            if not master or src.mastered:
+                return src.path
+            # Master the winning audio once and persist it as a render —
+            # later exports (and the Workbench chip) reuse it for free.
+            render = await mastering.master_to_render(
+                src.path,
+                project_id=project_id,
+                chapter_id=ch["id"],
+                output_format=fmt,
+            )
+            return Path(render["output_path"])
 
-        # (2) Chapter's explicitly marked active generation first
-        active_id = ch.get("active_generation_id")
-        if active_id:
-            active = await pm.get_generation(active_id)
-            if (
-                active
-                and active.get("chapter_id") == ch["id"]
-                and active.get("status") == "done"
-                and active.get("file_path")
-            ):
-                out = Path(active["file_path"])
-                if out.exists():
-                    return out
-
-        # (3) Otherwise, most recent ``done`` generation (SQL LIMIT 1
-        # instead of loading every generation — MED-PERF-4)
-        gen = await pm.get_latest_done_generation(ch["id"])
-        if gen and gen.get("file_path"):
-            out = Path(gen["file_path"])
-            if out.exists():
-                return out
-
-        # (4) Fresh synthesis
+        # Fresh synthesis — nothing usable on disk for this chapter.
         request = SynthesisRequest(
             text=ch["text"],
             voice_id=project["voice_id"],
@@ -148,6 +150,21 @@ async def batch_export(
             ),
         )
         temp_files.append(result.path)
+        if master:
+            # No persisted take to hang a render on — master the throwaway
+            # synthesis in place and clean both files up after zipping.
+            mastered_path = await mastering.apply_mastering(result.path, fmt)
+            embed_metadata(
+                mastered_path,
+                AudioMetadata(
+                    title=ch["title"],
+                    artist=project.get("description", ""),
+                    album=project["name"],
+                    track_number=idx + 1,
+                ),
+            )
+            temp_files.append(mastered_path)
+            return mastered_path
         return result.path
 
     try:

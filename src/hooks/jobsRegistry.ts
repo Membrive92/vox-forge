@@ -16,6 +16,7 @@ import type { TabId } from "@/types/domain";
 export type JobKind =
   | "quick-synth"
   | "chapter-synth"
+  | "mastering"
   | "conversion"
   | "video-render"
   | "transcription"

@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  getChapterExportSource,
+  masterChapter,
+  type ChapterExportSource,
+} from "@/api/chapterSynth";
+import {
   listGenerations,
   type Chapter,
   type Generation,
   type Project,
 } from "@/api/projects";
 import {
+  deleteStudioRender,
   listStudioRenders,
   type StudioRender,
 } from "@/api/studio";
@@ -14,12 +20,14 @@ import { Button } from "@/components/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
+import { useJobMirror } from "@/hooks/jobsContext";
 import { logger } from "@/logging/logger";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, space, transitions, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
 
 import { AmbienceMixer } from "./AmbienceMixer";
+import { exportSourceLabel } from "./workbenchHelpers";
 import { ChapterAudioPanel } from "./ChapterAudioPanel";
 import { ChapterVideoActions } from "./ChapterVideoActions";
 import { ChapterVoicePicker } from "./ChapterVoicePicker";
@@ -74,17 +82,20 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
   const [collapsed, setCollapsed] = useState(true);
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [renders, setRenders] = useState<StudioRender[]>([]);
+  const [exportSource, setExportSource] = useState<ChapterExportSource | null>(null);
   const [statusLoaded, setStatusLoaded] = useState(false);
   const [statusError, setStatusError] = useState(false);
 
   const loadStatus = useCallback(async () => {
     try {
-      const [gens, rnds] = await Promise.all([
+      const [gens, rnds, src] = await Promise.all([
         listGenerations(chapter.id),
         listStudioRenders({ chapterId: chapter.id }),
+        getChapterExportSource(chapter.id),
       ]);
       setGenerations(gens);
       setRenders(rnds);
+      setExportSource(src);
       setStatusError(false);
     } catch (e) {
       // The chips, audio panel and take selector all hang off this
@@ -154,6 +165,58 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
   const activeGen = chapter.active_generation_id
     ? generations.find((g) => g.id === chapter.active_generation_id) ?? latestDoneGen
     : latestDoneGen;
+
+  // Studio deep-link target: the active take when playable, else the
+  // newest done generation — every chapter with audio gets the button.
+  const studioSourceGen =
+    activeGen?.status === "done" && activeGen.file_path ? activeGen : latestDoneGen;
+  const isMastered = exportSource?.kind === "studio_edit" && exportSource.mastered;
+  const discardableRenderId =
+    exportSource?.kind === "studio_edit" ? exportSource.render_id : null;
+
+  // UX-02: one-click mastering runs server-side while the user keeps
+  // browsing — surface it in the global job tray like any other job.
+  const [isMastering, setIsMastering] = useState(false);
+  useJobMirror({
+    active: isMastering,
+    kind: "mastering",
+    originTab: "workbench",
+    label: chapter.title,
+  });
+
+  const handleMaster = async (): Promise<void> => {
+    setIsMastering(true);
+    try {
+      await masterChapter(chapter.id);
+      onToast(t.chapterMasterSuccess);
+      await loadStatus();
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    } finally {
+      setIsMastering(false);
+    }
+  };
+
+  const handleDiscardEdit = async (renderId: string): Promise<void> => {
+    if (
+      !(await confirm({
+        title: t.confirmDiscardEditTitle,
+        message: t.confirmDiscardEdit,
+        confirmText: t.chapterDiscardEdit,
+        cancelText: t.cancel,
+        confirmVariant: "danger",
+      }))
+    ) {
+      return;
+    }
+    try {
+      await deleteStudioRender(renderId);
+      onToast(t.chapterEditDiscarded);
+      await loadStatus();
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    }
+  };
 
   return (
     <div
@@ -324,6 +387,9 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
               active={videoRenderCount > 0}
               color="#f59e0b"
             />
+            {isMastered && (
+              <StatusChip label={t.chapterStatusMastered} active color="#34d399" />
+            )}
           </>
         )}
         {characters.length > 0 && (
@@ -349,6 +415,31 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
           </button>
         )}
         <div style={{ flex: 1 }} />
+        {/* Uniform affordance (UX-02): every chapter with audio can jump
+            into Studio or run the one-click mastering preset. */}
+        {statusLoaded && !statusError && studioSourceGen && (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Icons.Scissors />}
+              onClick={() => onOpenStudioWithSource(studioSourceGen.id)}
+            >
+              {t.chapterOpenInStudio}
+            </Button>
+            {!isMastered && (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Icons.SlidersIcon />}
+                loading={isMastering}
+                onClick={() => void handleMaster()}
+              >
+                {t.chapterMaster}
+              </Button>
+            )}
+          </>
+        )}
         {latestDoneGen && (
           <ChapterVideoActions
             t={t}
@@ -360,6 +451,40 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
           />
         )}
       </div>
+
+      {/* Export source (UX-02): which audio will win the batch export —
+          computed by the same backend helper the export uses, with an
+          explicit way out of the silent Studio-edit priority. */}
+      {statusLoaded && !statusError && exportSource && exportSource.kind !== "fresh_synthesis" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: space[2],
+            marginTop: space[1],
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              fontSize: typography.size.xs,
+              color: colors.textDim,
+              fontFamily: fonts.mono,
+            }}
+          >
+            {exportSourceLabel(exportSource, t)}
+          </span>
+          {discardableRenderId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleDiscardEdit(discardableRenderId)}
+            >
+              {t.chapterDiscardEdit}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Body */}
       {!collapsed && (

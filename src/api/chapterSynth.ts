@@ -56,6 +56,53 @@ export function getChunkMap(chapterId: string): Promise<ChunkMapResponse> {
   return getJson<ChunkMapResponse>(`/chapters/${chapterId}/chunks`);
 }
 
+export type ExportSourceKind =
+  | "studio_edit"
+  | "active_take"
+  | "latest_generation"
+  | "fresh_synthesis";
+
+/** Which audio will win the batch export for a chapter (UX-02).
+ * Computed server-side by the same helper the export uses, so the
+ * label shown in the Workbench can never diverge from the ZIP. */
+export interface ChapterExportSource {
+  chapter_id: string;
+  kind: ExportSourceKind;
+  render_id: string | null;
+  generation_id: string | null;
+  created_at: string | null;
+  mastered: boolean;
+}
+
+export function getChapterExportSource(
+  chapterId: string,
+  signal?: AbortSignal,
+): Promise<ChapterExportSource> {
+  return getJson<ChapterExportSource>(`/chapters/${chapterId}/export-source`, signal);
+}
+
+export interface MasterChapterResult {
+  chapter_id: string;
+  render_id: string;
+  output_path: string;
+  duration_s: number;
+  operations: string[];
+}
+
+/** One-click mastering: run the headless preset (denoise -> loudness
+ * -16 LUFS -> compressor) over the chapter's export audio. The result
+ * persists as a studio render, so it wins the export until discarded. */
+export function masterChapter(
+  chapterId: string,
+  signal?: AbortSignal,
+): Promise<MasterChapterResult> {
+  return postJson<MasterChapterResult, Record<string, never>>(
+    `/chapters/${chapterId}/master`,
+    {},
+    signal,
+  );
+}
+
 export interface ChunkQCInfo {
   index: number;
   qc_score: number | null;

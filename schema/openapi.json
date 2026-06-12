@@ -1584,6 +1584,92 @@
         }
       }
     },
+    "/api/chapters/{chapter_id}/export-source": {
+      "get": {
+        "tags": [
+          "chapter-synth"
+        ],
+        "summary": "Which audio will win the batch export for this chapter",
+        "description": "Expose the export priority (Studio edit > active take > latest\nsynthesis > fresh) so the Workbench can show — and the user can\noverride — the choice the export would otherwise make silently.",
+        "operationId": "get_export_source_api_chapters__chapter_id__export_source_get",
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chapter Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterExportSourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chapters/{chapter_id}/master": {
+      "post": {
+        "tags": [
+          "chapter-synth"
+        ],
+        "summary": "One-click mastering of the chapter's export audio",
+        "description": "Run the headless mastering preset (denoise -> loudness -16 LUFS ->\ncompressor) over the audio that currently wins the export, without\nopening the Studio editor. The result persists as a studio render so\nthe export picks it up; re-mastering requires discarding it first\n(prevents stacking denoise/compression on every click).",
+        "operationId": "master_chapter_api_chapters__chapter_id__master_post",
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chapter Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MasterChapterResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chapters/{chapter_id}/qc": {
       "post": {
         "tags": [
@@ -1681,13 +1767,13 @@
       }
     },
     "/api/export/{project_id}": {
-      "post": {
+      "get": {
         "tags": [
           "export"
         ],
         "summary": "Export all chapters as ZIP",
-        "description": "Build a ZIP with the best available audio per chapter.\n\nPreference order for each chapter:\n  1. Latest Studio edit (``studio_renders`` kind=\"audio\") — the user's\n     polished version.\n  2. Latest completed ``generation`` file on disk — cheaper than\n     re-synthesizing and preserves exactly what the user heard.\n  3. Fresh synthesis — only when neither of the above exists.\n\nIn addition, if the project has persisted video renders they are\nbundled under a ``videos/`` folder so the export is a complete\nproject artefact, not just the raw narration.",
-        "operationId": "batch_export_api_export__project_id__post",
+        "description": "Build a ZIP with the best available audio per chapter.\n\nGET (not POST) on purpose: the frontend triggers the download with a\nplain anchor so the browser streams the ZIP to disk, and anchors can\nonly issue GET.\n\nThe per-chapter preference order lives in\n``services.export_source.resolve_export_source`` (UX-02) — the same\nhelper the Workbench uses to display \"this audio will export\", so\nthe label and the bundle can't diverge:\n  1. Latest Studio edit (manual or one-click master).\n  2. The chapter's active take, then the latest completed generation.\n  3. Fresh synthesis — only when nothing usable exists on disk.\n\nWith ``master=true`` every chapter is run through the mastering\npreset first (skipping Studio edits that already are masters).\n\nIn addition, if the project has persisted video renders they are\nbundled under a ``videos/`` folder so the export is a complete\nproject artefact, not just the raw narration.",
+        "operationId": "batch_export_api_export__project_id__get",
         "parameters": [
           {
             "name": "project_id",
@@ -1697,6 +1783,18 @@
               "type": "string",
               "title": "Project Id"
             }
+          },
+          {
+            "name": "master",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Master every chapter (denoise + loudness + compressor) before bundling; already-mastered Studio edits are reused as-is.",
+              "default": false,
+              "title": "Master"
+            },
+            "description": "Master every chapter (denoise + loudness + compressor) before bundling; already-mastered Studio edits are reused as-is."
           }
         ],
         "responses": {
@@ -3789,6 +3887,69 @@
         "type": "object",
         "title": "ChapterCreate"
       },
+      "ChapterExportSourceResponse": {
+        "properties": {
+          "chapter_id": {
+            "type": "string",
+            "title": "Chapter Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "studio_edit",
+              "active_take",
+              "latest_generation",
+              "fresh_synthesis"
+            ],
+            "title": "Kind"
+          },
+          "render_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Render Id"
+          },
+          "generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Id"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "mastered": {
+            "type": "boolean",
+            "title": "Mastered",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "chapter_id",
+          "kind"
+        ],
+        "title": "ChapterExportSourceResponse",
+        "description": "Which audio will win the batch export for this chapter (UX-02).\n\nMirrors ``export_source.resolve_export_source`` 1:1 so the Workbench\nlabel and the actual ZIP content cannot diverge."
+      },
       "ChapterQCResponse": {
         "properties": {
           "generation_id": {
@@ -4854,6 +5015,43 @@
         ],
         "title": "LogsResponse",
         "description": "Recent log lines."
+      },
+      "MasterChapterResponse": {
+        "properties": {
+          "chapter_id": {
+            "type": "string",
+            "title": "Chapter Id"
+          },
+          "render_id": {
+            "type": "string",
+            "title": "Render Id"
+          },
+          "output_path": {
+            "type": "string",
+            "title": "Output Path"
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          },
+          "operations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Operations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chapter_id",
+          "render_id",
+          "output_path",
+          "duration_s",
+          "operations"
+        ],
+        "title": "MasterChapterResponse",
+        "description": "Result of the one-click mastering action (UX-02)."
       },
       "MixRequest": {
         "properties": {

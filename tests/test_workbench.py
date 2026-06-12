@@ -435,7 +435,8 @@ def test_batch_export_reuses_latest_done_generation(client, monkeypatch) -> None
 
     monkeypatch.setattr(TTSEngine, "synthesize", must_not_synthesize)
 
-    response = client.post(f"/api/export/{project['id']}")
+    # GET on purpose: the frontend downloads via a plain anchor (UX-02).
+    response = client.get(f"/api/export/{project['id']}")
     assert response.status_code == 200, response.text
     with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
         audio_entries = [n for n in zf.namelist() if n.startswith("audio/")]

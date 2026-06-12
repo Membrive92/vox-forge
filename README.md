@@ -213,7 +213,9 @@ npm run openapi   # export schema + regenerate TS types
 | POST | `/api/chapters/{id}/synthesize` | Synthesize a chapter with chunk tracking |
 | GET | `/api/chapters/{id}/chunks` | Chunk map for latest generation |
 | POST | `/api/chapters/{id}/regenerate-chunk/{n}` | Regenerate single chunk |
-| POST | `/api/export/{project_id}` | Batch export project as ZIP |
+| GET | `/api/chapters/{id}/export-source` | Which audio will win the export |
+| POST | `/api/chapters/{id}/master` | One-click mastering preset (headless Studio) |
+| GET | `/api/export/{project_id}?master=` | Batch export project as ZIP |
 | POST | `/api/convert` | Voice conversion (audio-to-audio) |
 | POST | `/api/voice-lab/process` | Apply DSP effects |
 | GET | `/api/voice-lab/presets` | Built-in DSP presets |

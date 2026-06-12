@@ -88,6 +88,8 @@ backend/
 │   ├── convert_engine.py    # OpenVoice V2 tone color converter
 │   ├── voice_lab_engine.py  # DSP suite (pedalboard, parselmouth, librosa)
 │   ├── audio_editor.py      # Stateless pydub batch editor (Studio module)
+│   ├── mastering.py         # Headless mastering preset (denoise → LUFS → compressor)
+│   ├── export_source.py     # Shared chapter export priority (Studio edit > take > fresh)
 │   ├── profile_manager.py   # JSON CRUD with asyncio.Lock + atomic writes
 │   ├── project_manager.py   # SQLite CRUD for projects/chapters/generations/takes
 │   ├── text_normalizer.py   # Spanish normalization (abbreviations, numbers, siglas)
@@ -102,8 +104,8 @@ backend/
     ├── voices.py             # Catalog + sample upload/serve (path traversal protected)
     ├── profiles.py           # CRUD /api/profiles
     ├── projects.py           # CRUD /api/projects + chapters + split
-    ├── chapter_synth.py      # Per-chapter synthesis + chunk map + regen
-    ├── batch_export.py       # ZIP export of all chapters
+    ├── chapter_synth.py      # Per-chapter synthesis + chunk map + regen + QC + mastering
+    ├── batch_export.py       # ZIP export of all chapters (GET, optional master-all)
     ├── character_synth.py    # Character-cast multi-voice synthesis
     ├── conversion.py         # Voice conversion (audio-to-audio)
     ├── voice_lab.py          # DSP processing + presets

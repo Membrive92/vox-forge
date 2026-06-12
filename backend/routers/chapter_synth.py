@@ -29,7 +29,9 @@ from ..dependencies import get_tts_engine
 from ..exceptions import UnsupportedFormatError
 from ..paths import OUTPUT_DIR, TEMP_DIR
 from ..schemas import SynthesisRequest
+from ..services import export_source as export_source_service
 from ..services import job_store
+from ..services import mastering
 from ..services import project_manager as pm
 from ..services import qc as qc_service
 from ..services.metadata import AudioMetadata, embed_metadata
@@ -93,6 +95,31 @@ class UploadedChapterGenerationResponse(BaseModel):
     duration: float
     file_path: str
     output_format: str
+
+
+class ChapterExportSourceResponse(BaseModel):
+    """Which audio will win the batch export for this chapter (UX-02).
+
+    Mirrors ``export_source.resolve_export_source`` 1:1 so the Workbench
+    label and the actual ZIP content cannot diverge.
+    """
+
+    chapter_id: str
+    kind: export_source_service.ExportSourceKind
+    render_id: str | None = None
+    generation_id: str | None = None
+    created_at: str | None = None
+    mastered: bool = False
+
+
+class MasterChapterResponse(BaseModel):
+    """Result of the one-click mastering action (UX-02)."""
+
+    chapter_id: str
+    render_id: str
+    output_path: str
+    duration_s: float
+    operations: list[str]
 
 
 @router.post("/{chapter_id}/synthesize", summary="Synthesize a chapter with per-chunk tracking")
@@ -397,6 +424,78 @@ async def get_chunk_map(chapter_id: str) -> dict:
         "chunks": result,
         "total": len(chunks),
     }
+
+
+@router.get(
+    "/{chapter_id}/export-source",
+    summary="Which audio will win the batch export for this chapter",
+    response_model=ChapterExportSourceResponse,
+)
+async def get_export_source(chapter_id: str) -> ChapterExportSourceResponse:
+    """Expose the export priority (Studio edit > active take > latest
+    synthesis > fresh) so the Workbench can show — and the user can
+    override — the choice the export would otherwise make silently."""
+    chapter = await pm.get_chapter(chapter_id)
+    if chapter is None:
+        raise HTTPException(404, "Chapter not found")
+
+    src = await export_source_service.resolve_export_source(chapter)
+    return ChapterExportSourceResponse(
+        chapter_id=chapter_id,
+        kind=src.kind,
+        render_id=src.render_id,
+        generation_id=src.generation_id,
+        created_at=src.created_at,
+        mastered=src.mastered,
+    )
+
+
+@router.post(
+    "/{chapter_id}/master",
+    summary="One-click mastering of the chapter's export audio",
+    response_model=MasterChapterResponse,
+)
+async def master_chapter(chapter_id: str) -> MasterChapterResponse:
+    """Run the headless mastering preset (denoise -> loudness -16 LUFS ->
+    compressor) over the audio that currently wins the export, without
+    opening the Studio editor. The result persists as a studio render so
+    the export picks it up; re-mastering requires discarding it first
+    (prevents stacking denoise/compression on every click).
+    """
+    chapter = await pm.get_chapter(chapter_id)
+    if chapter is None:
+        raise HTTPException(404, "Chapter not found")
+
+    src = await export_source_service.resolve_export_source(chapter)
+    if src.path is None:
+        raise HTTPException(400, "No completed generation to master")
+    if src.kind == "studio_edit" and src.mastered:
+        raise HTTPException(
+            400, "Chapter is already mastered — discard the Studio edit to re-master"
+        )
+
+    project = await pm.get_project(chapter["project_id"])
+    fmt = project["output_format"] if project else "mp3"
+    if fmt not in AUDIO_FORMATS:
+        fmt = "mp3"
+
+    render = await mastering.master_to_render(
+        src.path,
+        project_id=chapter.get("project_id"),
+        chapter_id=chapter_id,
+        output_format=fmt,
+    )
+    logger.info(
+        "Chapter mastered: chapter=%s source=%s -> %s",
+        chapter_id, src.path.name, Path(render["output_path"]).name,
+    )
+    return MasterChapterResponse(
+        chapter_id=chapter_id,
+        render_id=render["id"],
+        output_path=render["output_path"],
+        duration_s=render["duration_s"],
+        operations=list(mastering.MASTERING_OP_TYPES),
+    )
 
 
 @router.post(

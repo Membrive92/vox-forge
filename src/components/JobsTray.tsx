@@ -25,6 +25,7 @@ function kindLabel(t: Translations, kind: JobKind): string {
   switch (kind) {
     case "quick-synth": return t.jobKindQuickSynth;
     case "chapter-synth": return t.jobKindChapterSynth;
+    case "mastering": return t.jobKindMastering;
     case "conversion": return t.jobKindConversion;
     case "video-render": return t.jobKindVideoRender;
     case "transcription": return t.jobKindTranscription;

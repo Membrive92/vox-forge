@@ -654,6 +654,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chapters/{chapter_id}/export-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which audio will win the batch export for this chapter
+         * @description Expose the export priority (Studio edit > active take > latest
+         *     synthesis > fresh) so the Workbench can show � and the user can
+         *     override � the choice the export would otherwise make silently.
+         */
+        get: operations["get_export_source_api_chapters__chapter_id__export_source_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chapters/{chapter_id}/master": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * One-click mastering of the chapter's export audio
+         * @description Run the headless mastering preset (denoise -> loudness -16 LUFS ->
+         *     compressor) over the audio that currently wins the export, without
+         *     opening the Studio editor. The result persists as a studio render so
+         *     the export picks it up; re-mastering requires discarding it first
+         *     (prevents stacking denoise/compression on every click).
+         */
+        post: operations["master_chapter_api_chapters__chapter_id__master_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chapters/{chapter_id}/qc": {
         parameters: {
             query?: never;
@@ -715,24 +761,32 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
          * Export all chapters as ZIP
          * @description Build a ZIP with the best available audio per chapter.
          *
-         *     Preference order for each chapter:
-         *       1. Latest Studio edit (``studio_renders`` kind="audio") � the user's
-         *          polished version.
-         *       2. Latest completed ``generation`` file on disk � cheaper than
-         *          re-synthesizing and preserves exactly what the user heard.
-         *       3. Fresh synthesis � only when neither of the above exists.
+         *     GET (not POST) on purpose: the frontend triggers the download with a
+         *     plain anchor so the browser streams the ZIP to disk, and anchors can
+         *     only issue GET.
+         *
+         *     The per-chapter preference order lives in
+         *     ``services.export_source.resolve_export_source`` (UX-02) � the same
+         *     helper the Workbench uses to display "this audio will export", so
+         *     the label and the bundle can't diverge:
+         *       1. Latest Studio edit (manual or one-click master).
+         *       2. The chapter's active take, then the latest completed generation.
+         *       3. Fresh synthesis � only when nothing usable exists on disk.
+         *
+         *     With ``master=true`` every chapter is run through the mastering
+         *     preset first (skipping Studio edits that already are masters).
          *
          *     In addition, if the project has persisted video renders they are
          *     bundled under a ``videos/`` folder so the export is a complete
          *     project artefact, not just the raw narration.
          */
-        post: operations["batch_export_api_export__project_id__post"];
+        get: operations["batch_export_api_export__project_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1712,6 +1766,33 @@ export interface components {
             /** Profile Id */
             profile_id?: string | null;
         };
+        /**
+         * ChapterExportSourceResponse
+         * @description Which audio will win the batch export for this chapter (UX-02).
+         *
+         *     Mirrors ``export_source.resolve_export_source`` 1:1 so the Workbench
+         *     label and the actual ZIP content cannot diverge.
+         */
+        ChapterExportSourceResponse: {
+            /** Chapter Id */
+            chapter_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "studio_edit" | "active_take" | "latest_generation" | "fresh_synthesis";
+            /** Render Id */
+            render_id?: string | null;
+            /** Generation Id */
+            generation_id?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /**
+             * Mastered
+             * @default false
+             */
+            mastered: boolean;
+        };
         /** ChapterQCResponse */
         ChapterQCResponse: {
             /** Generation Id */
@@ -2106,6 +2187,22 @@ export interface components {
             source: string;
             /** Returned */
             returned: number;
+        };
+        /**
+         * MasterChapterResponse
+         * @description Result of the one-click mastering action (UX-02).
+         */
+        MasterChapterResponse: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Render Id */
+            render_id: string;
+            /** Output Path */
+            output_path: string;
+            /** Duration S */
+            duration_s: number;
+            /** Operations */
+            operations: string[];
         };
         /** MixRequest */
         MixRequest: {
@@ -3994,6 +4091,68 @@ export interface operations {
             };
         };
     };
+    get_export_source_api_chapters__chapter_id__export_source_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChapterExportSourceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    master_chapter_api_chapters__chapter_id__master_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterChapterResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     qc_chapter_api_chapters__chapter_id__qc_post: {
         parameters: {
             query?: never;
@@ -4060,9 +4219,12 @@ export interface operations {
             };
         };
     };
-    batch_export_api_export__project_id__post: {
+    batch_export_api_export__project_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Master every chapter (denoise + loudness + compressor) before bundling; already-mastered Studio edits are reused as-is. */
+                master?: boolean;
+            };
             header?: never;
             path: {
                 project_id: string;

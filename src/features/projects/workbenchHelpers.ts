@@ -1,3 +1,4 @@
+import type { ChapterExportSource } from "@/api/chapterSynth";
 import type { Translations } from "@/i18n";
 
 /**
@@ -17,4 +18,26 @@ export function relativeTime(iso: string, t: Translations): string {
   const days = Math.floor(hours / 24);
   if (days < 7) return t.timeDaysAgo.replace("{n}", String(days));
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/**
+ * Localized "Will export: …" label for a chapter's export source (UX-02).
+ * The kind itself comes from the backend resolver — this only renders it.
+ */
+export function exportSourceLabel(source: ChapterExportSource, t: Translations): string {
+  switch (source.kind) {
+    case "studio_edit": {
+      const template = source.mastered
+        ? t.chapterExportSourceMastered
+        : t.chapterExportSourceStudio;
+      const when = source.created_at ? relativeTime(source.created_at, t) : "—";
+      return template.replace("{when}", when);
+    }
+    case "active_take":
+      return t.chapterExportSourceActive;
+    case "latest_generation":
+      return t.chapterExportSourceLatest;
+    case "fresh_synthesis":
+      return t.chapterExportSourceFresh;
+  }
 }
