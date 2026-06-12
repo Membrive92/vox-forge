@@ -1,14 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 
-import { isAbortError } from "@/api/client";
 import {
-  applyEdit,
   deleteStudioRender,
   listStudioRenders,
   listStudioSources,
-  renderVideo,
-  transcribeSource,
-  uploadCover,
   type CoverUploadResult,
   type StudioOperation,
   type StudioRender,
@@ -18,7 +13,10 @@ import {
   type VideoOptions,
 } from "@/api/studio";
 import { logger } from "@/logging/logger";
-import { downloadUrl } from "@/utils/download";
+
+import { useEditSession } from "./useEditSession";
+import { useTranscription } from "./useTranscription";
+import { useVideoRender } from "./useVideoRender";
 
 export interface StudioSession {
   sources: StudioSource[];
@@ -79,48 +77,25 @@ export interface StudioSessionApi {
   removeRender: (renderId: string) => Promise<void>;
 }
 
+/**
+ * Thin facade over the three focused Studio hooks (MED-ARQ-4):
+ * ``useEditSession`` (op queue + apply), ``useTranscription`` (B.1) and
+ * ``useVideoRender`` (B.2). The facade owns what they share — the
+ * source list, the selected source, the persisted renders and the
+ * single error surface — and its public API is unchanged for consumers.
+ */
 export function useStudioSession(): StudioSessionApi {
   const [sources, setSources] = useState<StudioSource[]>([]);
   const [loadingSources, setLoadingSources] = useState(false);
   const [selected, setSelected] = useState<StudioSource | null>(null);
-  const [operations, setOperations] = useState<StudioOperation[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const lastUrlRef = useRef<string | null>(null);
-
-  const [transcript, setTranscript] = useState<TranscribeResult | null>(null);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-
-  const [cover, setCoverState] = useState<CoverUploadResult | null>(null);
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoMeta, setVideoMeta] = useState<StudioSession["videoMeta"]>(null);
-  const [isRendering, setIsRendering] = useState(false);
-  const lastVideoUrlRef = useRef<string | null>(null);
 
   const [renders, setRenders] = useState<StudioRender[]>([]);
   const [loadingRenders, setLoadingRenders] = useState(false);
 
-  // Abort controllers for each long-running task. Kept in refs so cancel
-  // methods can signal the in-flight fetch without re-rendering.
-  const applyAbortRef = useRef<AbortController | null>(null);
-  const transcribeAbortRef = useRef<AbortController | null>(null);
-  const renderAbortRef = useRef<AbortController | null>(null);
-
-  useEffect(
-    () => () => {
-      if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
-      if (lastVideoUrlRef.current) URL.revokeObjectURL(lastVideoUrlRef.current);
-      applyAbortRef.current?.abort();
-      transcribeAbortRef.current?.abort();
-      renderAbortRef.current?.abort();
-    },
-    [],
-  );
+  const edit = useEditSession(selected, setError);
+  const transcription = useTranscription(selected, setError);
+  const video = useVideoRender(selected, transcription.transcript, setError);
 
   const refreshSources = useCallback(async () => {
     setLoadingSources(true);
@@ -137,240 +112,16 @@ export function useStudioSession(): StudioSessionApi {
     }
   }, []);
 
-  const selectSource = useCallback((source: StudioSource | null) => {
-    setSelected(source);
-    setOperations([]);
-    setResultBlob(null);
-    if (lastUrlRef.current) {
-      URL.revokeObjectURL(lastUrlRef.current);
-      lastUrlRef.current = null;
-    }
-    setResultUrl(null);
-    // Phase B artifacts are per-source too — wipe them when switching.
-    setTranscript(null);
-    setVideoBlob(null);
-    setVideoMeta(null);
-    if (lastVideoUrlRef.current) {
-      URL.revokeObjectURL(lastVideoUrlRef.current);
-      lastVideoUrlRef.current = null;
-    }
-    setVideoUrl(null);
-  }, []);
-
-  const addOperation = useCallback((op: StudioOperation) => {
-    setOperations((prev) => [...prev, op]);
-  }, []);
-
-  const removeOperation = useCallback((index: number) => {
-    setOperations((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const moveOperation = useCallback((from: number, to: number) => {
-    setOperations((prev) => {
-      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) {
-        return prev;
-      }
-      const next = [...prev];
-      const [item] = next.splice(from, 1);
-      if (item) next.splice(to, 0, item);
-      return next;
-    });
-  }, []);
-
-  const clearOperations = useCallback(() => setOperations([]), []);
-
-  // apply() and applyPreview() differ only in the isPreviewMode flag, so
-  // they share one implementation.
-  const runApply = useCallback(
-    async (outputFormat: string, preview: boolean) => {
-      if (!selected || operations.length === 0) return;
-      const controller = new AbortController();
-      applyAbortRef.current = controller;
-      setIsProcessing(true);
-      setError(null);
-      if (!preview) setIsPreviewMode(false);
-      try {
-        logger.info(preview ? "Studio: applying edit preview" : "Studio: applying edit", {
-          source: selected.source_path,
-          ops: operations.length,
-          format: outputFormat,
-        });
-        const result = await applyEdit(
-          selected.source_path,
-          operations,
-          outputFormat,
-          { projectId: selected.project_id, chapterId: selected.chapter_id },
-          controller.signal,
-        );
-        if (lastUrlRef.current) URL.revokeObjectURL(lastUrlRef.current);
-        const url = URL.createObjectURL(result.blob);
-        lastUrlRef.current = url;
-        setResultBlob(result.blob);
-        setResultUrl(url);
-        if (preview) setIsPreviewMode(true);
-      } catch (err) {
-        if (isAbortError(err)) {
-          logger.info(preview ? "Studio: apply preview cancelled" : "Studio: apply cancelled");
-        } else {
-          const msg = err instanceof Error ? err.message : String(err);
-          setError(msg);
-          logger.error(preview ? "Studio: apply preview failed" : "Studio: apply failed", { error: msg });
-        }
-      } finally {
-        setIsProcessing(false);
-        if (applyAbortRef.current === controller) applyAbortRef.current = null;
-      }
+  const selectSource = useCallback(
+    (source: StudioSource | null) => {
+      setSelected(source);
+      // All Phase A/B artifacts are per-source — wipe them when switching.
+      edit.reset();
+      transcription.reset();
+      video.reset();
     },
-    [selected, operations],
+    [edit.reset, transcription.reset, video.reset],
   );
-
-  const apply = useCallback((outputFormat: string) => runApply(outputFormat, false), [runApply]);
-  const applyPreview = useCallback((outputFormat: string) => runApply(outputFormat, true), [runApply]);
-
-  const cancelApply = useCallback(() => {
-    applyAbortRef.current?.abort();
-  }, []);
-
-  const download = useCallback(
-    (filenameHint?: string) => {
-      if (!resultBlob || !resultUrl) return;
-      downloadUrl(resultUrl, filenameHint ?? `studio_edit_${Date.now()}.mp3`);
-    },
-    [resultBlob, resultUrl],
-  );
-
-  // ── Transcription (B.1) ──────────────────────────────────────────
-
-  const transcribe = useCallback(
-    async (language?: string) => {
-      if (!selected) return;
-      const controller = new AbortController();
-      transcribeAbortRef.current = controller;
-      setIsTranscribing(true);
-      setError(null);
-      try {
-        const result = await transcribeSource(
-          selected.source_path,
-          language ? { language } : {},
-          controller.signal,
-        );
-        setTranscript(result);
-        logger.info("Studio: transcribed", {
-          source: selected.source_path,
-          segments: result.entries.length,
-          engine: result.engine,
-        });
-      } catch (err) {
-        if (isAbortError(err)) {
-          logger.info("Studio: transcribe cancelled");
-        } else {
-          const msg = err instanceof Error ? err.message : String(err);
-          setError(msg);
-          logger.error("Studio: transcribe failed", { error: msg });
-        }
-      } finally {
-        setIsTranscribing(false);
-        if (transcribeAbortRef.current === controller) transcribeAbortRef.current = null;
-      }
-    },
-    [selected],
-  );
-
-  const cancelTranscribe = useCallback(() => {
-    transcribeAbortRef.current?.abort();
-  }, []);
-
-  const clearTranscript = useCallback(() => setTranscript(null), []);
-
-  // ── Cover + video render (B.2) ───────────────────────────────────
-
-  const setCover = useCallback(async (file: File) => {
-    setIsUploadingCover(true);
-    setError(null);
-    try {
-      const result = await uploadCover(file);
-      setCoverState(result);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setError(msg);
-      logger.error("Studio: cover upload failed", { error: msg });
-    } finally {
-      setIsUploadingCover(false);
-    }
-  }, []);
-
-  const clearCover = useCallback(() => setCoverState(null), []);
-
-  const renderCurrent = useCallback(
-    async (options: Partial<VideoOptions>, images?: VideoImage[]): Promise<boolean> => {
-      if (!selected) return false;
-      // Slideshow mode needs no cover; single-cover mode needs it.
-      const slideshow = images && images.length > 0;
-      if (!slideshow && !cover) return false;
-      const controller = new AbortController();
-      renderAbortRef.current = controller;
-      setIsRendering(true);
-      setError(null);
-      try {
-        const result = await renderVideo(
-          {
-            audio_path: selected.source_path,
-            cover_path: slideshow ? null : cover?.path ?? null,
-            subtitles_path: transcript?.srt_path ?? null,
-            options,
-            images: slideshow ? images : null,
-          },
-          controller.signal,
-        );
-        if (lastVideoUrlRef.current) URL.revokeObjectURL(lastVideoUrlRef.current);
-        const url = URL.createObjectURL(result.blob);
-        lastVideoUrlRef.current = url;
-        setVideoBlob(result.blob);
-        setVideoUrl(url);
-        setVideoMeta({
-          durationS: result.durationS,
-          sizeBytes: result.sizeBytes,
-          resolution: result.resolution,
-        });
-        return true;
-      } catch (err) {
-        if (isAbortError(err)) {
-          logger.info("Studio: render cancelled");
-        } else {
-          const msg = err instanceof Error ? err.message : String(err);
-          setError(msg);
-          logger.error("Studio: render failed", { error: msg });
-        }
-        return false;
-      } finally {
-        setIsRendering(false);
-        if (renderAbortRef.current === controller) renderAbortRef.current = null;
-      }
-    },
-    [selected, cover, transcript],
-  );
-
-  const cancelRender = useCallback(() => {
-    renderAbortRef.current?.abort();
-  }, []);
-
-  const downloadVideo = useCallback(
-    (filenameHint?: string) => {
-      if (!videoBlob || !videoUrl) return;
-      downloadUrl(videoUrl, filenameHint ?? `studio_video_${Date.now()}.mp4`);
-    },
-    [videoBlob, videoUrl],
-  );
-
-  const clearVideo = useCallback(() => {
-    if (lastVideoUrlRef.current) {
-      URL.revokeObjectURL(lastVideoUrlRef.current);
-      lastVideoUrlRef.current = null;
-    }
-    setVideoBlob(null);
-    setVideoUrl(null);
-    setVideoMeta(null);
-  }, []);
 
   // ── Recent renders (B.2) ─────────────────────────────────────────
 
@@ -410,42 +161,42 @@ export function useStudioSession(): StudioSessionApi {
       sources,
       loadingSources,
       selected,
-      operations,
-      isProcessing,
-      resultBlob,
-      resultUrl,
+      operations: edit.operations,
+      isProcessing: edit.isProcessing,
+      resultBlob: edit.resultBlob,
+      resultUrl: edit.resultUrl,
       error,
-      isPreviewMode,
-      transcript,
-      isTranscribing,
-      cover,
-      isUploadingCover,
-      videoBlob,
-      videoUrl,
-      videoMeta,
-      isRendering,
+      isPreviewMode: edit.isPreviewMode,
+      transcript: transcription.transcript,
+      isTranscribing: transcription.isTranscribing,
+      cover: video.cover,
+      isUploadingCover: video.isUploadingCover,
+      videoBlob: video.videoBlob,
+      videoUrl: video.videoUrl,
+      videoMeta: video.videoMeta,
+      isRendering: video.isRendering,
       renders,
       loadingRenders,
     },
     refreshSources,
     selectSource,
-    addOperation,
-    removeOperation,
-    moveOperation,
-    clearOperations,
-    apply,
-    applyPreview,
-    cancelApply,
-    download,
-    transcribe,
-    cancelTranscribe,
-    clearTranscript,
-    setCover,
-    clearCover,
-    renderCurrent,
-    cancelRender,
-    downloadVideo,
-    clearVideo,
+    addOperation: edit.addOperation,
+    removeOperation: edit.removeOperation,
+    moveOperation: edit.moveOperation,
+    clearOperations: edit.clearOperations,
+    apply: edit.apply,
+    applyPreview: edit.applyPreview,
+    cancelApply: edit.cancelApply,
+    download: edit.download,
+    transcribe: transcription.transcribe,
+    cancelTranscribe: transcription.cancelTranscribe,
+    clearTranscript: transcription.clearTranscript,
+    setCover: video.setCover,
+    clearCover: video.clearCover,
+    renderCurrent: video.renderCurrent,
+    cancelRender: video.cancelRender,
+    downloadVideo: video.downloadVideo,
+    clearVideo: video.clearVideo,
     refreshRenders,
     removeRender,
   };

@@ -19,7 +19,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 **Estados**: `RESUELTO-PREVIO` · `ABIERTO` · `NO-REPRODUCIBLE` · `WONTFIX` (justificado) · `HUMANO-PENDIENTE` · `DIFERIDO` (solo §F9).
 
-**Recuento** (triaje F0, actualizado tras F3): Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios 32/33 resueltos, **1 abierto** (MED-ARQ-4 parcial → F4) · Bajos 18/38 resueltos, **20 abiertos** · Nuevos (fuentes 2 y 3): ver tabla (F2/F2b/F8 cerrados salvo gates HUMANO; F7/F9 pendientes).
+**Recuento** (triaje F0, actualizado tras F4): Críticos 3/3 resueltos · Altos 13/13 resueltos · Medios **33/33 resueltos** (MED-ARQ-4 cerrado en F4) · Bajos 25/38 resueltos, **13 abiertos** (BAJO-16/27/28/29/30/31/32 cerrados en F4; quedan los de F5/F6 y varios menores) · Nuevos (fuentes 2 y 3): ver tabla (F2/F2b/F8 cerrados salvo gates HUMANO; F7/F9 pendientes).
 
 ---
 
@@ -90,7 +90,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | MED-ARQ-1 | `tabs.ts` divergente | RESUELTO-PREVIO | borrado | d716024 |
 | MED-ARQ-2 | useProfiles ×4 | RESUELTO-PREVIO | (= ALTO-03) | d716024 |
 | MED-ARQ-3 | setState durante render (VideoRenderPanel) | RESUELTO | el reset de `subsMode` a "none" al perder el transcript vive en `useEffect([hasTranscript])` (remedio sugerido por el audit), no en el cuerpo del render | F3 |
-| MED-ARQ-4 | useStudioSession god-hook | **ABIERTO (parcial)** | apply/applyPreview colapsados (0a1df73); falta partir en 3 hooks | 0a1df73 parcial |
+| MED-ARQ-4 | useStudioSession god-hook | RESUELTO | apply/applyPreview colapsados (0a1df73); F4: partido en `useEditSession` (cola+apply+resultado), `useTranscription` (B.1) y `useVideoRender` (B.2, cover sobrevive al cambio de fuente como antes), compuestos por una fachada `useStudioSession` (203 líneas) que posee lo compartido (sources/selected/renders/error único vía `reportError`); API pública intacta para StudioTab; cada sub-hook con su abort+revoke en cleanup propio y `reset()` por fuente | 0a1df73 + F4 |
 | MED-ARQ-5 | activity/stats/experimental/ambience dict crudo | RESUELTO-PREVIO | response_model en los 4 | 1466001 |
 
 ## Bajos (AUDIT §5)
