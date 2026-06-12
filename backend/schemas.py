@@ -262,6 +262,31 @@ class TranscribeResponse(BaseModel):
     entries: list[SrtEntry]
 
 
+class DetectScenesRequest(BaseModel):
+    """Group a transcript's SRT into ~N-second scenes (one image slot each)."""
+
+    srt_path: str = Field(..., min_length=1)
+    target_scene_seconds: float = Field(
+        default=25.0, ge=5.0, le=300.0,
+        description="Approximate length of each scene in seconds.",
+    )
+
+
+class DetectedScene(BaseModel):
+    """One detected scene: a time range plus the first words spoken in it."""
+
+    start_s: float = Field(..., ge=0)
+    end_s: float = Field(..., ge=0)
+    text_summary: str
+
+
+class DetectScenesResponse(BaseModel):
+    """Scenes detected from an SRT transcript."""
+
+    scenes: list[DetectedScene]
+    count: int
+
+
 class VideoOptions(BaseModel):
     """Visual options passed to the Studio video renderer."""
 

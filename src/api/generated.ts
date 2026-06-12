@@ -1099,6 +1099,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/scenes/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Group an SRT transcript into image-slot scenes
+         * @description Read ``srt_path`` and group its entries into ~``target_scene_seconds``
+         *     scenes (PROD-03). Each scene is a slot for one slideshow image. No
+         *     persistence: the client keeps the array and feeds it to
+         *     ``/render-video`` as ``images``.
+         */
+        post: operations["detect_scenes_api_studio_scenes_detect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/upload-cover": {
         parameters: {
             query?: never;
@@ -1796,6 +1819,42 @@ export interface components {
             status: string;
             /** Id */
             id: string;
+        };
+        /**
+         * DetectScenesRequest
+         * @description Group a transcript's SRT into ~N-second scenes (one image slot each).
+         */
+        DetectScenesRequest: {
+            /** Srt Path */
+            srt_path: string;
+            /**
+             * Target Scene Seconds
+             * @description Approximate length of each scene in seconds.
+             * @default 25
+             */
+            target_scene_seconds: number;
+        };
+        /**
+         * DetectScenesResponse
+         * @description Scenes detected from an SRT transcript.
+         */
+        DetectScenesResponse: {
+            /** Scenes */
+            scenes: components["schemas"]["DetectedScene"][];
+            /** Count */
+            count: number;
+        };
+        /**
+         * DetectedScene
+         * @description One detected scene: a time range plus the first words spoken in it.
+         */
+        DetectedScene: {
+            /** Start S */
+            start_s: number;
+            /** End S */
+            end_s: number;
+            /** Text Summary */
+            text_summary: string;
         };
         /** DiskUsage */
         DiskUsage: {
@@ -4628,6 +4687,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranscribeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detect_scenes_api_studio_scenes_detect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectScenesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetectScenesResponse"];
                 };
             };
             /** @description Validation Error */

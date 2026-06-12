@@ -5,6 +5,7 @@ Endpoints:
 - ``POST /api/studio/edit``           apply a queue of edit operations
 - ``GET  /api/studio/audio``          serve an audio file for wavesurfer.js
 - ``POST /api/studio/transcribe``     speech-to-text → SRT (Phase B.1)
+- ``POST /api/studio/scenes/detect``  group an SRT into image-slot scenes (PROD-03)
 - ``POST /api/studio/upload-cover``   upload cover image for video render (Phase B.2)
 - ``POST /api/studio/render-video``   compose MP4 via ffmpeg (Phase B.2)
 - ``GET  /api/studio/renders``        list persisted renders (Phase B.2)
@@ -35,6 +36,9 @@ from ..exceptions import (
 from ..paths import MEDIA_ROOTS, STUDIO_COVERS_DIR, is_within_allowed_roots
 from ..schemas import (
     CoverUploadResponse,
+    DetectedScene,
+    DetectScenesRequest,
+    DetectScenesResponse,
     GenerateImageRequest,
     GenerateImageResponse,
     RenderVideoRequest,
@@ -47,7 +51,7 @@ from ..schemas import (
     TranscribeRequest,
     TranscribeResponse,
 )
-from ..services import image_gen, studio_store
+from ..services import image_gen, scene_detect, studio_store
 from ..services.audio_editor import EditOperation, apply_operations
 from ..services.transcriber import Transcriber
 from ..services.video_renderer import VideoRenderer
@@ -237,6 +241,39 @@ async def transcribe(
         language=result.language,
         engine=result.engine,
         entries=entries,
+    )
+
+
+@router.post(
+    "/scenes/detect",
+    summary="Group an SRT transcript into image-slot scenes",
+    response_model=DetectScenesResponse,
+)
+async def detect_scenes(request: DetectScenesRequest) -> DetectScenesResponse:
+    """Read ``srt_path`` and group its entries into ~``target_scene_seconds``
+    scenes (PROD-03). Each scene is a slot for one slideshow image. No
+    persistence: the client keeps the array and feeds it to
+    ``/render-video`` as ``images``."""
+    srt_path = Path(request.srt_path)
+    if not _is_within_allowed_roots(srt_path):
+        raise PathNotAllowedError("SRT path is outside allowed directories")
+    if not srt_path.exists() or not srt_path.is_file():
+        raise SampleNotFound("SRT file not found")
+
+    entries = scene_detect.parse_srt(srt_path.read_text(encoding="utf-8"))
+    scenes = scene_detect.group_into_scenes(
+        entries, target_scene_seconds=request.target_scene_seconds
+    )
+    logger.info(
+        "Studio scenes: %s -> %d scenes (target %.0fs, %d entries)",
+        srt_path.name, len(scenes), request.target_scene_seconds, len(entries),
+    )
+    return DetectScenesResponse(
+        scenes=[
+            DetectedScene(start_s=s.start_s, end_s=s.end_s, text_summary=s.text_summary)
+            for s in scenes
+        ],
+        count=len(scenes),
     )
 
 

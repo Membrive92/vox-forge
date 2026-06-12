@@ -2635,6 +2635,48 @@
         }
       }
     },
+    "/api/studio/scenes/detect": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Group an SRT transcript into image-slot scenes",
+        "description": "Read ``srt_path`` and group its entries into ~``target_scene_seconds``\nscenes (PROD-03). Each scene is a slot for one slideshow image. No\npersistence: the client keeps the array and feeds it to\n``/render-video`` as ``images``.",
+        "operationId": "detect_scenes_api_studio_scenes_detect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectScenesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectScenesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/upload-cover": {
       "post": {
         "tags": [
@@ -4141,6 +4183,77 @@
           "id"
         ],
         "title": "DeletedResponse"
+      },
+      "DetectScenesRequest": {
+        "properties": {
+          "srt_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Srt Path"
+          },
+          "target_scene_seconds": {
+            "type": "number",
+            "maximum": 300.0,
+            "minimum": 5.0,
+            "title": "Target Scene Seconds",
+            "description": "Approximate length of each scene in seconds.",
+            "default": 25.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "srt_path"
+        ],
+        "title": "DetectScenesRequest",
+        "description": "Group a transcript's SRT into ~N-second scenes (one image slot each)."
+      },
+      "DetectScenesResponse": {
+        "properties": {
+          "scenes": {
+            "items": {
+              "$ref": "#/components/schemas/DetectedScene"
+            },
+            "type": "array",
+            "title": "Scenes"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenes",
+          "count"
+        ],
+        "title": "DetectScenesResponse",
+        "description": "Scenes detected from an SRT transcript."
+      },
+      "DetectedScene": {
+        "properties": {
+          "start_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Start S"
+          },
+          "end_s": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "End S"
+          },
+          "text_summary": {
+            "type": "string",
+            "title": "Text Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_s",
+          "end_s",
+          "text_summary"
+        ],
+        "title": "DetectedScene",
+        "description": "One detected scene: a time range plus the first words spoken in it."
       },
       "DiskUsage": {
         "properties": {

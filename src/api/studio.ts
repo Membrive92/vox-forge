@@ -92,6 +92,40 @@ export function transcribeSource(
   );
 }
 
+// ── Scene detection (PROD-03) ─────────────────────────────────────
+
+export interface DetectedScene {
+  start_s: number;
+  end_s: number;
+  /** First words spoken in the scene — label for its image slot. */
+  text_summary: string;
+}
+
+interface DetectScenesResponse {
+  scenes: DetectedScene[];
+  count: number;
+}
+
+/**
+ * Group an SRT transcript into ~`targetSceneSeconds` scenes, each a slot
+ * for one slideshow image (feeds `renderVideo`'s `images` list).
+ *
+ * No UI consumer yet by design: the montage UI arrives with UX-03/M5
+ * (`internal-docs/studio-montage-redesign.md`) — do not prune.
+ */
+export async function detectScenes(
+  srtPath: string,
+  targetSceneSeconds = 25,
+  signal?: AbortSignal,
+): Promise<DetectedScene[]> {
+  const body = await postJson<DetectScenesResponse>(
+    "/studio/scenes/detect",
+    { srt_path: srtPath, target_scene_seconds: targetSceneSeconds },
+    signal,
+  );
+  return body.scenes;
+}
+
 // ── Video rendering (Phase B.2) ───────────────────────────────────
 
 export interface VideoOptions {

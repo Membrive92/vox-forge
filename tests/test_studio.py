@@ -400,6 +400,106 @@ def test_transcribe_forwards_language_to_model(client) -> None:
     assert response.json()["language"] == "es"
 
 
+# ── Router: /api/studio/scenes/detect (PROD-03) ─────────────────────
+
+
+def _seed_srt(name: str, blocks: list[tuple[str, str, str]]) -> Path:
+    """Write an SRT into STUDIO_SUBS_DIR; blocks are (start, end, text)."""
+    from backend.paths import STUDIO_SUBS_DIR
+
+    STUDIO_SUBS_DIR.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = []
+    for i, (start, end, text) in enumerate(blocks, start=1):
+        lines += [str(i), f"{start} --> {end}", text, ""]
+    path = STUDIO_SUBS_DIR / name
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def test_detect_scenes_groups_by_target_duration(client) -> None:
+    """Six 10s entries, default 25s target: scenes close when the span
+    reaches the target -> (0-30) and (30-60)."""
+    blocks = [
+        ("00:00:00,000", "00:00:10,000", "uno"),
+        ("00:00:10,000", "00:00:20,000", "dos"),
+        ("00:00:20,000", "00:00:30,000", "tres"),
+        ("00:00:30,000", "00:00:40,000", "cuatro"),
+        ("00:00:40,000", "00:00:50,000", "cinco"),
+        ("00:00:50,000", "00:01:00,000", "seis"),
+    ]
+    srt = _seed_srt("scenes_six.srt", blocks)
+    response = client.post(
+        "/api/studio/scenes/detect",
+        json={"srt_path": str(srt.resolve())},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["count"] == 2
+    assert [(s["start_s"], s["end_s"]) for s in body["scenes"]] == [
+        (0.0, 30.0), (30.0, 60.0),
+    ]
+    assert body["scenes"][0]["text_summary"] == "uno dos tres"
+
+
+def test_detect_scenes_custom_target(client) -> None:
+    blocks = [
+        ("00:00:00,000", "00:00:10,000", "primera escena"),
+        ("00:00:10,000", "00:00:20,000", "segunda escena"),
+    ]
+    srt = _seed_srt("scenes_target.srt", blocks)
+    response = client.post(
+        "/api/studio/scenes/detect",
+        json={"srt_path": str(srt.resolve()), "target_scene_seconds": 10.0},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 2
+    assert body["scenes"][0]["text_summary"] == "primera escena"
+    assert body["scenes"][1]["text_summary"] == "segunda escena"
+
+
+def test_detect_scenes_empty_srt_returns_empty_list(client) -> None:
+    from backend.paths import STUDIO_SUBS_DIR
+
+    STUDIO_SUBS_DIR.mkdir(parents=True, exist_ok=True)
+    empty = STUDIO_SUBS_DIR / "scenes_empty.srt"
+    empty.write_text("", encoding="utf-8")
+    response = client.post(
+        "/api/studio/scenes/detect",
+        json={"srt_path": str(empty.resolve())},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"scenes": [], "count": 0}
+
+
+def test_detect_scenes_rejects_path_outside_allowed_roots(client) -> None:
+    response = client.post(
+        "/api/studio/scenes/detect",
+        json={"srt_path": "/etc/passwd"},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "path_not_allowed"
+
+
+def test_detect_scenes_missing_srt_returns_404(client) -> None:
+    from backend.paths import STUDIO_SUBS_DIR
+
+    response = client.post(
+        "/api/studio/scenes/detect",
+        json={"srt_path": str((STUDIO_SUBS_DIR / "missing_scenes.srt").resolve())},
+    )
+    assert response.status_code == 404
+
+
+def test_detect_scenes_target_out_of_range_is_422(client) -> None:
+    srt = _seed_srt("scenes_range.srt", [("00:00:00,000", "00:00:05,000", "hola")])
+    response = client.post(
+        "/api/studio/scenes/detect",
+        json={"srt_path": str(srt.resolve()), "target_scene_seconds": 2.0},
+    )
+    assert response.status_code == 422
+
+
 # ── Service: video_renderer argv builder ────────────────────────────
 
 
