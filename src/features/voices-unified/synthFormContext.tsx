@@ -12,7 +12,7 @@
  * so it comes in as props; ``toggleLang`` lives here because switching
  * language also resets the selected voice to the new language's default.
  */
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { CreateProfileInput } from "@/api/profiles";
 import { VOICES } from "@/constants/voices";
@@ -88,7 +88,11 @@ export function SynthFormProvider({ lang, setLang, t, onToast, onShowVoices, chi
   const samplePlayer = useSamplePlayer();
   const { create, update, remove } = useSharedProfiles();
 
-  const settings: SynthSettings = {
+  // Identidades estables (BAJO-12): App re-renderiza a menudo (toasts,
+  // polling de jobs/errores) y el provider vive dentro de su árbol; sin
+  // memoización, cada render regalaba un value nuevo y re-renderizaba todo
+  // el subárbol de Voices aunque nada hubiera cambiado.
+  const settings: SynthSettings = useMemo(() => ({
     lang, setLang,
     selectedVoice, setSelectedVoice,
     format, setFormat,
@@ -96,22 +100,22 @@ export function SynthFormProvider({ lang, setLang, t, onToast, onShowVoices, chi
     pitch, setPitch,
     volume, setVolume,
     activeProfileId, setActiveProfileId,
-  };
+  }), [lang, setLang, selectedVoice, format, speed, pitch, volume, activeProfileId]);
 
-  const draft: ProfileDraft = {
+  const draft: ProfileDraft = useMemo(() => ({
     name: newProfileName, setName: setNewProfileName,
     uploadedFile, setUploadedFile,
     editingId: editingProfile, setEditingId: setEditingProfile,
-  };
+  }), [newProfileName, uploadedFile, editingProfile]);
 
-  const toggleLang = (): void => {
+  const toggleLang = useCallback((): void => {
     const next: Language = lang === "es" ? "en" : "es";
     setLang(next);
     const firstVoice = VOICES[next][0];
     if (firstVoice) setSelectedVoice(firstVoice.id);
-  };
+  }, [lang, setLang]);
 
-  const saveProfile = async (): Promise<void> => {
+  const saveProfile = useCallback(async (): Promise<void> => {
     if (!newProfileName.trim()) return;
     try {
       if (editingProfile) {
@@ -137,21 +141,27 @@ export function SynthFormProvider({ lang, setLang, t, onToast, onShowVoices, chi
     } catch (e) {
       onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     }
-  };
+  }, [newProfileName, editingProfile, selectedVoice, lang, speed, pitch, volume, uploadedFile, create, update, onToast, t]);
 
-  const useProfile = (p: Profile): void => {
+  const useProfile = useCallback((p: Profile): void => {
     setSelectedVoice(p.voiceId);
     setSpeed(p.speed);
     setPitch(p.pitch);
     setVolume(p.volume);
     setLang(p.lang);
     setActiveProfileId(p.id);
+    // Drop any in-progress edit draft: keeping it would make the next
+    // "Save" overwrite the profile being edited with THIS profile's
+    // params (BAJO-6).
+    setEditingProfile(null);
+    setNewProfileName("");
+    setUploadedFile(null);
     // The lab section renders inside the Voices tab; make sure the user
     // is there to see the profile become the active one.
     onShowVoices();
-  };
+  }, [setLang, onShowVoices]);
 
-  const editProfile = (p: Profile): void => {
+  const editProfile = useCallback((p: Profile): void => {
     setEditingProfile(p.id);
     setNewProfileName(p.name);
     setSpeed(p.speed);
@@ -163,44 +173,48 @@ export function SynthFormProvider({ lang, setLang, t, onToast, onShowVoices, chi
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, 0);
-  };
+  }, [onShowVoices]);
 
-  const deleteProfile = async (id: string): Promise<void> => {
+  const deleteProfile = useCallback(async (id: string): Promise<void> => {
     try {
       await remove(id);
     } catch (e) {
       onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     }
-  };
+  }, [remove, onToast, t]);
 
-  const toggleCastilianAnchor = async (id: string, value: boolean): Promise<void> => {
+  const toggleCastilianAnchor = useCallback(async (id: string, value: boolean): Promise<void> => {
     try {
       await update(id, { castilianAnchor: value });
     } catch (e) {
       onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     }
-  };
+  }, [update, onToast, t]);
+
+  const value = useMemo<SynthFormState>(() => ({
+    settings,
+    draft,
+    text,
+    setText,
+    dragOver,
+    setDragOver,
+    voicePreview,
+    samplePlayer,
+    toggleLang,
+    saveProfile,
+    useProfile,
+    editProfile,
+    deleteProfile,
+    toggleCastilianAnchor,
+    createProfile: create,
+  }), [
+    settings, draft, text, dragOver, voicePreview, samplePlayer,
+    toggleLang, saveProfile, useProfile, editProfile, deleteProfile,
+    toggleCastilianAnchor, create,
+  ]);
 
   return (
-    <SynthFormContext.Provider
-      value={{
-        settings,
-        draft,
-        text,
-        setText,
-        dragOver,
-        setDragOver,
-        voicePreview,
-        samplePlayer,
-        toggleLang,
-        saveProfile,
-        useProfile,
-        editProfile,
-        deleteProfile,
-        toggleCastilianAnchor,
-        createProfile: create,
-      }}
-    >
+    <SynthFormContext.Provider value={value}>
       {children}
     </SynthFormContext.Provider>
   );

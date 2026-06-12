@@ -40,11 +40,20 @@ export function InteractivePlayer({
   seekLabel,
 }: Props) {
   const ready = !disabled && player.url !== null;
-  const progress = player.duration > 0 ? (player.currentTime / player.duration) * 100 : 0;
+  // La duración del estado puede divergir de la real del elemento (p. ej.
+  // header X-Audio-Duration impreciso): el scrub mapearía a un punto
+  // equivocado. Preferir la del <audio> cuando es finita (BAJO-10).
+  const elementDuration = player.audioRef.current?.duration;
+  const effectiveDuration =
+    elementDuration !== undefined && Number.isFinite(elementDuration) && elementDuration > 0
+      ? elementDuration
+      : player.duration;
+
+  const progress = effectiveDuration > 0 ? (player.currentTime / effectiveDuration) * 100 : 0;
 
   const handleScrub = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const pct = Number(e.target.value);
-    player.seek((pct / 100) * player.duration);
+    player.seek((pct / 100) * effectiveDuration);
   };
 
   return (

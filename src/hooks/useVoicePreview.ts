@@ -1,5 +1,5 @@
 /** Synthesize a demo phrase with a given voice (or cloned profile) and play it. */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { synthesize } from "@/api/synthesis";
 import type { Language } from "@/types/domain";
@@ -89,5 +89,6 @@ export function useVoicePreview(): VoicePreviewState {
     [previewingId, cleanup],
   );
 
-  return { previewingId, loadingId, toggle };
+  // Identidad estable para consumidores via contexto (BAJO-12).
+  return useMemo(() => ({ previewingId, loadingId, toggle }), [previewingId, loadingId, toggle]);
 }

@@ -1,5 +1,5 @@
 /** Play audio samples stored in the backend. */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { API_BASE } from "@/api/client";
 
@@ -38,5 +38,7 @@ export function useSamplePlayer(): SamplePlayerState {
     [playingFilename, cleanup],
   );
 
-  return { playingFilename, toggle };
+  // Identidad estable: los consumidores via contexto solo re-renderizan
+  // cuando cambia el estado real, no en cada render del provider (BAJO-12).
+  return useMemo(() => ({ playingFilename, toggle }), [playingFilename, toggle]);
 }

@@ -60,6 +60,20 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
   const qcAbortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
 
+  // El audio cargado pertenece a UNA generación: si genId cambia a otra
+  // distinta (regen, cambio de capítulo) el player quedaría reproduciendo
+  // el audio viejo como si fuera el nuevo (BAJO-7). loadedForGenRef marca
+  // a qué generación corresponde lo cargado, para NO descargar el blob
+  // recién sintetizado cuando el refresh del mapa trae su propio genId.
+  const loadedForGenRef = useRef<string | null>(null);
+  const playerUnload = player.unload;
+  useEffect(() => {
+    if (loadedForGenRef.current !== genId) {
+      playerUnload();
+      loadedForGenRef.current = null;
+    }
+  }, [genId, playerUnload]);
+
   // UX-01: chapter synthesis keeps running while the user browses other
   // tabs (the Workbench host stays mounted) — surface it in the global
   // tray. No progress endpoint here, so it shows as indeterminate.
@@ -117,6 +131,7 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
     setSynthesizing(true);
     try {
       const result: ChapterSynthResult = await synthesizeChapter(chapterId, controller.signal);
+      loadedForGenRef.current = result.generationId;
       player.load(result.blob, result.duration);
       setGenId(result.generationId);
       onToast(
@@ -148,6 +163,12 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
     setRegenIndex(index);
     try {
       const result = await regenerateChunk(chapterId, index, controller.signal);
+      if (result.respliced) {
+        // El audio del capítulo cambió aunque genId sea el mismo: lo
+        // cargado en el player es la versión vieja (BAJO-7).
+        loadedForGenRef.current = null;
+        player.unload();
+      }
       onToast(
         (result.respliced ? t.chunkRegeneratedApplied : t.chunkRegeneratedPreview)
           .replace("{n}", String(index + 1)),

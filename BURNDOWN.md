@@ -19,9 +19,9 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 **Estados**: `RESUELTO-PREVIO` · `ABIERTO` · `NO-REPRODUCIBLE` · `WONTFIX` (justificado) · `HUMANO-PENDIENTE` · `DIFERIDO` (solo §F9).
 
-**Recuento** (actualizado tras F1–F8 + F7/UX, 2026-06-12): Críticos 3/3 · Altos 13/13 · Medios **33/33** · Bajos 26/38 — **12 abiertos** (menores misceláneos: BAJO-1,4,5,6,7,8,10,11,12,13,14,15; barrido final pendiente) · Nuevos: F2/F2b/F8 y F7 (PROD-01..04, UX-01/02) **cerrados** salvo gates HUMANO (VOZ-06, VOZ-09 A/B, PROD-05); F9 DIFERIDO.
+**Recuento** (final de código, 2026-06-12): Críticos **3/3** · Altos **13/13** · Medios **33/33** · Bajos **38/38** · Nuevos: F2/F2b/F8 y F7 **cerrados** salvo gates HUMANO (VOZ-06, VOZ-09 A/B, PROD-05, DOG-01); F9 DIFERIDO con motivo. **Cero ABIERTO en F0–F8.**
 
-**Gates post-ejecución (verificados 2026-06-12)**: backend **386 passed** · frontend **100 passed** (18 ficheros) · typecheck limpio · e2e 12+3 (corrido en UX-01) · phase vocoder: **0 referencias** · WorkbenchTab: **568 líneas** (<600) · 33 commits en `remediation`, árbol limpio.
+**Gates post-ejecución (verificados 2026-06-12, tras el barrido de bajos)**: backend **390 passed** · frontend **100 passed** · typecheck limpio · e2e 12+3 · phase vocoder: **0 referencias** · WorkbenchTab: **568 líneas** (<600) · 36 commits en `remediation`, árbol limpio.
 
 ---
 
@@ -104,15 +104,15 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-3 | Unidades corrompen texto | RESUELTO-PREVIO | text_normalizer.py:284 regex con word-boundary |
 | BAJO-4 | `_run_loudnorm` sin guarda ffmpeg | RESUELTO | `shutil.which("ffmpeg")` → RuntimeError accionable; test con which parcheado |
 | BAJO-5 | RMS crudo bajo campo dBFS | RESUELTO | campo renombrado a `rms_amplitude` (modelo + schema + tipo front + mock); semántica honesta |
-| BAJO-6 | Edit-draft conflictivo en `handleUseProfile` | **ABIERTO** | App.tsx:130-141 |
-| BAJO-7 | Player ChunkMap sin reset por genId | **ABIERTO** | ChunkMap.tsx:39-43 |
-| BAJO-8 | `onActiveProjectChange` parpadeo | **ABIERTO** | WorkbenchTab.tsx:105 |
+| BAJO-6 | Edit-draft conflictivo en `handleUseProfile` | RESUELTO | `useProfile` limpia editingId/nombre/upload (synthFormContext) — Save ya no puede pisar el perfil equivocado |
+| BAJO-7 | Player ChunkMap sin reset por genId | RESUELTO | unload keyed por generación (`loadedForGenRef`) + unload explícito tras regen respliced |
+| BAJO-8 | `onActiveProjectChange` parpadeo | RESUELTO | effect keyed por `selected?.name`, no por el objeto recreado en cada refresh |
 | BAJO-9 | StatusChip con latestDoneGen | RESUELTO-PREVIO | ChapterCard.tsx:498 usa activeGen.id |
-| BAJO-10 | Scrub contra duration de estado | **ABIERTO** | InteractivePlayer.tsx:47-51 |
+| BAJO-10 | Scrub contra duration de estado | RESUELTO | `effectiveDuration` del `<audio>` cuando es finita; estado solo como fallback |
 | BAJO-11 | cleanup stat/unlink bloqueantes | RESUELTO | `_purge_dir` vía `asyncio.to_thread` ×2 (la corrutina corre como bg task EN el loop, no en threadpool) |
-| BAJO-12 | App reconstruye settings/draft cada render | **ABIERTO** | App.tsx:79-93 |
-| BAJO-13 | AmbienceMixer 2 players sin throttle | **ABIERTO** | AmbienceMixer.tsx:42 (cae con MED-PERF-F2) |
-| BAJO-14 | useErrorBadge sin pausa en hidden | **ABIERTO** | useErrorBadge.ts:20 |
+| BAJO-12 | App reconstruye settings/draft cada render | RESUELTO | useMemo/useCallback en synthFormContext (value, settings, draft, handlers) + retornos memoizados de useVoicePreview/useSamplePlayer |
+| BAJO-13 | AmbienceMixer 2 players sin throttle | RESUELTO-PREVIO | incidental: el throttle de `useAudioPlayer` (MED-PERF-F2, F3) cubre ambos players |
+| BAJO-14 | useErrorBadge sin pausa en hidden | RESUELTO | poll salta en `document.hidden` + refresh inmediato en `visibilitychange` |
 | BAJO-15 | HTTPException sin mensaje amigable | RESUELTO | handler global normaliza a `{detail, code: http_NNN, technical}`; test del shape en 404 |
 | BAJO-16 | `catch {}` vacíos | RESUELTO | "Sin datos" ya no se confunde con fallo: el chunk-map vacío es un 200, así que el catch de `getChunkMap` es fallo real ⇒ logger.error + alerta con Reintentar; `loadStatus` de ChapterCard igual (chips/panel de audio ya no mienten en vacío); fetches decorativos (studio edits, sonda de incomplete jobs) ⇒ logger.warn con degradación explícita; test UI del branch de error+retry — F4 |
 | BAJO-17 | Resume concurrente mismo job_id | RESUELTO | resume devuelve 409 si `status=="running"` (check+start sin await, race-free); /synthesize acuña id fresco si el header está en vuelo; chunks con `os.replace` atómico — 479aafa |

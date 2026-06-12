@@ -108,10 +108,14 @@ export function WorkbenchTab({ t, onToast, onOpenStudioWithSource, onNavigateToQ
   // Push the active project name up to App so the global header can
   // show it. Cleanup when this tab unmounts (rare — visited tabs stay
   // mounted) or when the user deselects.
+  // Keyed por nombre, no por el objeto: cada refresh de la lista crea un
+  // objeto nuevo para el mismo proyecto y el header parpadeaba null→nombre
+  // en cada recarga (BAJO-8).
+  const activeProjectName = selected?.name ?? null;
   useEffect(() => {
-    onActiveProjectChange?.(selected?.name ?? null);
+    onActiveProjectChange?.(activeProjectName);
     return () => onActiveProjectChange?.(null);
-  }, [selected, onActiveProjectChange]);
+  }, [activeProjectName, onActiveProjectChange]);
 
   const handleNewProject = useCallback(async () => {
     try {

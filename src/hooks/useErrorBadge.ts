@@ -12,13 +12,20 @@ export function useErrorBadge(): number {
 
   useEffect(() => {
     const poll = (): void => {
+      // Pestaña en segundo plano: no quemar peticiones que nadie ve; al
+      // volver, visibilitychange refresca al instante (BAJO-14).
+      if (document.hidden) return;
       void fetchErrorCount(60)
         .then((d) => setCount(d.errors))
         .catch(() => { /* harmless — keep the previous count */ });
     };
     poll();
     const id = window.setInterval(poll, 30_000);
-    return () => window.clearInterval(id);
+    document.addEventListener("visibilitychange", poll);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", poll);
+    };
   }, []);
 
   return count;
