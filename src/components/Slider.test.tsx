@@ -26,6 +26,23 @@ describe("Slider", () => {
     expect(onChange).toHaveBeenCalledWith(5);
   });
 
+  it("exposes the info tooltip as a toggle button (BAJO-21)", () => {
+    render(<Slider label="Pitch" value={0} onChange={() => {}} info="Shifts the pitch" />);
+
+    const toggle = screen.getByRole("button", { name: "Pitch" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Shifts the pitch")).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const panel = document.getElementById(toggle.getAttribute("aria-controls")!);
+    expect(panel).toHaveTextContent("Shifts the pitch");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Shifts the pitch")).not.toBeInTheDocument();
+  });
+
   it("marks the degraded zones on the track", () => {
     render(
       <Slider

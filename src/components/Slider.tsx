@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { colors, fonts, typography } from "@/theme/tokens";
 
@@ -36,6 +36,7 @@ export function Slider({
 }: SliderProps) {
   const pct = ((value - min) / (max - min)) * 100;
   const [showInfo, setShowInfo] = useState(false);
+  const infoId = useId();
 
   const toPct = (v: number): number => ((v - min) / (max - min)) * 100;
   const isDegraded =
@@ -48,18 +49,25 @@ export function Slider({
         <span style={{ fontSize: typography.size.sm, color: colors.textMuted, fontFamily: fonts.sans, display: "flex", alignItems: "center", gap: 6 }}>
           {label}
           {info && (
-            <span
+            <button
+              type="button"
+              aria-label={label}
+              aria-expanded={showInfo}
+              aria-controls={infoId}
               onMouseEnter={() => setShowInfo(true)}
               onMouseLeave={() => setShowInfo(false)}
               onClick={() => setShowInfo((v) => !v)}
               style={{
                 width: 16,
                 height: 16,
+                padding: 0,
+                border: "none",
                 borderRadius: "50%",
                 background: showInfo ? colors.primary : "rgba(148,163,184,0.15)",
                 color: showInfo ? "#fff" : colors.textDim,
                 fontSize: typography.size.xs,
                 fontWeight: 700,
+                fontFamily: "inherit",
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -69,7 +77,7 @@ export function Slider({
               }}
             >
               i
-            </span>
+            </button>
           )}
         </span>
         <span
@@ -86,6 +94,7 @@ export function Slider({
       </div>
       {showInfo && info && (
         <div
+          id={infoId}
           style={{
             fontSize: typography.size.xs,
             color: colors.textMuted,

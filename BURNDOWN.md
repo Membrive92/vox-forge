@@ -116,8 +116,8 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-17 | Resume concurrente mismo job_id | RESUELTO | resume devuelve 409 si `status=="running"` (check+start sin await, race-free); /synthesize acuña id fresco si el header está en vuelo; chunks con `os.replace` atómico — 479aafa |
 | BAJO-18 | Takes done sin file_path | RESUELTO-PREVIO | chapter_synth.py:150,239,245 persisten file_path |
 | BAJO-19 | Nav sin tablist/tab | RESUELTO-PREVIO | ARIA tabs completo (App.tsx:490+) — d6777a7 |
-| BAJO-20 | `<audio>/<video>` sin nombre accesible | **ABIERTO** | ChapterCard/StudioTab/Recorder/VideoRenderPanel |
-| BAJO-21 | Tooltip Slider `<span>` no enfocable | **ABIERTO** | Slider.tsx:35, EditOperationsPanel ×3 |
+| BAJO-20 | `<audio>/<video>` sin nombre accesible | RESUELTO | StudioTab y VideoRenderPanel ya tenían `aria-label` (RESUELTO-PREVIO parcial); los 3 restantes etiquetados con claves i18n nuevas es/en: ChapterAudioPanel (`chapterAudioPlayerLabel`), ChapterRecorder (`recorderPreviewLabel`), ExperimentalTab CandidateRow (`expCandidatePlayerLabel` con {n}); los `<audio>` ocultos (HiddenAudio, AmbienceMixer preview) no llevan controls ni entran al árbol a11y — F5 |
+| BAJO-21 | Tooltip Slider `<span>` no enfocable | RESUELTO | Slider: toggle convertido a `<button aria-label={label} aria-expanded aria-controls>` (useId) manteniendo hover; EditOperationsPanel: los 3 `<span title>?` (LUFS/denoise/compresor) son `<button aria-expanded aria-controls>` que abren un panel de tip visible, con `label htmlFor` explícito hacia el input (botón ya no vive dentro del label); tests UI en Slider.test y EditOperationsPanel.test — F5 |
 | BAJO-22 | M:SS duplicado | RESUELTO-PREVIO | utils/format.ts — 33abced. Verificación F4: 2 rezagados migrados (`InteractivePlayer.formatTime`, `SourcePicker.formatDuration` que conserva "—" para duración desconocida); los `Xm YYs` de estimación (ChapterCard/SynthTab), el `M:SS.cc` con centisegundos (EditOperationsPanel) y el `H:MM:SS` sobre ms del ChapterRecorder (con horas; formatClock no las soporta) son formatos distintos, no duplicados |
 | BAJO-23 | Anchor de descarga duplicado | RESUELTO-PREVIO | utils/download.ts — d6777a7. Verificación F4: grep `createElement("a")` ⇒ solo download.ts |
 | BAJO-24 | `<audio>` oculto duplicado | RESUELTO-PREVIO | components/HiddenAudio.tsx — 9f5bf26. Verificación F4: los 10 players ocultos usan HiddenAudio; los `<audio controls>` restantes son reproductores visibles, no duplicados |
@@ -178,6 +178,11 @@ Herramientas: `vulture backend/ --min-confidence 90` (pip, dev-only, NO añadido
 **Falsos positivos (no re-investigar)**: `metadata.py:33 import mutagen` — sonda deliberada de disponibilidad en try/except ImportError · `generated.ts paths/webhooks/$defs` — fichero AUTO, nunca se edita · `i18n/index.ts getTranslations` — usado en App/ErrorBoundary; ts-prune no resuelve bien el alias `@/i18n`.
 
 **TODO/FIXME/XXX**: grep en `src/` y `backend/` ⇒ cero coincidencias; nada que convertir en ids.
+
+## F5 — Accesibilidad (2026-06-12)
+
+- **Focus trap verificado sin huecos**: los 3 modales reales (`ConfirmDialog`, `PromptDialog`, `ImageGenDialog` de VideoRenderPanel) usan `useFocusTrap` con restauración de foco al cerrar; `ChapterRecorder` se renderiza inline dentro de la ChapterCard (no es overlay modal) y no necesita trap.
+- **Walkthrough de teclado**: tablist con patrón ARIA completo (roving tabindex + flechas/Home/End) cubierto por e2e nuevo `e2e/keyboard-nav.spec.ts` (recorre los 4 tabs visibles, wrap en ambos sentidos, foco y selección sincronizados). Nota: las "6 pestañas" del plan original son hoy 4 entradas de nav — Quick Synth vive dentro de Voices y Studio se abre desde el capítulo (decisión de la reorg, App.tsx:362-365).
 
 ## Pasos HUMANO-PENDIENTE (instrucciones de una línea)
 

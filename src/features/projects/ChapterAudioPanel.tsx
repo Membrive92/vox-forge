@@ -91,6 +91,7 @@ export function ChapterAudioPanel({
             <div style={{ flex: 1 }}>
               <audio
                 controls
+                aria-label={t.chapterAudioPlayerLabel}
                 src={getGenerationAudioUrl(activeGen.file_path)}
                 style={{
                   width: "100%",

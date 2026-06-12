@@ -674,6 +674,7 @@ function CandidateRow({ t, index, take }: CandidateRowProps) {
       </div>
       <audio
         controls
+        aria-label={t.expCandidatePlayerLabel.replace("{n}", String(index))}
         src={url}
         style={{ flex: 1, height: 36 }}
       />

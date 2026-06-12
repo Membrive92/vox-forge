@@ -284,7 +284,7 @@ export function ChapterRecorder({ t, onSave, onCancel, isSaving = false }: Props
 
       {/* Preview player (shown once stopped) */}
       {previewUrl && state === "stopped" && (
-        <audio controls src={previewUrl} style={{ width: "100%" }} />
+        <audio controls aria-label={t.recorderPreviewLabel} src={previewUrl} style={{ width: "100%" }} />
       )}
 
       {/* Controls */}

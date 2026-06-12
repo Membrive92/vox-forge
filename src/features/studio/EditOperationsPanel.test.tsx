@@ -42,6 +42,38 @@ function renderPanel(operations: StudioOperation[] = OPS) {
   return onMove;
 }
 
+describe("EditOperationsPanel info tips (BAJO-21)", () => {
+  it("exposes each DSP tip as a toggle button with aria-expanded/aria-controls", async () => {
+    renderPanel();
+    const user = userEvent.setup();
+
+    const lufsToggle = screen.getByRole("button", { name: es.studioLufsTarget });
+    expect(lufsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(es.studioLufsTip)).not.toBeInTheDocument();
+
+    await user.click(lufsToggle);
+    expect(lufsToggle).toHaveAttribute("aria-expanded", "true");
+    const panel = document.getElementById(lufsToggle.getAttribute("aria-controls")!);
+    expect(panel).toHaveTextContent(es.studioLufsTip);
+
+    await user.click(lufsToggle);
+    expect(lufsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(es.studioLufsTip)).not.toBeInTheDocument();
+  });
+
+  it("opening another tip closes the previous one", async () => {
+    renderPanel();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: es.studioLufsTarget }));
+    expect(screen.getByText(es.studioLufsTip)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: es.studioDenoiseStrength }));
+    expect(screen.getByText(es.studioDenoiseTip)).toBeInTheDocument();
+    expect(screen.queryByText(es.studioLufsTip)).not.toBeInTheDocument();
+  });
+});
+
 describe("EditOperationsPanel reorder", () => {
   it("moves an operation up and down via the row buttons", async () => {
     const onMove = renderPanel();

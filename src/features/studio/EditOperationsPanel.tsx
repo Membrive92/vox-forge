@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import type { StudioOperation } from "@/api/studio";
 import { Button } from "@/components/Button";
@@ -83,6 +83,11 @@ export function EditOperationsPanel({
   const [denoiseStrength, setDenoiseStrength] = useState(50);   // 0..100
   const [compressorAmount, setCompressorAmount] = useState(40); // 0..100
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [openTip, setOpenTip] = useState<"lufs" | "denoise" | "compressor" | null>(null);
+  const idBase = useId();
+
+  const toggleTip = (tip: "lufs" | "denoise" | "compressor"): void =>
+    setOpenTip((current) => (current === tip ? null : tip));
 
   const requireRegion = (): StudioRegion | null => {
     if (!region) {
@@ -225,18 +230,21 @@ export function EditOperationsPanel({
               style={inputStyle}
             />
           </label>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: typography.size.xs,
-              color: colors.textDim,
-            }}
-          >
-            {t.studioLufsTarget}
-            <span title={t.studioLufsTip} style={{ cursor: "help", fontSize: "1.1em" }}>?</span>
+          <div style={fieldRowStyle}>
+            <label htmlFor={`${idBase}-lufs`}>{t.studioLufsTarget}</label>
+            <button
+              type="button"
+              aria-label={t.studioLufsTarget}
+              aria-expanded={openTip === "lufs"}
+              aria-controls={`${idBase}-lufs-tip`}
+              title={t.studioLufsTip}
+              onClick={() => toggleTip("lufs")}
+              style={tipButtonStyle}
+            >
+              ?
+            </button>
             <input
+              id={`${idBase}-lufs`}
               type="number"
               min={-24}
               max={-10}
@@ -245,19 +253,22 @@ export function EditOperationsPanel({
               onChange={(e) => setLufs(Number(e.target.value))}
               style={inputStyle}
             />
-          </label>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: typography.size.xs,
-              color: colors.textDim,
-            }}
-          >
-            {t.studioDenoiseStrength}
-            <span title={t.studioDenoiseTip} style={{ cursor: "help", fontSize: "1.1em" }}>?</span>
+          </div>
+          <div style={fieldRowStyle}>
+            <label htmlFor={`${idBase}-denoise`}>{t.studioDenoiseStrength}</label>
+            <button
+              type="button"
+              aria-label={t.studioDenoiseStrength}
+              aria-expanded={openTip === "denoise"}
+              aria-controls={`${idBase}-denoise-tip`}
+              title={t.studioDenoiseTip}
+              onClick={() => toggleTip("denoise")}
+              style={tipButtonStyle}
+            >
+              ?
+            </button>
             <input
+              id={`${idBase}-denoise`}
               type="number"
               min={0}
               max={100}
@@ -266,19 +277,22 @@ export function EditOperationsPanel({
               onChange={(e) => setDenoiseStrength(Number(e.target.value))}
               style={inputStyle}
             />
-          </label>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: typography.size.xs,
-              color: colors.textDim,
-            }}
-          >
-            {t.studioCompressorAmount}
-            <span title={t.studioCompressorTip} style={{ cursor: "help", fontSize: "1.1em" }}>?</span>
+          </div>
+          <div style={fieldRowStyle}>
+            <label htmlFor={`${idBase}-compressor`}>{t.studioCompressorAmount}</label>
+            <button
+              type="button"
+              aria-label={t.studioCompressorAmount}
+              aria-expanded={openTip === "compressor"}
+              aria-controls={`${idBase}-compressor-tip`}
+              title={t.studioCompressorTip}
+              onClick={() => toggleTip("compressor")}
+              style={tipButtonStyle}
+            >
+              ?
+            </button>
             <input
+              id={`${idBase}-compressor`}
               type="number"
               min={0}
               max={100}
@@ -287,7 +301,7 @@ export function EditOperationsPanel({
               onChange={(e) => setCompressorAmount(Number(e.target.value))}
               style={inputStyle}
             />
-          </label>
+          </div>
           <label
             style={{
               display: "flex",
@@ -312,6 +326,28 @@ export function EditOperationsPanel({
             </select>
           </label>
         </div>
+
+        {openTip && (
+          <div
+            id={`${idBase}-${openTip}-tip`}
+            style={{
+              marginTop: 8,
+              padding: "8px 10px",
+              borderRadius: radii.md,
+              background: colors.surfaceAlt,
+              border: `1px solid ${colors.borderFaint}`,
+              fontSize: typography.size.xs,
+              color: colors.textMuted,
+              lineHeight: 1.5,
+            }}
+          >
+            {openTip === "lufs"
+              ? t.studioLufsTip
+              : openTip === "denoise"
+                ? t.studioDenoiseTip
+                : t.studioCompressorTip}
+          </div>
+        )}
       </div>
 
       <div style={{ borderTop: `1px solid ${colors.borderHair}`, paddingTop: 12 }}>
@@ -463,4 +499,23 @@ const inputStyle: React.CSSProperties = {
   color: colors.text,
   fontSize: typography.size.xs,
   fontFamily: fonts.mono,
+};
+
+const fieldRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: typography.size.xs,
+  color: colors.textDim,
+};
+
+const tipButtonStyle: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  padding: 0,
+  color: colors.textDim,
+  cursor: "pointer",
+  fontSize: "1.1em",
+  fontFamily: "inherit",
+  lineHeight: 1,
 };
