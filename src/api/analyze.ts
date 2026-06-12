@@ -11,6 +11,8 @@ export interface SampleAnalysis {
   snr_db: number;
   clip_ratio: number;
   silence_ratio: number;
+  /** Approximate speech rate in syllables/second (VOZ-10 curation aid). */
+  rhythm_sps: number;
   rating: "excellent" | "good" | "fair" | "poor";
   issues: string[];
 }

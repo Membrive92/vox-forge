@@ -16,7 +16,8 @@ function makeProfile(overrides: Partial<ProfileDTO> = {}): ProfileDTO {
     speed: 100,
     pitch: 0,
     volume: 80,
-    sample_filename: null,
+    samples: [],
+    sample_filename: null, // deprecated readonly alias of samples[0]
     sample_duration: null,
     castilian_anchor: false,
     created_at: new Date().toISOString(),

@@ -23,7 +23,7 @@ export const en: Record<TranslationKey, string> = {
   voiceConfig: "Voice Configuration",
   uploadVoice: "Upload voice sample",
   uploadDesc: "Drag an audio file (.wav, .mp3) or click to select",
-  uploadHint: "Min. 6 seconds of clean audio for optimal cloning",
+  uploadHint: "Min. 6 seconds of clean audio. After creating the profile you can attach up to 5 samples (3–5 clips of 6–10 s improve cloning)",
   profileName: "Profile name",
   saveProfile: "Save profile",
   deleteProfile: "Delete",
@@ -200,6 +200,21 @@ export const en: Record<TranslationKey, string> = {
   sampleQualityGood: "Good",
   sampleQualityFair: "Fair",
   sampleQualityPoor: "Poor",
+  sampleRhythmUnit: "syl/s",
+
+  // Multi-sample conditioning (VOZ-10)
+  profileSamples: "Voice samples",
+  profileSamplesHint:
+    "Ideal: 3–5 clean clips of 6–10 s, same microphone, varied registers (neutral, question, exclamation). XTTS averages all samples.",
+  profileAddSample: "Add sample",
+  profileAnalyzeSample: "Analyze",
+  profileDeleteSample: "Delete sample",
+  profileSamplesFull: "5-sample limit reached",
+  profileSampleAdded: "Sample added to profile",
+  profileSampleRemoved: "Sample removed",
+  profileSampleAnalysisFailed: "Could not analyze the sample",
+  confirmDeleteSample:
+    "Delete sample \"{name}\" from this profile? The file will be removed from disk.",
 
   // Audio Tools
   audioToolsChangeVoice: "Change voice",

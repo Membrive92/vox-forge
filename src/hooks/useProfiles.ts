@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 import {
+  addProfileSample,
   createProfile,
   deleteProfile,
   listProfiles,
+  removeProfileSample,
   updateProfile,
   type CreateProfileInput,
   type UpdateProfileInput,
@@ -16,6 +18,10 @@ export interface ProfilesState {
   create: (input: CreateProfileInput) => Promise<Profile>;
   update: (id: string, input: UpdateProfileInput) => Promise<Profile>;
   remove: (id: string) => Promise<void>;
+  /** Append a conditioning sample to a profile (max 5, VOZ-10). */
+  addSample: (id: string, file: File) => Promise<Profile>;
+  /** Detach a sample and delete its file on the backend. */
+  removeSample: (id: string, filename: string) => Promise<Profile>;
 }
 
 export function useProfiles(): ProfilesState {
@@ -53,5 +59,17 @@ export function useProfiles(): ProfilesState {
     setProfiles((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  return { profiles, error, create, update, remove };
+  const addSample = useCallback(async (id: string, file: File) => {
+    const updated = await addProfileSample(id, file);
+    setProfiles((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    return updated;
+  }, []);
+
+  const removeSample = useCallback(async (id: string, filename: string) => {
+    const updated = await removeProfileSample(id, filename);
+    setProfiles((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    return updated;
+  }, []);
+
+  return { profiles, error, create, update, remove, addSample, removeSample };
 }

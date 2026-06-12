@@ -60,15 +60,18 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
   // Profiles that have an attached audio sample — those can be used here
   // as the speaker_wav source. Profiles without a sample (preset-only)
   // are filtered out.
-  const profilesWithSample = profiles.filter((p) => p.sampleName);
+  const profilesWithSample = profiles.filter((p) => p.samples.length > 0);
 
   const handlePickProfile = async (profile: Profile): Promise<void> => {
-    if (!profile.sampleName) return;
+    // Cross-lingual takes ONE uploaded speaker_wav; use the profile's
+    // primary sample.
+    const primarySample = profile.samples[0];
+    if (!primarySample) return;
     try {
-      const res = await fetch(`${API_BASE}/voices/samples/${profile.sampleName}`);
+      const res = await fetch(`${API_BASE}/voices/samples/${primarySample}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
-      const file = new File([blob], profile.sampleName, {
+      const file = new File([blob], primarySample, {
         type: blob.type || "audio/wav",
       });
       setSampleFile(file);

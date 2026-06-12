@@ -17,6 +17,9 @@ export interface ProfileDTO {
   speed: number;
   pitch: number;
   volume: number;
+  /** Conditioning sample filenames (0-5, VOZ-10). */
+  samples: string[];
+  /** Deprecated readonly alias of samples[0]. */
   sample_filename: string | null;
   sample_duration: number | null;
   created_at: string;
@@ -86,6 +89,7 @@ export async function installApiMocks(page: Page): Promise<MockState> {
       speed: overrides.speed ?? 100,
       pitch: overrides.pitch ?? 0,
       volume: overrides.volume ?? 80,
+      samples: overrides.samples ?? [],
       sample_filename: overrides.sample_filename ?? null,
       sample_duration: overrides.sample_duration ?? null,
       created_at: now,
@@ -164,7 +168,8 @@ export async function installApiMocks(page: Page): Promise<MockState> {
       });
       // Detect if a sample was uploaded
       if (text.includes('name="sample"')) {
-        profile.sample_filename = `${profile.id}_voice.wav`;
+        profile.samples = [`${profile.id}_voice.wav`];
+        profile.sample_filename = profile.samples[0]!;
         profile.sample_duration = 1.5;
       }
       state.profiles.push(profile);

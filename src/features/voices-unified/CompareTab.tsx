@@ -25,7 +25,7 @@ export function CompareTab({ t, profiles, onToast }: Props) {
   const playerA = useAudioPlayer();
   const playerB = useAudioPlayer();
 
-  const profilesWithSample = profiles.filter((p) => p.sampleName !== null);
+  const profilesWithSample = profiles.filter((p) => p.samples.length > 0);
 
   const handleGenerate = async (side: "A" | "B"): Promise<void> => {
     const pid = side === "A" ? profileA : profileB;

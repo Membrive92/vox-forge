@@ -38,7 +38,7 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
     abortRef.current?.abort();
   }, []);
 
-  const profilesWithSample = profiles.filter((p) => p.sampleName !== null);
+  const profilesWithSample = profiles.filter((p) => p.samples.length > 0);
 
   const canConvert =
     sourceFile !== null &&

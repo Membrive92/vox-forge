@@ -147,6 +147,15 @@ export async function deleteResource(path: string, signal?: AbortSignal): Promis
   await request(path, opts);
 }
 
+/** DELETE that returns the updated resource (e.g. detaching a profile
+ * sample returns the refreshed profile). */
+export async function deleteJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const opts: RequestOptions = { method: "DELETE" };
+  if (signal) opts.signal = signal;
+  const res = await request(path, opts);
+  return (await res.json()) as T;
+}
+
 export interface AudioResponse {
   blob: Blob;
   duration: number;

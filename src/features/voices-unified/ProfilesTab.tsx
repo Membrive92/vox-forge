@@ -1,4 +1,8 @@
+import { useRef, useState } from "react";
+
+import { analyzeSample, type SampleAnalysis } from "@/api/analyze";
 import { API_BASE } from "@/api/client";
+import { AudioRecorder } from "@/components/AudioRecorder";
 import { Button } from "@/components/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { IconButton } from "@/components/IconButton";
@@ -6,11 +10,16 @@ import { logger } from "@/logging/logger";
 import { downloadBlob } from "@/utils/download";
 import * as Icons from "@/components/icons";
 import { ALL_VOICES } from "@/constants/voices";
+import { useSharedProfiles } from "@/hooks/profilesContext";
 import type { SamplePlayerState } from "@/hooks/useSamplePlayer";
 import type { VoicePreviewState } from "@/hooks/useVoicePreview";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 import type { Profile } from "@/types/domain";
+
+import { QualityFeedback } from "./QualityFeedback";
+
+const MAX_SAMPLES = 5;
 
 interface ProfilesTabProps {
   t: Translations;
@@ -20,11 +29,12 @@ interface ProfilesTabProps {
   onDelete: (profileId: string) => void;
   onToggleCastilianAnchor: (profileId: string, value: boolean) => void;
   onNew: () => void;
+  onToast: (msg: string) => void;
   samplePlayer: SamplePlayerState;
   voicePreview: VoicePreviewState;
 }
 
-export function ProfilesTab({ t, profiles, onUse, onEdit, onDelete, onToggleCastilianAnchor, onNew, samplePlayer, voicePreview }: ProfilesTabProps) {
+export function ProfilesTab({ t, profiles, onUse, onEdit, onDelete, onToggleCastilianAnchor, onNew, onToast, samplePlayer, voicePreview }: ProfilesTabProps) {
   return (
     <div>
       <div
@@ -54,6 +64,7 @@ export function ProfilesTab({ t, profiles, onUse, onEdit, onDelete, onToggleCast
               onEdit={() => onEdit(p)}
               onDelete={() => onDelete(p.id)}
               onToggleCastilianAnchor={(v) => onToggleCastilianAnchor(p.id, v)}
+              onToast={onToast}
               samplePlayer={samplePlayer}
               voicePreview={voicePreview}
             />
@@ -95,33 +106,16 @@ interface ProfileCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onToggleCastilianAnchor: (value: boolean) => void;
+  onToast: (msg: string) => void;
   samplePlayer: SamplePlayerState;
   voicePreview: VoicePreviewState;
 }
 
-function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnchor, samplePlayer, voicePreview }: ProfileCardProps) {
+function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnchor, onToast, samplePlayer, voicePreview }: ProfileCardProps) {
   const confirm = useConfirm();
   const voice = ALL_VOICES.find((v) => v.id === profile.voiceId);
+  const hasSamples = profile.samples.length > 0;
 
-  // Downloads the stored voice sample named after the profile (not the
-  // opaque server filename). Fetched as a blob so the anchor download
-  // works regardless of API origin.
-  const handleDownloadSample = async (): Promise<void> => {
-    if (!profile.sampleName) return;
-    const dot = profile.sampleName.lastIndexOf(".");
-    const ext = dot >= 0 ? profile.sampleName.slice(dot) : ".wav";
-    const base = profile.name.replace(/[^\w\s.-]/g, "_").trim() || "voice_sample";
-    try {
-      const res = await fetch(`${API_BASE}/voices/samples/${profile.sampleName}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      downloadBlob(await res.blob(), `${base}${ext}`);
-    } catch (e) {
-      logger.error("Profile sample download failed", {
-        profileId: profile.id,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-  };
   const params = [
     { label: t.speed, value: `${profile.speed}%` },
     { label: t.pitch, value: `${profile.pitch > 0 ? "+" : ""}${profile.pitch}st` },
@@ -158,14 +152,14 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnc
             borderRadius: 4,
             fontSize: 9,
             fontWeight: 700,
-            background: profile.sampleName ? colors.successSoft : "rgba(148,163,184,0.08)",
-            color: profile.sampleName ? colors.success : colors.textDim,
+            background: hasSamples ? colors.successSoft : "rgba(148,163,184,0.08)",
+            color: hasSamples ? colors.success : colors.textDim,
             textTransform: "uppercase",
             letterSpacing: "1px",
             fontFamily: fonts.mono,
           }}
         >
-          {profile.sampleName ? t.badgeWithSample : t.badgePreset}
+          {hasSamples ? t.badgeWithSample : t.badgePreset}
         </span>
       </div>
 
@@ -213,66 +207,12 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnc
         ))}
       </div>
 
-      {profile.sampleName ? (
-        <div
-          style={{
-            padding: "8px 12px",
-            borderRadius: radii.md,
-            marginBottom: 16,
-            background: "rgba(59,130,246,0.06)",
-            border: "1px solid rgba(59,130,246,0.1)",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <button
-            onClick={() => samplePlayer.toggle(profile.sampleName!)}
-            aria-label={samplePlayer.playingFilename === profile.sampleName ? t.stop : t.play}
-            style={{
-              width: 28,
-              height: 28,
-              borderRadius: "50%",
-              background: samplePlayer.playingFilename === profile.sampleName
-                ? colors.accent
-                : colors.primary,
-              border: "none",
-              color: "#fff",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              transition: "all 0.2s",
-            }}
-          >
-            {samplePlayer.playingFilename === profile.sampleName
-              ? <Icons.Stop />
-              : <Icons.Play />}
-          </button>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: typography.size.xs, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {profile.sampleName}
-            </p>
-            <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim }}>
-              {profile.sampleDuration}s
-            </p>
-          </div>
-          <IconButton
-            aria-label={t.profileDownloadSample}
-            variant="secondary"
-            size="sm"
-            onClick={() => void handleDownloadSample()}
-          >
-            <Icons.Download />
-          </IconButton>
-        </div>
-      ) : null}
+      <ProfileSamples t={t} profile={profile} onToast={onToast} samplePlayer={samplePlayer} />
 
       {/* Preview: cloned profiles route through the clone engine (real
           cloned voice); preset profiles preview their base voice. */}
       {(() => {
-        const isCloned = profile.sampleName !== null;
+        const isCloned = hasSamples;
         const previewKey = isCloned ? profile.id : profile.voiceId;
         const isActive = voicePreview.previewingId === previewKey;
         const isLoading = voicePreview.loadingId === previewKey;
@@ -317,7 +257,7 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnc
       })()}
 
       {/* Castilian anchor toggle: prepend the configured reference voice
-          to this profile's sample at synthesis time. Off by default. */}
+          to this profile's primary sample at synthesis time. Off by default. */}
       <label
         style={{
           display: "flex",
@@ -385,4 +325,255 @@ function ProfileCard({ t, profile, onUse, onEdit, onDelete, onToggleCastilianAnc
       </div>
     </div>
   );
+}
+
+// ── Sample manager (VOZ-10) ─────────────────────────────────────────
+
+interface ProfileSamplesProps {
+  t: Translations;
+  profile: Profile;
+  onToast: (msg: string) => void;
+  samplePlayer: SamplePlayerState;
+}
+
+/**
+ * Manage a profile's conditioning samples: listen, analyze (per-sample
+ * quality + rhythm), download, delete with confirm, and add new ones
+ * (file upload or microphone recording) up to MAX_SAMPLES. Every stored
+ * sample is passed to XTTS, which averages the conditioning latents.
+ */
+function ProfileSamples({ t, profile, onToast, samplePlayer }: ProfileSamplesProps) {
+  const confirm = useConfirm();
+  const { addSample, removeSample } = useSharedProfiles();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [analyses, setAnalyses] = useState<Record<string, SampleAnalysis | "loading">>({});
+
+  const handleAdd = async (file: File | undefined): Promise<void> => {
+    if (!file || busy) return;
+    setBusy(true);
+    try {
+      await addSample(profile.id, file);
+      onToast(t.profileSampleAdded);
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemove = async (filename: string): Promise<void> => {
+    const ok = await confirm({
+      title: t.confirmDeleteTitle,
+      message: t.confirmDeleteSample.replace("{name}", filename),
+      confirmText: t.actionDelete,
+      cancelText: t.cancel,
+      confirmVariant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await removeSample(profile.id, filename);
+      if (samplePlayer.playingFilename === filename) samplePlayer.toggle(filename);
+      setAnalyses((prev) => {
+        const next = { ...prev };
+        delete next[filename];
+        return next;
+      });
+      onToast(t.profileSampleRemoved);
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    }
+  };
+
+  const handleAnalyze = async (filename: string): Promise<void> => {
+    setAnalyses((prev) => ({ ...prev, [filename]: "loading" }));
+    try {
+      const file = await fetchSampleFile(filename);
+      const result = await analyzeSample(file);
+      setAnalyses((prev) => ({ ...prev, [filename]: result }));
+    } catch (e) {
+      logger.error("Sample analysis failed", {
+        profileId: profile.id,
+        filename,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      setAnalyses((prev) => {
+        const next = { ...prev };
+        delete next[filename];
+        return next;
+      });
+      onToast(t.profileSampleAnalysisFailed);
+    }
+  };
+
+  // Downloads a stored sample named after the profile (not the opaque
+  // server filename). Fetched as a blob so the anchor download works
+  // regardless of API origin.
+  const handleDownload = async (filename: string, index: number): Promise<void> => {
+    const dot = filename.lastIndexOf(".");
+    const ext = dot >= 0 ? filename.slice(dot) : ".wav";
+    const base = profile.name.replace(/[^\w\s.-]/g, "_").trim() || "voice_sample";
+    const suffix = profile.samples.length > 1 ? `_${index + 1}` : "";
+    try {
+      const res = await fetch(`${API_BASE}/voices/samples/${filename}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      downloadBlob(await res.blob(), `${base}${suffix}${ext}`);
+    } catch (e) {
+      logger.error("Profile sample download failed", {
+        profileId: profile.id,
+        filename,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  };
+
+  const canAdd = profile.samples.length < MAX_SAMPLES;
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontSize: typography.size.xs, fontWeight: 700, color: colors.textMuted }}>
+          {t.profileSamples} ({profile.samples.length}/{MAX_SAMPLES})
+        </span>
+      </div>
+      <p style={{ margin: "0 0 8px", fontSize: 10, color: colors.textFaint, lineHeight: 1.4 }}>
+        {t.profileSamplesHint}
+      </p>
+
+      {profile.samples.map((filename, index) => {
+        const analysis = analyses[filename];
+        const playing = samplePlayer.playingFilename === filename;
+        return (
+          <div key={filename} style={{ marginBottom: 6 }}>
+            <div
+              style={{
+                padding: "6px 10px",
+                borderRadius: radii.md,
+                background: "rgba(59,130,246,0.06)",
+                border: "1px solid rgba(59,130,246,0.1)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <button
+                onClick={() => samplePlayer.toggle(filename)}
+                aria-label={playing ? t.stop : t.play}
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: "50%",
+                  background: playing ? colors.accent : colors.primary,
+                  border: "none",
+                  color: "#fff",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  transition: "all 0.2s",
+                }}
+              >
+                {playing ? <Icons.Stop /> : <Icons.Play />}
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: typography.size.xs, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {filename}
+                </p>
+                {index === 0 && profile.sampleDuration !== null && (
+                  <p style={{ margin: 0, fontSize: 10, color: colors.textDim }}>
+                    {profile.sampleDuration}s
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => void handleAnalyze(filename)}
+                disabled={analysis === "loading"}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: radii.sm,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  background: "transparent",
+                  border: `1px solid ${colors.borderFaint}`,
+                  color: colors.textMuted,
+                  cursor: analysis === "loading" ? "wait" : "pointer",
+                  fontFamily: fonts.sans,
+                  flexShrink: 0,
+                }}
+              >
+                {analysis === "loading" ? "..." : t.profileAnalyzeSample}
+              </button>
+              <IconButton
+                aria-label={t.profileDownloadSample}
+                variant="secondary"
+                size="sm"
+                onClick={() => void handleDownload(filename, index)}
+              >
+                <Icons.Download />
+              </IconButton>
+              <IconButton
+                aria-label={t.profileDeleteSample}
+                variant="danger"
+                size="sm"
+                onClick={() => void handleRemove(filename)}
+              >
+                <Icons.Trash />
+              </IconButton>
+            </div>
+            {analysis !== undefined && analysis !== "loading" && (
+              <div style={{ marginTop: 4 }}>
+                <QualityFeedback t={t} analysis={analysis} analyzing={false} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {canAdd ? (
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".wav,.mp3,.ogg,.flac"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              void handleAdd(e.target.files?.[0]);
+              e.target.value = ""; // allow re-picking the same file
+            }}
+          />
+          <div style={{ flex: 1 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              fullWidth
+              loading={busy}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              + {t.profileAddSample}
+            </Button>
+          </div>
+          <div style={{ flex: 1 }}>
+            <AudioRecorder
+              onRecorded={(file) => void handleAdd(file)}
+              labelRecord={t.recordVoice}
+              labelStop={t.stopRecording}
+              labelRecording={t.recording}
+            />
+          </div>
+        </div>
+      ) : (
+        <p style={{ margin: "4px 0 0", fontSize: 10, color: colors.textFaint }}>
+          {t.profileSamplesFull}
+        </p>
+      )}
+    </div>
+  );
+}
+
+async function fetchSampleFile(filename: string): Promise<File> {
+  const res = await fetch(`${API_BASE}/voices/samples/${filename}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type || "audio/wav" });
 }

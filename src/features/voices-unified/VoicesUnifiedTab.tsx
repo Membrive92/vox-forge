@@ -17,12 +17,13 @@ import { analyzeSample, type SampleAnalysis } from "@/api/analyze";
 import type { SamplePlayerState } from "@/hooks/useSamplePlayer";
 import type { VoicePreviewState } from "@/hooks/useVoicePreview";
 import type { Translations } from "@/i18n";
-import { colors, fonts, radii, typography } from "@/theme/tokens";
+import { colors, fonts, typography } from "@/theme/tokens";
 import type { Profile, UploadedSample } from "@/types/domain";
 
 import type { ProfileDraft, SynthSettings } from "../state";
 
 import { ProfilesTab } from "./ProfilesTab";
+import { QualityFeedback } from "./QualityFeedback";
 import { VoicesTab } from "./VoicesTab";
 
 interface Props {
@@ -108,6 +109,7 @@ export function VoicesUnifiedTab({
           onDelete={onDeleteProfile}
           onToggleCastilianAnchor={onToggleCastilianAnchor}
           onNew={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          onToast={onToast}
           samplePlayer={samplePlayer}
           voicePreview={voicePreview}
         />
@@ -140,74 +142,4 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       {children}
     </div>
   );
-}
-
-interface QualityProps {
-  t: Translations;
-  analysis: SampleAnalysis | null;
-  analyzing: boolean;
-}
-
-function QualityFeedback({ t, analysis, analyzing }: QualityProps) {
-  if (analyzing) {
-    return (
-      <div style={feedbackBoxStyle(colors.surfaceAlt, colors.border)}>
-        <span style={{ color: colors.textDim, fontSize: typography.size.sm }}>
-          {t.sampleQuality}: ...
-        </span>
-      </div>
-    );
-  }
-  if (!analysis) return null;
-
-  const ratingColor: Record<SampleAnalysis["rating"], string> = {
-    excellent: "#34d399",
-    good: "#60a5fa",
-    fair: "#fbbf24",
-    poor: "#f87171",
-  };
-  const ratingLabel: Record<SampleAnalysis["rating"], string> = {
-    excellent: t.sampleQualityExcellent,
-    good: t.sampleQualityGood,
-    fair: t.sampleQualityFair,
-    poor: t.sampleQualityPoor,
-  };
-
-  const color = ratingColor[analysis.rating];
-
-  return (
-    <div style={feedbackBoxStyle(`${color}15`, `${color}40`)}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <div style={{
-          width: 8, height: 8, borderRadius: "50%", background: color,
-        }} />
-        <span style={{ fontSize: typography.size.sm, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
-          {t.sampleQuality}: {ratingLabel[analysis.rating]}
-        </span>
-        <span style={{ fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.mono, marginLeft: "auto" }}>
-          {analysis.duration_s.toFixed(1)}s · SNR {analysis.snr_db.toFixed(1)}dB · peak {analysis.peak_dbfs.toFixed(1)}dBFS
-        </span>
-      </div>
-      {analysis.issues.length > 0 && (
-        <ul style={{
-          margin: "6px 0 0", paddingLeft: 18, fontSize: typography.size.xs,
-          color: colors.textDim, lineHeight: 1.6,
-        }}>
-          {analysis.issues.map((issue, i) => (
-            <li key={i}>{issue}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function feedbackBoxStyle(bg: string, border: string): React.CSSProperties {
-  return {
-    padding: "10px 14px",
-    background: bg,
-    border: `1px solid ${border}`,
-    borderRadius: radii.md,
-    fontFamily: fonts.sans,
-  };
 }

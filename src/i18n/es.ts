@@ -21,7 +21,7 @@ export const es = {
   voiceConfig: "Configuración de Voces",
   uploadVoice: "Subir muestra de voz",
   uploadDesc: "Arrastra un archivo de audio (.wav, .mp3) o haz clic para seleccionar",
-  uploadHint: "Mín. 6 segundos de audio limpio para clonación óptima",
+  uploadHint: "Mín. 6 segundos de audio limpio. Tras crear el perfil puedes añadir hasta 5 muestras (3–5 clips de 6–10 s mejoran la clonación)",
   profileName: "Nombre del perfil",
   saveProfile: "Guardar perfil",
   deleteProfile: "Eliminar",
@@ -198,6 +198,21 @@ export const es = {
   sampleQualityGood: "Buena",
   sampleQualityFair: "Aceptable",
   sampleQualityPoor: "Mejorable",
+  sampleRhythmUnit: "síl/s",
+
+  // Multi-sample conditioning (VOZ-10)
+  profileSamples: "Muestras de voz",
+  profileSamplesHint:
+    "Ideal: 3–5 clips de 6–10 s, limpios, con el mismo micrófono y registros variados (neutro, pregunta, exclamación). XTTS promedia todas las muestras.",
+  profileAddSample: "Añadir muestra",
+  profileAnalyzeSample: "Analizar",
+  profileDeleteSample: "Eliminar muestra",
+  profileSamplesFull: "Límite de 5 muestras alcanzado",
+  profileSampleAdded: "Muestra añadida al perfil",
+  profileSampleRemoved: "Muestra eliminada",
+  profileSampleAnalysisFailed: "No se pudo analizar la muestra",
+  confirmDeleteSample:
+    "¿Eliminar la muestra \"{name}\" de este perfil? El archivo se borrará del disco.",
 
   // Audio Tools
   audioToolsChangeVoice: "Cambiar voz",

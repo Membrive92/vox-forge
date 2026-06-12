@@ -116,7 +116,7 @@ export function CharacterCasting({ t, chapterText, chapterTitle, onToast }: Prop
   };
 
   const allVoices = [...VOICES.es, ...VOICES.en];
-  const profilesWithSample = profiles.filter((p) => p.sampleName !== null);
+  const profilesWithSample = profiles.filter((p) => p.samples.length > 0);
 
   return (
     <div

@@ -129,3 +129,36 @@ Validación rápida: sintetizar el mismo párrafo con y sin
   escuchar checkpoints intermedios.
 - **El fine-tuning no arregla el techo estructural** del AR de 2023 (saltos,
   sensibilidad a la longitud): eso queda delegado al spike PROD-06.
+
+## Apéndice — Curación de muestras de conditioning (VOZ-10, sin fine-tuning)
+
+Antes (o además) de entrenar: los perfiles de VoxForge aceptan hasta
+**5 muestras** y XTTS recibe la lista completa en `speaker_wav`,
+promediando los latents de conditioning. Bien curadas, las muestras
+multiples estabilizan el timbre y la prosodia sin tocar los pesos.
+
+Receta:
+
+- **3–5 clips de 6–10 s** cada uno. Clips mas largos no aportan: el
+  embedding usa como maximo ~60 s en total y los primeros segundos pesan
+  mas.
+- **Limpios**: sin musica, sin reverb, sin ruido de fondo (SNR alto en el
+  analizador de la pestaña Voices).
+- **Mismo microfono y misma distancia** en todas las muestras — mezclar
+  tomas de micros distintos emborrona el timbre promedio.
+- **Registros variados**: frase neutra, una pregunta, una exclamacion,
+  algo de narracion pausada. La variedad prosodica da al modelo un rango
+  expresivo más amplio que 5 clips monotonos.
+- **Ritmo al tempo objetivo**: el analizador por muestra reporta
+  `rhythm_sps` (silabas/segundo aproximadas). Para narracion castellana
+  el objetivo razonable es 5–7 sil/s; descartar muestras muy fuera de ese
+  rango si la voz clonada sale acelerada o arrastrada.
+
+Gestion en la UI: pestaña Voices → tarjeta del perfil → "Muestras de
+voz" (añadir por archivo o grabacion, escuchar, analizar por muestra,
+descargar, eliminar con confirmacion).
+
+Nota A/B pendiente (HUMANO): con conditioning multi-muestra mergeado,
+re-evaluar si el anclaje `castilian_warmup`/`castilian_anchor` sigue
+aportando — la deriva de acento es en parte un problema de conditioning.
+Si ya no aporta, retirarlo es limpieza de F4.

@@ -20,6 +20,8 @@ const INERT: ProfilesState = {
   create: () => Promise.reject(new Error("ProfilesContext provider is missing")),
   update: () => Promise.reject(new Error("ProfilesContext provider is missing")),
   remove: () => Promise.reject(new Error("ProfilesContext provider is missing")),
+  addSample: () => Promise.reject(new Error("ProfilesContext provider is missing")),
+  removeSample: () => Promise.reject(new Error("ProfilesContext provider is missing")),
 };
 
 export function useSharedProfiles(): ProfilesState {

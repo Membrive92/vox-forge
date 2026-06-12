@@ -7,7 +7,10 @@ Un perfil de voz es una configuracion guardada que combina:
 - **Nombre** identificativo ("Mi voz de narrador")
 - **Voz base** de Edge-TTS (ej: es-ES-AlvaroNeural)
 - **Parametros**: velocidad, tono, volumen
-- **Muestra de voz** (opcional): archivo de audio para clonacion
+- **Muestras de voz** (opcional, 0-5): archivos de audio para clonacion.
+  XTTS recibe la lista completa y promedia los latents de conditioning
+  (VOZ-10); 3-5 clips limpios de 6-10 s dan una voz mas estable que una
+  sola muestra larga.
 
 ## Modelo de datos
 
@@ -20,8 +23,10 @@ class VoiceProfile:
     speed: int            # 50-200 (100 = normal)
     pitch: int            # -10 a +10 semitonos
     volume: int           # 0-100
-    sample_filename: str? # Nombre del archivo en data/voices/ (null si no hay)
-    sample_duration: float? # Duracion de la muestra en segundos
+    samples: list[str]    # Nombres de archivo en data/voices/ (0-5)
+    sample_duration: float? # Duracion de la primera muestra en segundos
+    # sample_filename (solo en respuestas HTTP): alias DEPRECADO de
+    # samples[0], mantenido por compatibilidad durante la transicion
     created_at: str       # ISO 8601
     updated_at: str       # ISO 8601
 ```
@@ -40,7 +45,7 @@ Los perfiles se almacenan en `data/profiles/profiles.json`:
     "speed": 100,
     "pitch": 0,
     "volume": 80,
-    "sample_filename": "abc123.wav",
+    "samples": ["abc123.wav", "def456.wav"],
     "sample_duration": 28.5,
     "created_at": "2026-04-06T13:29:18.611275",
     "updated_at": "2026-04-06T13:29:18.611293"
@@ -93,16 +98,16 @@ async def create(self, profile):
 1. Recibe JSON: { name?, voice_id?, language?, speed?, pitch?, volume? }
 2. Solo los campos enviados se actualizan (exclude_none=True)
 3. updated_at se actualiza automaticamente
-4. No permite cambiar sample_filename via PATCH
-   (usar POST /api/voices/upload-sample con profile_id)
+4. No permite cambiar samples via PATCH
+   (usar POST /api/voices/upload-sample y DELETE /api/profiles/{id}/samples/{filename})
 ```
 
 ### Eliminar perfil (DELETE /api/profiles/{id})
 
 ```
 1. Busca el perfil
-2. Si tiene sample_filename:
-   └─ Elimina el archivo de data/voices/
+2. Por cada archivo en samples:
+   └─ Lo elimina de data/voices/
 3. Elimina del diccionario
 4. Escritura atomica
 5. Devuelve { status: "deleted", id: "..." }
@@ -115,16 +120,34 @@ async def create(self, profile):
 2. Guarda el archivo en data/voices/
 3. Si ffmpeg disponible: analiza duracion, channels, sample_rate, bit_depth
 4. Si profile_id proporcionado:
-   a. ProfileManager.attach_sample(profile_id, filename, duration)
-   b. Si el perfil tenia muestra anterior → la elimina del disco
+   a. ProfileManager.add_sample(profile_id, filename, duration)
+   b. La muestra se ANADE a la lista (no reemplaza); maximo 5
+   c. Si el perfil ya esta lleno → 400 y el archivo se borra del disco
 5. Devuelve metadata del audio subido
 ```
+
+### Quitar muestra (DELETE /api/profiles/{id}/samples/{filename})
+
+```
+1. Valida el filename (sin separadores de ruta ni traversal)
+2. ProfileManager.remove_sample(profile_id, filename)
+   a. Quita el archivo de la lista del perfil
+   b. Lo elimina de data/voices/
+3. Devuelve el perfil actualizado
+```
+
+### Migracion (VOZ-10)
+
+Los profiles.json anteriores (campo unico `sample_filename` +
+`extra_samples` muerto) se convierten a la forma `samples` en la primera
+carga y el archivo se reescribe una sola vez; las cargas siguientes son
+lecturas puras.
 
 ## Relacion perfil ↔ motor de sintesis
 
 ```
-Perfil sin muestra → Edge-TTS (usa voice_id + speed/pitch/volume)
-Perfil con muestra → XTTS v2 (usa sample_filename, ignora voice_id)
+Perfil sin muestras → Edge-TTS (usa voice_id + speed/pitch/volume)
+Perfil con muestras → XTTS v2 (pasa la lista samples completa, ignora voice_id)
 ```
 
-El `voice_id` se mantiene en perfiles con muestra como fallback: si el archivo de muestra se borra del disco, el sistema cae a Edge-TTS con esa voz automaticamente.
+El `voice_id` se mantiene en perfiles con muestras como fallback: si ningun archivo de muestra existe en disco, el sistema cae a Edge-TTS con esa voz automaticamente. Las muestras que falten en disco simplemente se omiten de la lista de conditioning.

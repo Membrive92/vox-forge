@@ -782,7 +782,7 @@ function ChapterVoicePicker({ t, chapter, project, profiles, onChange }: Chapter
     }
   };
 
-  const profilesWithSample = profiles.filter((p) => p.sampleName !== null);
+  const profilesWithSample = profiles.filter((p) => p.samples.length > 0);
   const isInheriting = currentValue === "inherit";
 
   // Label shown when inheriting — derive from the project's active voice

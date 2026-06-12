@@ -640,7 +640,7 @@ function ProjectVoicePicker({ t, project, profiles, onChange }: VoicePickerProps
     }
   };
 
-  const profilesWithSample = profiles.filter((p) => p.sampleName !== null);
+  const profilesWithSample = profiles.filter((p) => p.samples.length > 0);
 
   return (
     <div

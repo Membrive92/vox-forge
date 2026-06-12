@@ -19,11 +19,14 @@ export interface Profile {
   speed: number;
   pitch: number;
   volume: number;
-  sampleName: string | null;
+  /** Stored sample filenames (0-5). Every one is passed to XTTS as a
+   * conditioning reference (VOZ-10 — the model averages the latents). */
+  samples: string[];
+  /** Duration in seconds of the first sample, when known. */
   sampleDuration: number | null;
   /** When true, the configured Castilian reference voice is concatenated
-   * to the profile's sample before XTTS sees it (production audio
-   * anchor). Off by default. */
+   * to the profile's primary sample before XTTS sees it (production
+   * audio anchor). Off by default. */
   castilianAnchor: boolean;
 }
 

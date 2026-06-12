@@ -2,7 +2,7 @@
 
 import type { Language, Profile } from "@/types/domain";
 
-import { deleteResource, getJson, patchJson, postForm } from "./client";
+import { deleteJson, deleteResource, getJson, patchJson, postForm } from "./client";
 import type { ProfileDTO } from "./types";
 
 function toProfile(dto: ProfileDTO): Profile {
@@ -10,6 +10,8 @@ function toProfile(dto: ProfileDTO): Profile {
   // defaults for them (id=_new_id, language="es"), but the backend always
   // serializes them in responses. The fallbacks keep TS happy without
   // splitting the Pydantic model into separate create/response variants.
+  // ``sample_filename`` still exists in the DTO as a deprecated readonly
+  // alias of samples[0]; the domain type only carries ``samples``.
   return {
     id: dto.id ?? "",
     name: dto.name,
@@ -18,7 +20,7 @@ function toProfile(dto: ProfileDTO): Profile {
     speed: dto.speed,
     pitch: dto.pitch,
     volume: dto.volume,
-    sampleName: dto.sample_filename ?? null,
+    samples: dto.samples ?? [],
     sampleDuration: dto.sample_duration ?? null,
     castilianAnchor: dto.castilian_anchor ?? false,
   };
@@ -82,4 +84,30 @@ export async function updateProfile(
 
 export async function deleteProfile(profileId: string): Promise<void> {
   await deleteResource(`/profiles/${profileId}`);
+}
+
+export async function getProfile(profileId: string): Promise<Profile> {
+  const dto = await getJson<ProfileDTO>(`/profiles/${profileId}`);
+  return toProfile(dto);
+}
+
+/** Append a sample to a profile's conditioning set (max 5, VOZ-10).
+ * Returns the refreshed profile. */
+export async function addProfileSample(profileId: string, file: File): Promise<Profile> {
+  const fd = new FormData();
+  fd.append("sample", file);
+  fd.append("profile_id", profileId);
+  await postForm("/voices/upload-sample", fd);
+  return getProfile(profileId);
+}
+
+/** Detach a sample from a profile and delete its file on the backend. */
+export async function removeProfileSample(
+  profileId: string,
+  filename: string,
+): Promise<Profile> {
+  const dto = await deleteJson<ProfileDTO>(
+    `/profiles/${profileId}/samples/${encodeURIComponent(filename)}`,
+  );
+  return toProfile(dto);
 }
