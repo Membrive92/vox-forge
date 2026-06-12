@@ -11,7 +11,7 @@ from pydub import AudioSegment
 
 from ..catalogs import SUPPORTED_VOICES, VoiceMeta
 from ..dependencies import get_profile_manager
-from ..exceptions import ProfileNotFound, SampleNotFound
+from ..exceptions import InvalidSampleError, ProfileNotFound, SampleNotFound
 from ..paths import VOICES_DIR
 from ..schemas import SampleUploadResponse
 from ..services.profile_manager import ProfileManager
@@ -46,7 +46,12 @@ async def upload_voice_sample(
     profile_id: Optional[str] = Form(default=None),
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> SampleUploadResponse:
-    """Upload an audio sample; optionally attach it to a profile."""
+    """Upload an audio sample; optionally attach it to a profile.
+
+    With ``profile_id``, the sample is APPENDED to the profile's
+    conditioning set (up to 5 samples, VOZ-10) — it no longer replaces
+    the previous one. Returns 400 when the profile is already full.
+    """
     validate_audio_upload(sample)
 
     ext = Path(sample.filename or "").suffix or ".wav"
@@ -79,8 +84,8 @@ async def upload_voice_sample(
     attached_profile_id = profile_id
     if profile_id:
         try:
-            await profiles.attach_sample(profile_id, filename, duration)
-        except ProfileNotFound:
+            await profiles.add_sample(profile_id, filename, duration)
+        except (ProfileNotFound, InvalidSampleError):
             # Don't leave orphaned samples on disk
             filepath.unlink(missing_ok=True)
             raise

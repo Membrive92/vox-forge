@@ -500,7 +500,7 @@ class TestDualEngineRouting:
         profile = VoiceProfile(
             name="Cloned",
             voice_id="es-ES-AlvaroNeural",
-            sample_filename=sample_filename,
+            samples=[sample_filename],
             sample_duration=10.0,
         )
         await pm.create(profile)
@@ -529,7 +529,7 @@ class TestDualEngineRouting:
         profile = VoiceProfile(
             name="Missing File",
             voice_id="es-ES-AlvaroNeural",
-            sample_filename="nonexistent.wav",
+            samples=["nonexistent.wav"],
             sample_duration=10.0,
         )
         await pm.create(profile)

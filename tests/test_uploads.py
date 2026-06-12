@@ -53,29 +53,90 @@ def test_upload_sample_attached_to_profile(client) -> None:
 
     # Verificar que el perfil se actualizó
     updated = client.get(f"/api/profiles/{profile['id']}").json()
-    assert updated["sample_filename"] == body["filename"]
+    assert updated["samples"] == [body["filename"]]
+    assert updated["sample_filename"] == body["filename"]  # deprecated alias
     assert updated["sample_duration"] == 1.0
 
 
-def test_upload_replaces_old_sample(client) -> None:
-    # Crear perfil con primera muestra
+def test_upload_appends_second_sample(client) -> None:
+    """VOZ-10: a second upload joins the conditioning set, it does not
+    replace the first sample."""
     profile = client.post(
         "/api/profiles",
-        data={"name": "Replacement", "voice_id": "es-ES-AlvaroNeural"},
+        data={"name": "MultiSample", "voice_id": "es-ES-AlvaroNeural"},
         files={"sample": ("first.wav", _fake_wav(), "audio/wav")},
     ).json()
-    first_sample = profile["sample_filename"]
-    assert first_sample is not None
+    first_sample = profile["samples"][0]
 
-    # Subir segunda muestra
-    client.post(
+    second = client.post(
         "/api/voices/upload-sample",
         files={"sample": ("second.wav", _fake_wav(), "audio/wav")},
         data={"profile_id": profile["id"]},
-    )
+    ).json()
 
     updated = client.get(f"/api/profiles/{profile['id']}").json()
-    assert updated["sample_filename"] != first_sample
+    assert updated["samples"] == [first_sample, second["filename"]]
+    assert updated["sample_filename"] == first_sample  # alias = samples[0]
+
+
+def test_sixth_upload_rejected_and_not_orphaned(client) -> None:
+    """Profiles hold at most 5 samples; the rejected file must not stay
+    on disk."""
+    from backend.paths import VOICES_DIR
+
+    profile = client.post(
+        "/api/profiles",
+        data={"name": "Full", "voice_id": "es-ES-AlvaroNeural"},
+    ).json()
+
+    for i in range(5):
+        r = client.post(
+            "/api/voices/upload-sample",
+            files={"sample": (f"s{i}.wav", _fake_wav(), "audio/wav")},
+            data={"profile_id": profile["id"]},
+        )
+        assert r.status_code == 200
+
+    before = {p.name for p in VOICES_DIR.iterdir()}
+    rejected = client.post(
+        "/api/voices/upload-sample",
+        files={"sample": ("s5.wav", _fake_wav(), "audio/wav")},
+        data={"profile_id": profile["id"]},
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["code"] == "invalid_sample"
+    assert {p.name for p in VOICES_DIR.iterdir()} == before, (
+        "rejected upload left an orphaned file in VOICES_DIR"
+    )
+    updated = client.get(f"/api/profiles/{profile['id']}").json()
+    assert len(updated["samples"]) == 5
+
+
+def test_delete_profile_sample_endpoint(client) -> None:
+    """DELETE /profiles/{id}/samples/{filename} detaches the sample and
+    removes the file from disk."""
+    from backend.paths import VOICES_DIR
+
+    profile = client.post(
+        "/api/profiles",
+        data={"name": "Detach", "voice_id": "es-ES-AlvaroNeural"},
+        files={"sample": ("first.wav", _fake_wav(), "audio/wav")},
+    ).json()
+    first = profile["samples"][0]
+    second = client.post(
+        "/api/voices/upload-sample",
+        files={"sample": ("second.wav", _fake_wav(), "audio/wav")},
+        data={"profile_id": profile["id"]},
+    ).json()["filename"]
+
+    response = client.delete(f"/api/profiles/{profile['id']}/samples/{first}")
+    assert response.status_code == 200
+    assert response.json()["samples"] == [second]
+    assert not (VOICES_DIR / first).exists()
+    assert (VOICES_DIR / second).exists()
+
+    missing = client.delete(f"/api/profiles/{profile['id']}/samples/ghost.wav")
+    assert missing.status_code == 404
 
 
 # --- Sample serving ---

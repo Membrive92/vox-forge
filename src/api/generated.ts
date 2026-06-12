@@ -145,6 +145,10 @@ export interface paths {
         /**
          * Upload voice sample
          * @description Upload an audio sample; optionally attach it to a profile.
+         *
+         *     With ``profile_id``, the sample is APPENDED to the profile's
+         *     conditioning set (up to 5 samples, VOZ-10) � it no longer replaces
+         *     the previous one. Returns 400 when the profile is already full.
          */
         post: operations["upload_voice_sample_api_voices_upload_sample_post"];
         delete?: never;
@@ -182,7 +186,8 @@ export interface paths {
         put?: never;
         /**
          * Create profile
-         * @description Create a profile. Audio sample is optional.
+         * @description Create a profile. Audio sample is optional (more can be attached
+         *     later via ``POST /voices/upload-sample`` � up to 5 per profile).
          */
         post: operations["create_profile_api_profiles_post"];
         delete?: never;
@@ -208,6 +213,26 @@ export interface paths {
         head?: never;
         /** Update profile */
         patch: operations["update_profile_api_profiles__profile_id__patch"];
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}/samples/{filename}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Detach voice sample
+         * @description Detach a stored sample from a profile and delete it from disk.
+         */
+        delete: operations["delete_profile_sample_api_profiles__profile_id__samples__filename__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/preprocess": {
@@ -2558,6 +2583,13 @@ export interface components {
         /**
          * VoiceProfile
          * @description Persisted voice profile.
+         *
+         *     ``samples`` holds 0-5 stored sample filenames (under ``data/voices/``).
+         *     Every file in the list is passed to XTTS as a conditioning reference
+         *     (VOZ-10 � the model averages the conditioning latents). The
+         *     serialized ``sample_filename`` is a **deprecated** read-only alias of
+         *     ``samples[0]``, kept only for HTTP back-compat during the multi-sample
+         *     transition; new code must read ``samples``.
          */
         VoiceProfile: {
             /** Id */
@@ -2586,12 +2618,10 @@ export interface components {
              * @default 80
              */
             volume: number;
-            /** Sample Filename */
-            sample_filename?: string | null;
+            /** Samples */
+            samples?: string[];
             /** Sample Duration */
             sample_duration?: number | null;
-            /** Extra Samples */
-            extra_samples?: string[];
             /**
              * Castilian Anchor
              * @default false
@@ -2601,6 +2631,11 @@ export interface components {
             created_at?: string;
             /** Updated At */
             updated_at?: string;
+            /**
+             * Sample Filename
+             * @description Deprecated alias of ``samples[0]`` (HTTP back-compat, VOZ-10).
+             */
+            readonly sample_filename: string | null;
         };
     };
     responses: never;
@@ -3000,6 +3035,38 @@ export interface operations {
                 "application/json": components["schemas"]["ProfileUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceProfile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_profile_sample_api_profiles__profile_id__samples__filename__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+                filename: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

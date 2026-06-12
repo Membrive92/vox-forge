@@ -261,7 +261,7 @@
           "voices"
         ],
         "summary": "Upload voice sample",
-        "description": "Upload an audio sample; optionally attach it to a profile.",
+        "description": "Upload an audio sample; optionally attach it to a profile.\n\nWith ``profile_id``, the sample is APPENDED to the profile's\nconditioning set (up to 5 samples, VOZ-10) — it no longer replaces\nthe previous one. Returns 400 when the profile is already full.",
         "operationId": "upload_voice_sample_api_voices_upload_sample_post",
         "requestBody": {
           "content": {
@@ -366,7 +366,7 @@
           "profiles"
         ],
         "summary": "Create profile",
-        "description": "Create a profile. Audio sample is optional.",
+        "description": "Create a profile. Audio sample is optional (more can be attached\nlater via ``POST /voices/upload-sample`` — up to 5 per profile).",
         "operationId": "create_profile_api_profiles_post",
         "requestBody": {
           "content": {
@@ -517,6 +517,58 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DeletedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiles/{profile_id}/samples/{filename}": {
+      "delete": {
+        "tags": [
+          "profiles"
+        ],
+        "summary": "Detach voice sample",
+        "description": "Detach a stored sample from a profile and delete it from disk.",
+        "operationId": "delete_profile_sample_api_profiles__profile_id__samples__filename__delete",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoiceProfile"
                 }
               }
             }
@@ -6172,16 +6224,13 @@
             "title": "Volume",
             "default": 80
           },
-          "sample_filename": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sample Filename"
+          "samples": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Samples"
           },
           "sample_duration": {
             "anyOf": [
@@ -6193,13 +6242,6 @@
               }
             ],
             "title": "Sample Duration"
-          },
-          "extra_samples": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Extra Samples"
           },
           "castilian_anchor": {
             "type": "boolean",
@@ -6213,15 +6255,29 @@
           "updated_at": {
             "type": "string",
             "title": "Updated At"
+          },
+          "sample_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Filename",
+            "description": "Deprecated alias of ``samples[0]`` (HTTP back-compat, VOZ-10).",
+            "readOnly": true
           }
         },
         "type": "object",
         "required": [
           "name",
-          "voice_id"
+          "voice_id",
+          "sample_filename"
         ],
         "title": "VoiceProfile",
-        "description": "Persisted voice profile."
+        "description": "Persisted voice profile.\n\n``samples`` holds 0-5 stored sample filenames (under ``data/voices/``).\nEvery file in the list is passed to XTTS as a conditioning reference\n(VOZ-10 — the model averages the conditioning latents). The\nserialized ``sample_filename`` is a **deprecated** read-only alias of\n``samples[0]``, kept only for HTTP back-compat during the multi-sample\ntransition; new code must read ``samples``."
       }
     }
   }

@@ -5,9 +5,14 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from .config import settings
+
+# Max conditioning samples per voice profile (VOZ-10). XTTS accepts a
+# list in ``speaker_wav`` and averages the conditioning latents; 3-5
+# clean clips of 6-10s give a more stable voice than one long sample.
+MAX_PROFILE_SAMPLES = 5
 
 
 def _new_id() -> str:
@@ -36,7 +41,15 @@ class SynthesisRequest(BaseModel):
 
 
 class VoiceProfile(BaseModel):
-    """Persisted voice profile."""
+    """Persisted voice profile.
+
+    ``samples`` holds 0-5 stored sample filenames (under ``data/voices/``).
+    Every file in the list is passed to XTTS as a conditioning reference
+    (VOZ-10 — the model averages the conditioning latents). The
+    serialized ``sample_filename`` is a **deprecated** read-only alias of
+    ``samples[0]``, kept only for HTTP back-compat during the multi-sample
+    transition; new code must read ``samples``.
+    """
 
     id: str = Field(default_factory=_new_id)
     name: str = Field(..., min_length=1, max_length=100)
@@ -45,9 +58,10 @@ class VoiceProfile(BaseModel):
     speed: int = Field(default=100, ge=50, le=200)
     pitch: int = Field(default=0, ge=-10, le=10)
     volume: int = Field(default=80, ge=0, le=100)
-    sample_filename: Optional[str] = None
+    samples: list[str] = Field(default_factory=list, max_length=MAX_PROFILE_SAMPLES)
+    # Duration of the FIRST sample when known (display only). None when
+    # there are no samples or the first one's duration wasn't measured.
     sample_duration: Optional[float] = None
-    extra_samples: list[str] = Field(default_factory=list)
     # When True, the configured Castilian reference voice is concatenated
     # in front of this profile's sample before XTTS sees it. Same trick as
     # the experimental "audio anchor" mode (E), but applied automatically
@@ -57,6 +71,12 @@ class VoiceProfile(BaseModel):
     castilian_anchor: bool = False
     created_at: str = Field(default_factory=_now_iso)
     updated_at: str = Field(default_factory=_now_iso)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def sample_filename(self) -> Optional[str]:
+        """Deprecated alias of ``samples[0]`` (HTTP back-compat, VOZ-10)."""
+        return self.samples[0] if self.samples else None
 
 
 class ProfileUpdate(BaseModel):

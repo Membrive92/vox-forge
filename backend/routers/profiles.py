@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydub import AudioSegment
 
 from ..dependencies import get_profile_manager
-from ..exceptions import ProfileNotFound
+from ..exceptions import ProfileNotFound, SampleNotFound
 from ..paths import VOICES_DIR
 from ..schemas import DeletedResponse, ProfileUpdate, VoiceProfile
 from ..services.profile_manager import ProfileManager
@@ -48,7 +48,8 @@ async def create_profile(
     sample: Optional[UploadFile] = File(default=None),
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> VoiceProfile:
-    """Create a profile. Audio sample is optional."""
+    """Create a profile. Audio sample is optional (more can be attached
+    later via ``POST /voices/upload-sample`` — up to 5 per profile)."""
     sample_filename: Optional[str] = None
     sample_duration: Optional[float] = None
 
@@ -79,7 +80,7 @@ async def create_profile(
         speed=speed,
         pitch=pitch,
         volume=volume,
-        sample_filename=sample_filename,
+        samples=[sample_filename] if sample_filename else [],
         sample_duration=sample_duration,
         castilian_anchor=castilian_anchor,
     )
@@ -102,3 +103,20 @@ async def delete_profile(
 ) -> DeletedResponse:
     await profiles.delete(profile_id)
     return DeletedResponse(status="deleted", id=profile_id)
+
+
+@router.delete(
+    "/{profile_id}/samples/{filename}",
+    response_model=VoiceProfile,
+    summary="Detach voice sample",
+)
+async def delete_profile_sample(
+    profile_id: str,
+    filename: str,
+    profiles: ProfileManager = Depends(get_profile_manager),
+) -> VoiceProfile:
+    """Detach a stored sample from a profile and delete it from disk."""
+    # Reject path separators and traversal attempts before touching disk.
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise SampleNotFound("Sample not found")
+    return await profiles.remove_sample(profile_id, filename)

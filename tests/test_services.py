@@ -79,7 +79,9 @@ async def test_delete_nonexistent_raises(pm) -> None:
 
 
 @pytest.mark.asyncio
-async def test_attach_sample_replaces_old(pm, tmp_path) -> None:
+async def test_add_sample_appends_and_keeps_existing(pm) -> None:
+    """VOZ-10: adding a sample APPENDS to the conditioning set; the
+    previous sample stays both in the profile and on disk."""
     from backend.schemas import VoiceProfile
     from backend.paths import VOICES_DIR
 
@@ -89,43 +91,164 @@ async def test_attach_sample_replaces_old(pm, tmp_path) -> None:
     profile = VoiceProfile(
         name="WithSample",
         voice_id="es-ES-AlvaroNeural",
-        sample_filename="old.wav",
+        samples=["old.wav"],
         sample_duration=5.0,
     )
     created = await pm.create(profile)
 
-    updated = await pm.attach_sample(created.id, "new.wav", 10.0)
-    assert updated.sample_filename == "new.wav"
-    assert updated.sample_duration == 10.0
-    assert not old_sample.exists()  # viejo borrado
+    updated = await pm.add_sample(created.id, "new.wav", 10.0)
+    assert updated.samples == ["old.wav", "new.wav"]
+    assert updated.sample_filename == "old.wav"  # alias = first sample
+    assert updated.sample_duration == 5.0  # first sample's duration kept
+    assert old_sample.exists()  # nothing deleted
+    old_sample.unlink(missing_ok=True)
+
+
+@pytest.mark.asyncio
+async def test_add_sample_rejects_sixth(pm) -> None:
+    from backend.exceptions import InvalidSampleError
+    from backend.schemas import MAX_PROFILE_SAMPLES, VoiceProfile
+
+    profile = VoiceProfile(
+        name="Full",
+        voice_id="es-ES-AlvaroNeural",
+        samples=[f"s{i}.wav" for i in range(MAX_PROFILE_SAMPLES)],
+    )
+    created = await pm.create(profile)
+
+    with pytest.raises(InvalidSampleError):
+        await pm.add_sample(created.id, "one_too_many.wav", 1.0)
+    assert len(pm.get(created.id).samples) == MAX_PROFILE_SAMPLES
+
+
+@pytest.mark.asyncio
+async def test_remove_sample_unlinks_file_and_updates_profile(pm) -> None:
+    from backend.paths import VOICES_DIR
+    from backend.schemas import VoiceProfile
+
+    for name in ("first.wav", "second.wav"):
+        (VOICES_DIR / name).write_bytes(b"fake")
+
+    profile = VoiceProfile(
+        name="TwoSamples",
+        voice_id="es-ES-AlvaroNeural",
+        samples=["first.wav", "second.wav"],
+        sample_duration=7.0,
+    )
+    created = await pm.create(profile)
+
+    updated = await pm.remove_sample(created.id, "first.wav")
+    assert updated.samples == ["second.wav"]
+    assert not (VOICES_DIR / "first.wav").exists()
+    assert (VOICES_DIR / "second.wav").exists()
+    # Duration belonged to the removed first sample — now unknown.
+    assert updated.sample_duration is None
+    (VOICES_DIR / "second.wav").unlink(missing_ok=True)
+
+
+@pytest.mark.asyncio
+async def test_remove_sample_unknown_raises(pm) -> None:
+    from backend.exceptions import SampleNotFound
+    from backend.schemas import VoiceProfile
+
+    created = await pm.create(
+        VoiceProfile(name="NoSuch", voice_id="es-ES-AlvaroNeural")
+    )
+    with pytest.raises(SampleNotFound):
+        await pm.remove_sample(created.id, "ghost.wav")
+
+
+# --- VOZ-10 migration: old single-sample profiles.json -> samples list ---
+
+
+def _old_shape_profile(profile_id: str, **overrides) -> dict:
+    base = {
+        "id": profile_id,
+        "name": "Preexisting",
+        "voice_id": "es-ES-AlvaroNeural",
+        "language": "es",
+        "speed": 100,
+        "pitch": 0,
+        "volume": 80,
+        "sample_filename": None,
+        "sample_duration": None,
+        "created_at": "2025-01-01T00:00:00",
+        "updated_at": "2025-01-01T00:00:00",
+    }
+    base.update(overrides)
+    return base
 
 
 def test_load_existing_file(tmp_path) -> None:
-    """ProfileManager loads existing data from disk."""
+    """ProfileManager loads (and migrates) pre-VOZ-10 data from disk."""
     from backend.services.profile_manager import ProfileManager
 
     filepath = tmp_path / "profiles.json"
-    data = {
-        "abc": {
-            "id": "abc",
-            "name": "Preexisting",
-            "voice_id": "es-ES-AlvaroNeural",
-            "language": "es",
-            "speed": 100,
-            "pitch": 0,
-            "volume": 80,
-            "sample_filename": None,
-            "sample_duration": None,
-            "created_at": "2025-01-01T00:00:00",
-            "updated_at": "2025-01-01T00:00:00",
-        }
-    }
-    filepath.write_text(json.dumps(data), encoding="utf-8")
+    filepath.write_text(
+        json.dumps({"abc": _old_shape_profile("abc")}), encoding="utf-8"
+    )
 
     pm = ProfileManager(filepath)
     assert pm.count == 1
     assert pm.get("abc") is not None
     assert pm.get("abc").name == "Preexisting"
+    assert pm.get("abc").samples == []
+
+
+def test_migration_converts_old_shape_and_rewrites_file(tmp_path) -> None:
+    """sample_filename (+ legacy extra_samples) become the samples list;
+    the file on disk is rewritten in the new shape on first load."""
+    from backend.services.profile_manager import ProfileManager
+
+    filepath = tmp_path / "profiles.json"
+    filepath.write_text(
+        json.dumps({
+            "one": _old_shape_profile(
+                "one",
+                sample_filename="voice_a.wav",
+                sample_duration=8.5,
+                extra_samples=["voice_b.wav"],
+            ),
+            "two": _old_shape_profile("two"),
+        }),
+        encoding="utf-8",
+    )
+
+    pm = ProfileManager(filepath)
+    assert pm.get("one").samples == ["voice_a.wav", "voice_b.wav"]
+    assert pm.get("one").sample_filename == "voice_a.wav"  # alias intact
+    assert pm.get("one").sample_duration == 8.5
+    assert pm.get("two").samples == []
+
+    raw = json.loads(filepath.read_text(encoding="utf-8"))
+    assert raw["one"]["samples"] == ["voice_a.wav", "voice_b.wav"]
+    assert "sample_filename" not in raw["one"], "legacy key must be dropped on write"
+    assert "extra_samples" not in raw["one"]
+    assert raw["two"]["samples"] == []
+
+
+def test_migration_is_idempotent(tmp_path) -> None:
+    """Loading an already-migrated file must not change it again."""
+    import os
+
+    from backend.services.profile_manager import ProfileManager
+
+    filepath = tmp_path / "profiles.json"
+    filepath.write_text(
+        json.dumps({
+            "one": _old_shape_profile("one", sample_filename="voice_a.wav"),
+        }),
+        encoding="utf-8",
+    )
+
+    ProfileManager(filepath)  # first load migrates + rewrites
+    migrated_content = filepath.read_text(encoding="utf-8")
+    migrated_mtime = os.path.getmtime(filepath)
+
+    pm2 = ProfileManager(filepath)  # second load must be a pure read
+    assert pm2.get("one").samples == ["voice_a.wav"]
+    assert filepath.read_text(encoding="utf-8") == migrated_content
+    assert os.path.getmtime(filepath) == migrated_mtime
 
 
 def test_load_corrupt_file_recovers(tmp_path) -> None:
