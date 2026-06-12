@@ -4,6 +4,13 @@ export type Language = "es" | "en";
 export type Gender = "M" | "F";
 export type AudioFormat = "mp3" | "wav" | "ogg" | "flac";
 
+/**
+ * Top-level tab hosts. Studio has no nav entry (it opens from a chapter
+ * via a navigation intent) but is still a navigable destination — jobs
+ * record it as their origin so the tray can lead back to it (UX-01).
+ */
+export type TabId = "workbench" | "voices" | "audio-tools" | "studio" | "activity";
+
 export interface Voice {
   id: string;
   name: string;

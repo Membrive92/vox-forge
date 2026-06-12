@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isAbortError } from "@/api/client";
 import { fetchProgress, newJobId, synthesize } from "@/api/synthesis";
+import { useJobMirror } from "@/hooks/jobsContext";
 import type { SynthesisParams } from "@/types/domain";
 
 export interface SynthesisState {
@@ -40,6 +41,18 @@ export function useSynthesis(): SynthesisHook {
   const [lastEngine, setLastEngine] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // UX-01: mirror this run into the global job tray. Quick Synth lives in
+  // the Voices tab (lab section), so that's the origin to navigate back
+  // to. The polling stays here; the registry only reflects its state.
+  useJobMirror({
+    active: isGenerating,
+    kind: "quick-synth",
+    originTab: "voices",
+    progress: chunksTotal > 0 ? Math.min(progress / 100, 1) : null,
+    chunksDone: chunksTotal > 0 ? chunksDone : null,
+    chunksTotal: chunksTotal > 0 ? chunksTotal : null,
+  });
 
   const clearPoll = useCallback(() => {
     if (intervalRef.current !== null) {

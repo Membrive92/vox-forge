@@ -10,6 +10,7 @@ import {
   type VideoImage,
   type VideoOptions,
 } from "@/api/studio";
+import { useJobMirror } from "@/hooks/jobsContext";
 import { logger } from "@/logging/logger";
 import { downloadUrl } from "@/utils/download";
 
@@ -52,6 +53,15 @@ export function useVideoRender(
   const [isRendering, setIsRendering] = useState(false);
   const lastVideoUrlRef = useRef<string | null>(null);
   const renderAbortRef = useRef<AbortController | null>(null);
+
+  // UX-01: an ffmpeg MP4 render takes a while — keep it visible in the
+  // global tray when the user navigates away from Studio.
+  useJobMirror({
+    active: isRendering,
+    kind: "video-render",
+    originTab: "studio",
+    label: selected?.chapter_title ?? "",
+  });
 
   useEffect(
     () => () => {

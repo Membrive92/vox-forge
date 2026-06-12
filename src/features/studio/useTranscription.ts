@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isAbortError } from "@/api/client";
 import { transcribeSource, type StudioSource, type TranscribeResult } from "@/api/studio";
+import { useJobMirror } from "@/hooks/jobsContext";
 import { logger } from "@/logging/logger";
 
 /**
@@ -26,6 +27,15 @@ export function useTranscription(
   const [transcript, setTranscript] = useState<TranscribeResult | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const transcribeAbortRef = useRef<AbortController | null>(null);
+
+  // UX-01: whisper transcription is minutes-long — mirror it into the
+  // global tray so it stays visible outside the Studio tab.
+  useJobMirror({
+    active: isTranscribing,
+    kind: "transcription",
+    originTab: "studio",
+    label: selected?.chapter_title ?? "",
+  });
 
   useEffect(() => () => transcribeAbortRef.current?.abort(), []);
 

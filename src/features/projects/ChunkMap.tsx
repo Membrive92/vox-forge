@@ -15,6 +15,7 @@ import { HiddenAudio } from "@/components/HiddenAudio";
 import { InteractivePlayer } from "@/components/InteractivePlayer";
 import { Skeleton } from "@/components/Skeleton";
 import * as Icons from "@/components/icons";
+import { useJobMirror } from "@/hooks/jobsContext";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { logger } from "@/logging/logger";
 import { downloadUrl } from "@/utils/download";
@@ -58,6 +59,16 @@ export function ChunkMap({ t, chapterId, chapterTitle, onToast, onOpenStudioWith
   const regenAbortRef = useRef<AbortController | null>(null);
   const qcAbortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
+
+  // UX-01: chapter synthesis keeps running while the user browses other
+  // tabs (the Workbench host stays mounted) — surface it in the global
+  // tray. No progress endpoint here, so it shows as indeterminate.
+  useJobMirror({
+    active: synthesizing,
+    kind: "chapter-synth",
+    originTab: "workbench",
+    label: chapterTitle,
+  });
 
   useEffect(() => () => {
     synthAbortRef.current?.abort();

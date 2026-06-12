@@ -7,6 +7,7 @@ import { HiddenAudio } from "@/components/HiddenAudio";
 import { Slider } from "@/components/Slider";
 import { logger } from "@/logging/logger";
 import * as Icons from "@/components/icons";
+import { useJobMirror } from "@/hooks/jobsContext";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
@@ -33,6 +34,15 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
   const targetInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const player = useAudioPlayer();
+
+  // UX-01: voice conversion can take minutes on GPU — keep it visible in
+  // the global tray while the user works in other tabs.
+  useJobMirror({
+    active: isConverting,
+    kind: "conversion",
+    originTab: "audio-tools",
+    label: sourceFile?.name ?? "",
+  });
 
   useEffect(() => () => {
     abortRef.current?.abort();

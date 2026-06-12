@@ -9,25 +9,24 @@ import { StudioTab } from "@/features/studio/StudioTab";
 import { VOICES_LAB_SECTION_ID, VoicesPlusLab } from "@/features/voices-unified/VoicesPlusLab";
 import { SynthFormProvider, useSynthForm } from "@/features/voices-unified/synthFormContext";
 import { useErrorBadge } from "@/hooks/useErrorBadge";
+import { JobsProvider } from "@/hooks/jobsContext";
 import { ProfilesContext } from "@/hooks/profilesContext";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useToast } from "@/hooks/useToast";
 import { getTranslations } from "@/i18n";
 import { colors, fonts, fontsHref, typography } from "@/theme/tokens";
-import type { Language } from "@/types/domain";
-
-type Tab = "quick-synth" | "workbench" | "voices" | "audio-tools" | "studio" | "activity";
+import type { Language, TabId } from "@/types/domain";
 
 export default function App() {
   const [lang, setLang] = useState<Language>("es");
-  const [tab, setTab] = useState<Tab>("workbench");
+  const [tab, setTab] = useState<TabId>("workbench");
 
   // Keep tabs mounted after first visit so in-flight jobs (synth, render,
   // transcribe) aren't wiped when the user navigates away mid-work. The
   // fetch/polling lives inside the tab's hooks — if we unmount the
   // component, its state setters become no-ops when the backend
   // eventually resolves.
-  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set([tab]));
+  const [visitedTabs, setVisitedTabs] = useState<Set<TabId>>(() => new Set([tab]));
   useEffect(() => {
     setVisitedTabs((prev) => (prev.has(tab) ? prev : new Set([...prev, tab])));
   }, [tab]);
@@ -69,6 +68,7 @@ export default function App() {
   const t = getTranslations(lang);
 
   return (
+    <JobsProvider>
     <ProfilesContext.Provider value={profilesState}>
     <SynthFormProvider
       lang={lang}
@@ -143,6 +143,7 @@ export default function App() {
     </div>
     </SynthFormProvider>
     </ProfilesContext.Provider>
+    </JobsProvider>
   );
 }
 
@@ -353,8 +354,8 @@ function Header({ t, lang, onToggleLang, activeProjectName }: HeaderProps) {
 
 interface TabsNavProps {
   t: ReturnType<typeof getTranslations>;
-  tab: Tab;
-  setTab: (t: Tab) => void;
+  tab: TabId;
+  setTab: (t: TabId) => void;
   errorCount: number;
 }
 
@@ -363,7 +364,7 @@ function TabsNav({ t, tab, setTab, errorCount }: TabsNavProps) {
   // Synth lives inside Voices (the lab section) and Studio opens as a panel
   // from a chapter, so neither needs its own nav entry. Audio Tools (Change
   // Voice + Effects), however, is only reachable from here.
-  const tabs: readonly { id: Tab; icon: JSX.Element; label: string }[] = [
+  const tabs: readonly { id: TabId; icon: JSX.Element; label: string }[] = [
     { id: "workbench", icon: <Icons.Book />, label: t.tabWorkbench },
     { id: "voices", icon: <Icons.Mic2 />, label: t.tabVoices },
     { id: "audio-tools", icon: <Icons.SlidersIcon />, label: t.tabAudioTools },

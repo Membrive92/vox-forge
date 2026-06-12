@@ -17,6 +17,7 @@ import { Button } from "@/components/Button";
 import { PromptDialog } from "@/components/PromptDialog";
 import * as Icons from "@/components/icons";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import { useJobMirror } from "@/hooks/jobsContext";
 import { useSharedProfiles } from "@/hooks/profilesContext";
 import { downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
@@ -56,6 +57,14 @@ export function ExperimentalTab({ t, onToast, onCreateProfile }: ExperimentalTab
   const { profiles, create: defaultCreateProfile } = useSharedProfiles();
   const createProfile = onCreateProfile || defaultCreateProfile;
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+
+  // UX-01: cross-lingual XTTS generation is GPU-slow — mirror it into
+  // the global tray (this panel lives inside the Voices tab).
+  useJobMirror({
+    active: isGenerating,
+    kind: "cross-lingual",
+    originTab: "voices",
+  });
 
   // Profiles that have an attached audio sample — those can be used here
   // as the speaker_wav source. Profiles without a sample (preset-only)

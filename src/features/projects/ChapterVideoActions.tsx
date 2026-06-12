@@ -5,6 +5,7 @@ import { isAbortError } from "@/api/client";
 import { renderVideo } from "@/api/studio";
 import { Button } from "@/components/Button";
 import * as Icons from "@/components/icons";
+import { useJobMirror } from "@/hooks/jobsContext";
 import type { Translations } from "@/i18n";
 
 // ── ChapterVideoActions ─────────────────────────────────────────────
@@ -34,6 +35,15 @@ export function ChapterVideoActions({
 }: ChapterVideoActionsProps) {
   const [isRendering, setIsRendering] = useState(false);
   const renderAbortRef = useRef<AbortController | null>(null);
+
+  // UX-01: chapter video renders run for minutes — mirror them into the
+  // global tray so leaving the Workbench doesn't hide the progress.
+  useJobMirror({
+    active: isRendering,
+    kind: "video-render",
+    originTab: "workbench",
+    label: chapter.title,
+  });
 
   useEffect(() => () => { renderAbortRef.current?.abort(); }, []);
 
