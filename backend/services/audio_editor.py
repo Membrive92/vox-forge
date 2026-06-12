@@ -173,6 +173,11 @@ def _round_trip(
 def _run_loudnorm(in_path: Path, out_path: Path, target_lufs: float = -16.0) -> None:
     """Apply ffmpeg ``loudnorm`` filter. TP=-1.5, LRA=11 are ITU BS.1770
     defaults — good for speech/audiobook material."""
+    if shutil.which("ffmpeg") is None:
+        raise RuntimeError(
+            "ffmpeg not found in PATH. Install ffmpeg (https://ffmpeg.org) — "
+            "it is required for the loudness/mastering operations."
+        )
     argv = [
         "ffmpeg", "-y", "-i", str(in_path),
         "-af", f"loudnorm=I={target_lufs}:TP=-1.5:LRA=11",

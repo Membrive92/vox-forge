@@ -5737,9 +5737,9 @@
             "type": "number",
             "title": "Peak Dbfs"
           },
-          "rms": {
+          "rms_amplitude": {
             "type": "number",
-            "title": "Rms"
+            "title": "Rms Amplitude"
           },
           "snr_db": {
             "type": "number",
@@ -5781,7 +5781,7 @@
           "sample_rate",
           "channels",
           "peak_dbfs",
-          "rms",
+          "rms_amplitude",
           "snr_db",
           "clip_ratio",
           "silence_ratio",

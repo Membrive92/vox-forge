@@ -133,3 +133,29 @@ def test_normalizer_keeps_common_uppercase_words() -> None:
     assert "ene o" not in _spell_unknown_siglas("¡NO puede ser!")
     # Genuine unknown acronyms still get spelled.
     assert _spell_unknown_siglas("la XYZ") != "la XYZ"
+
+
+# ── BAJO-1: X-Request-ID log-injection guard ────────────────────────
+
+def test_request_id_header_sanitized(client) -> None:
+    """A hostile X-Request-ID must not be reflected (log injection)."""
+    evil = "abc\r\n[FAKE] injected=1"
+    resp = client.get("/api/health", headers={"X-Request-ID": evil})
+    echoed = resp.headers["X-Request-ID"]
+    assert echoed != evil
+    assert "\n" not in echoed and "\r" not in echoed
+
+
+def test_request_id_header_valid_is_echoed(client) -> None:
+    resp = client.get("/api/health", headers={"X-Request-ID": "trace-1.2_3"})
+    assert resp.headers["X-Request-ID"] == "trace-1.2_3"
+
+
+# ── BAJO-15: bare HTTPException normalized to the ApiError shape ────
+
+def test_http_exception_carries_code_and_technical(client) -> None:
+    resp = client.get("/api/synthesize/progress/zzzzzzzzzzzz")
+    assert resp.status_code == 404
+    body = resp.json()
+    assert body["code"] == "http_404"
+    assert "detail" in body and "technical" in body

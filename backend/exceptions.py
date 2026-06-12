@@ -120,3 +120,21 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "technical": exc.message,
             },
         )
+
+    # Bare HTTPException (404s and friends raised directly in routers) gets
+    # normalized to the same {detail, code, technical} shape the frontend's
+    # ApiError expects, instead of FastAPI's plain {detail} (BAJO-15).
+    from fastapi import HTTPException
+
+    @app.exception_handler(HTTPException)
+    async def _handle_http(_: Request, exc: HTTPException) -> JSONResponse:
+        detail = str(exc.detail)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "detail": detail,
+                "code": f"http_{exc.status_code}",
+                "technical": detail,
+            },
+            headers=getattr(exc, "headers", None),
+        )

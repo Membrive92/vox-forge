@@ -145,7 +145,7 @@ describe("ProfilesTab sample manager (VOZ-10)", () => {
           sample_rate: 44100,
           channels: 1,
           peak_dbfs: -6.0,
-          rms: 1000,
+          rms_amplitude: 1000,
           snr_db: 20.0,
           clip_ratio: 0,
           silence_ratio: 0.1,

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 
@@ -12,6 +13,10 @@ from starlette.responses import Response
 from .logging_config import request_id_var
 
 logger = logging.getLogger("backend.access")
+
+# The incoming id is reflected into logs and the response header — never
+# accept control chars / arbitrary payloads from the client (log injection).
+_REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -27,8 +32,12 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):  # noqa: ANN001
-        incoming_id = request.headers.get("x-request-id")
-        req_id = incoming_id if incoming_id else str(uuid.uuid4())[:12]
+        incoming_id = request.headers.get("x-request-id", "")
+        req_id = (
+            incoming_id
+            if _REQUEST_ID_RE.fullmatch(incoming_id)
+            else str(uuid.uuid4())[:12]
+        )
 
         token = request_id_var.set(req_id)
         try:

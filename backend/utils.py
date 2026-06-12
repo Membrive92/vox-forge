@@ -1,6 +1,7 @@
 """Maintenance utilities."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -27,8 +28,13 @@ async def cleanup_old_files(max_age_hours: int | None = None) -> int:
     threshold = max_age_hours or settings.cleanup_max_age_hours
     now = datetime.now().timestamp()
 
+    # The directory scans stat/unlink hundreds of files synchronously —
+    # run them off the event loop (this coroutine runs as a background
+    # task on the loop itself, not in Starlette's threadpool) (BAJO-11).
     # TEMP_DIR: scratch files, always safe to purge by age.
-    count = _purge_dir(TEMP_DIR, threshold, now, protected=frozenset())
+    count = await asyncio.to_thread(
+        _purge_dir, TEMP_DIR, threshold, now, protected=frozenset()
+    )
 
     # OUTPUT_DIR: only purge files NOT referenced by the database.
     try:
@@ -38,7 +44,9 @@ async def cleanup_old_files(max_age_hours: int | None = None) -> int:
             "Cleanup: skipping OUTPUT_DIR — could not load referenced paths: %s", exc
         )
     else:
-        count += _purge_dir(OUTPUT_DIR, threshold, now, protected=protected)
+        count += await asyncio.to_thread(
+            _purge_dir, OUTPUT_DIR, threshold, now, protected=protected
+        )
 
     if count:
         logger.info("Cleanup: %d old files deleted", count)

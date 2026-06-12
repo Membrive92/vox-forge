@@ -29,7 +29,9 @@ class SampleAnalysisResponse(BaseModel):
     sample_rate: int
     channels: int
     peak_dbfs: float
-    rms: float
+    # Raw RMS amplitude from pydub (integer sample units), NOT dBFS — named
+    # honestly so nobody treats it as decibels (BAJO-5).
+    rms_amplitude: float
     snr_db: float
     clip_ratio: float
     silence_ratio: float
@@ -100,7 +102,7 @@ def _analyze_bytes(content: bytes) -> dict:
         clipped = sum(1 for s in samples if abs(s) >= clip_threshold)
         clip_ratio = clipped / len(samples) if samples else 0
 
-        rms_db = seg.rms
+        rms_amplitude = seg.rms
         peak_db = seg.max_dBFS
 
         # Silence analysis (windows below -40dBFS).
@@ -157,7 +159,7 @@ def _analyze_bytes(content: bytes) -> dict:
             "sample_rate": sample_rate,
             "channels": channels,
             "peak_dbfs": round(peak_db, 1),
-            "rms": rms_db,
+            "rms_amplitude": rms_amplitude,
             "snr_db": round(snr_db, 1),
             "clip_ratio": round(clip_ratio, 5),
             "silence_ratio": round(silence_ratio, 3),

@@ -1355,3 +1355,14 @@ def test_generate_image_autoseeds_when_not_provided(client) -> None:
     body = response.json()
     assert isinstance(body["seed"], int)
     assert body["seed"] >= 0
+
+
+def test_loudnorm_requires_ffmpeg_on_path(monkeypatch, tmp_path) -> None:
+    """BAJO-4: missing ffmpeg must fail with an actionable message."""
+    import shutil as _shutil
+
+    from backend.services import audio_editor
+
+    monkeypatch.setattr(_shutil, "which", lambda _: None)
+    with pytest.raises(RuntimeError, match="ffmpeg not found"):
+        audio_editor._run_loudnorm(tmp_path / "in.wav", tmp_path / "out.wav")

@@ -99,21 +99,21 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 | id | título | estado | evidencia |
 |---|---|---|---|
-| BAJO-1 | Log injection `X-Request-ID` | **ABIERTO** | middleware.py:30-31 sin sanitizar |
+| BAJO-1 | Log injection `X-Request-ID` | RESUELTO | `_REQUEST_ID_RE` allowlist `[A-Za-z0-9._-]{1,64}` en middleware.py; id hostil → uuid fresco; tests de inyección y eco válido |
 | BAJO-2 | Monitor fugado (dup ALTO-06) | RESUELTO-PREVIO | = ALTO-06 |
 | BAJO-3 | Unidades corrompen texto | RESUELTO-PREVIO | text_normalizer.py:284 regex con word-boundary |
-| BAJO-4 | `_run_loudnorm` sin guarda ffmpeg | **ABIERTO** | audio_editor.py:173-184 |
-| BAJO-5 | RMS crudo bajo campo dBFS | **ABIERTO** | analyze.py:28,69 `rms` sigue siendo amplitud entera |
+| BAJO-4 | `_run_loudnorm` sin guarda ffmpeg | RESUELTO | `shutil.which("ffmpeg")` → RuntimeError accionable; test con which parcheado |
+| BAJO-5 | RMS crudo bajo campo dBFS | RESUELTO | campo renombrado a `rms_amplitude` (modelo + schema + tipo front + mock); semántica honesta |
 | BAJO-6 | Edit-draft conflictivo en `handleUseProfile` | **ABIERTO** | App.tsx:130-141 |
 | BAJO-7 | Player ChunkMap sin reset por genId | **ABIERTO** | ChunkMap.tsx:39-43 |
 | BAJO-8 | `onActiveProjectChange` parpadeo | **ABIERTO** | WorkbenchTab.tsx:105 |
 | BAJO-9 | StatusChip con latestDoneGen | RESUELTO-PREVIO | ChapterCard.tsx:498 usa activeGen.id |
 | BAJO-10 | Scrub contra duration de estado | **ABIERTO** | InteractivePlayer.tsx:47-51 |
-| BAJO-11 | cleanup stat/unlink bloqueantes | **ABIERTO** | utils.py sin to_thread (la parte BD-aware sí está) |
+| BAJO-11 | cleanup stat/unlink bloqueantes | RESUELTO | `_purge_dir` vía `asyncio.to_thread` ×2 (la corrutina corre como bg task EN el loop, no en threadpool) |
 | BAJO-12 | App reconstruye settings/draft cada render | **ABIERTO** | App.tsx:79-93 |
 | BAJO-13 | AmbienceMixer 2 players sin throttle | **ABIERTO** | AmbienceMixer.tsx:42 (cae con MED-PERF-F2) |
 | BAJO-14 | useErrorBadge sin pausa en hidden | **ABIERTO** | useErrorBadge.ts:20 |
-| BAJO-15 | HTTPException sin mensaje amigable | **ABIERTO** | chapter_synth.py:48+ |
+| BAJO-15 | HTTPException sin mensaje amigable | RESUELTO | handler global normaliza a `{detail, code: http_NNN, technical}`; test del shape en 404 |
 | BAJO-16 | `catch {}` vacíos | RESUELTO | "Sin datos" ya no se confunde con fallo: el chunk-map vacío es un 200, así que el catch de `getChunkMap` es fallo real ⇒ logger.error + alerta con Reintentar; `loadStatus` de ChapterCard igual (chips/panel de audio ya no mienten en vacío); fetches decorativos (studio edits, sonda de incomplete jobs) ⇒ logger.warn con degradación explícita; test UI del branch de error+retry — F4 |
 | BAJO-17 | Resume concurrente mismo job_id | RESUELTO | resume devuelve 409 si `status=="running"` (check+start sin await, race-free); /synthesize acuña id fresco si el header está en vuelo; chunks con `os.replace` atómico — 479aafa |
 | BAJO-18 | Takes done sin file_path | RESUELTO-PREVIO | chapter_synth.py:150,239,245 persisten file_path |

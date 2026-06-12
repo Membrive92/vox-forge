@@ -2451,8 +2451,8 @@ export interface components {
             channels: number;
             /** Peak Dbfs */
             peak_dbfs: number;
-            /** Rms */
-            rms: number;
+            /** Rms Amplitude */
+            rms_amplitude: number;
             /** Snr Db */
             snr_db: number;
             /** Clip Ratio */

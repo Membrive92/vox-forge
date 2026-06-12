@@ -7,7 +7,7 @@ export interface SampleAnalysis {
   sample_rate: number;
   channels: number;
   peak_dbfs: number;
-  rms: number;
+  rms_amplitude: number;
   snr_db: number;
   clip_ratio: number;
   silence_ratio: number;
