@@ -17,7 +17,7 @@ from pydub import AudioSegment
 
 from ..catalogs import AUDIO_FORMATS
 from ..dependencies import get_tts_engine
-from ..exceptions import InvalidSampleError, UnsupportedFormatError
+from ..exceptions import InvalidParameterError, UnsupportedFormatError
 from ..paths import OUTPUT_DIR, TEMP_DIR
 from ..services.castilian_warmup import (
     build_anchored_speaker_wav,
@@ -208,7 +208,7 @@ def _validate_common(language: str, output_format: str) -> None:
             f"Unsupported format: {output_format}. Valid: {sorted(AUDIO_FORMATS)}"
         )
     if language not in _ALLOWED_LANGUAGES:
-        raise InvalidSampleError(
+        raise InvalidParameterError(
             f"Unsupported language: {language}. Valid: {sorted(_ALLOWED_LANGUAGES)}"
         )
 

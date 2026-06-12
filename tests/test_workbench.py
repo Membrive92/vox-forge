@@ -260,6 +260,108 @@ def test_chapter_synthesize_nonexistent_404(client) -> None:
     assert client.post("/api/chapters/nonexistent/synthesize").status_code == 404
 
 
+# ── MED-CONC-2: bookkeeping must use the engine's real chunk list ────
+
+_CONC2_TEXT = (
+    "Primera frase del capitulo. Segunda frase distinta. Tercera y ultima frase."
+)
+
+
+def _make_cloned_profile(client, name: str = "Narrador clonado") -> dict:
+    response = client.post(
+        "/api/profiles",
+        data={
+            "name": name,
+            "voice_id": "es-ES-AlvaroNeural",
+            "language": "es",
+            "speed": 100, "pitch": 0, "volume": 80,
+        },
+        files={"sample": ("voice.wav", _fake_wav(), "audio/wav")},
+    )
+    profile = response.json()
+    assert profile["sample_filename"] is not None
+    return profile
+
+
+def test_chapter_synthesis_registers_clone_chunks_for_xtts_profile(
+    client, monkeypatch,
+) -> None:
+    """MED-CONC-2: when the profile routes to XTTS, ``chunks_total``,
+    the takes and the chunk map must mirror the clause-level clone
+    chunking — this text is 1 Edge chunk but 3 clone chunks."""
+    from backend.paths import OUTPUT_DIR
+    from backend.services import tts_engine as te
+
+    clone_texts = [c.text for c in te.split_into_clone_chunks(_CONC2_TEXT)]
+    assert len(clone_texts) == 3
+    assert len(te.split_into_chunks(_CONC2_TEXT)) == 1  # the old, wrong basis
+
+    async def fake_cloned(
+        self, request, sample_paths, language,
+        cancel_token=None, job_id=None, *, castilian_anchor=False,
+    ):
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        out = OUTPUT_DIR / "fake_clone_chapter.mp3"
+        out.write_bytes(b"ID3fake-clone-audio")
+        return te.SynthesisResult(path=out, chunks=len(clone_texts), engine="xtts-v2")
+
+    monkeypatch.setattr(te.TTSEngine, "_synthesize_cloned", fake_cloned)
+
+    profile = _make_cloned_profile(client)
+    project = _create_project(client, "Clone chunks")
+    chapter = client.post(
+        f"/api/projects/{project['id']}/chapters",
+        json={"title": "C1", "text": _CONC2_TEXT, "sort_order": 0},
+    ).json()
+    patched = client.patch(
+        f"/api/projects/chapters/{chapter['id']}",
+        json={"profile_id": profile["id"]},
+    )
+    assert patched.status_code == 200, patched.text
+
+    synth = client.post(f"/api/chapters/{chapter['id']}/synthesize")
+    assert synth.status_code == 200, synth.text
+    assert synth.headers["x-audio-engine"] == "xtts-v2"
+    assert synth.headers["x-audio-chunks"] == "3"
+
+    gens = client.get(f"/api/projects/chapters/{chapter['id']}/generations").json()
+    assert len(gens) == 1
+    gen = gens[0]
+    assert gen["engine"] == "xtts-v2"
+    assert gen["chunks_total"] == 3
+    assert gen["chunks_done"] == 3
+
+    chunk_map = client.get(f"/api/chapters/{chapter['id']}/chunks").json()
+    assert chunk_map["total"] == 3
+    assert [c["text"] for c in chunk_map["chunks"]] == clone_texts
+    assert all(c["status"] == "done" and c["take_id"] for c in chunk_map["chunks"])
+
+
+def test_failed_clone_chapter_records_real_engine_and_chunk_count(client) -> None:
+    """Even when XTTS synthesis fails (no CUDA in tests), the generation
+    row must carry the resolved engine and the clone chunk count — not
+    the hardcoded edge-tts + Edge chunking the route used to write."""
+    profile = _make_cloned_profile(client, "Narrador sin GPU")
+    project = _create_project(client, "Clone failure")
+    chapter = client.post(
+        f"/api/projects/{project['id']}/chapters",
+        json={"title": "C1", "text": _CONC2_TEXT, "sort_order": 0},
+    ).json()
+    client.patch(
+        f"/api/projects/chapters/{chapter['id']}",
+        json={"profile_id": profile["id"]},
+    )
+
+    synth = client.post(f"/api/chapters/{chapter['id']}/synthesize")
+    assert synth.status_code != 200
+
+    gens = client.get(f"/api/projects/chapters/{chapter['id']}/generations").json()
+    assert len(gens) == 1
+    assert gens[0]["engine"] == "xtts-v2"
+    assert gens[0]["status"] == "error"
+    assert gens[0]["chunks_total"] == 3
+
+
 # ── Character casting ────────────────────────────────────────────────
 
 def test_extract_characters(client) -> None:

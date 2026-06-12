@@ -137,15 +137,60 @@ def test_qc_without_done_generation_400(client) -> None:
     assert res.status_code == 400
 
 
-def test_qc_skips_multichunk_clone_without_per_chunk_audio(client, monkeypatch) -> None:
-    """XTTS generations persist clause-level WAVs whose indices don't
-    match the take chunking — QC must skip those chunks (score None,
-    never flagged) instead of scoring the wrong audio."""
+def test_qc_skips_clone_chunks_without_audio_on_disk(client, monkeypatch) -> None:
+    """A clone generation with no job-dir WAVs and no take audio has
+    nothing to transcribe — QC must skip every chunk (score None, never
+    flagged) instead of scoring the wrong audio. Since MED-CONC-2 the
+    chunk list itself is the clause-level clone chunking."""
     import asyncio
 
     from backend.services import project_manager as pm
+    from backend.services.tts_engine import split_into_clone_chunks
 
     text = _multichunk_text()
+    clone_total = len(split_into_clone_chunks(text))
+    assert clone_total > 3, "clone chunking must be finer than the 3 Edge chunks"
+    cid = _create_chapter(client, text)
+
+    loop = asyncio.new_event_loop()
+    try:
+        gen = loop.run_until_complete(pm.create_generation(
+            chapter_id=cid,
+            voice_id="es-ES-AlvaroNeural",
+            output_format="mp3",
+            engine="xtts-v2",
+            chunks_total=clone_total,
+        ))
+        loop.run_until_complete(pm.update_generation(
+            gen["id"], status="done", file_path="/fake/clone.mp3",
+        ))
+    finally:
+        loop.close()
+
+    def must_not_run(_path: Path, _language: str | None) -> str:
+        raise AssertionError("QC transcribed audio it should have skipped")
+
+    _patch_transcriber(monkeypatch, must_not_run)
+    body = client.post(f"/api/chapters/{cid}/qc").json()
+    assert body["total"] == clone_total
+    assert body["skipped"] == clone_total
+    assert body["flagged"] == 0
+    assert all(c["qc_score"] is None for c in body["chunks"])
+
+
+def test_qc_scores_clone_chunks_from_job_dir_wavs(client, monkeypatch) -> None:
+    """Since MED-CONC-2 the takes of an XTTS generation use the clone
+    chunk list, so the clause-level ``chunk_NNNN.wav`` files in the job
+    dir are index-aligned and QC can transcribe them directly."""
+    import asyncio
+
+    from backend.services import job_store
+    from backend.services import project_manager as pm
+    from backend.services.tts_engine import split_into_clone_chunks
+
+    text = "La noche era oscura. El mar estaba en calma. Una luz brillaba a lo lejos."
+    clone_texts = [c.text for c in split_into_clone_chunks(text)]
+    assert len(clone_texts) == 3
     cid = _create_chapter(client, text)
 
     loop = asyncio.new_event_loop()
@@ -163,15 +208,29 @@ def test_qc_skips_multichunk_clone_without_per_chunk_audio(client, monkeypatch) 
     finally:
         loop.close()
 
-    def must_not_run(_path: Path, _language: str | None) -> str:
-        raise AssertionError("QC transcribed audio it should have skipped")
+    for i in range(3):
+        wav = job_store.chunk_path(gen["id"], i, "wav")
+        wav.parent.mkdir(parents=True, exist_ok=True)
+        wav.write_bytes(b"RIFF" + b"\x00" * 64)
 
-    _patch_transcriber(monkeypatch, must_not_run)
+    sabotaged_index = 2
+
+    def per_chunk(path: Path, _language: str | None) -> str:
+        assert path.suffix == ".wav", f"expected the job-dir WAV, got {path}"
+        match = re.search(r"chunk_(\d{4})", path.name)
+        assert match is not None, f"unexpected audio path: {path}"
+        index = int(match.group(1))
+        if index == sabotaged_index:
+            return "algo completamente distinto sin relacion alguna"
+        return clone_texts[index]
+
+    _patch_transcriber(monkeypatch, per_chunk)
     body = client.post(f"/api/chapters/{cid}/qc").json()
     assert body["total"] == 3
-    assert body["skipped"] == 3
-    assert body["flagged"] == 0
-    assert all(c["qc_score"] is None for c in body["chunks"])
+    assert body["scored"] == 3
+    assert body["skipped"] == 0
+    flagged = [c["index"] for c in body["chunks"] if c["qc_flagged"]]
+    assert flagged == [sabotaged_index]
 
 
 def test_regenerating_a_chunk_clears_its_qc_verdict(client, monkeypatch) -> None:

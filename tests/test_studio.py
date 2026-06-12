@@ -231,7 +231,8 @@ def test_edit_rejects_path_outside_allowed_roots(client) -> None:
         },
     )
     assert response.status_code == 400
-    assert response.json()["code"] == "invalid_sample"
+    # MED-ERR-2: a path guard must not masquerade as a bad audio sample.
+    assert response.json()["code"] == "path_not_allowed"
 
 
 def test_edit_rejects_empty_operations(client) -> None:
@@ -375,7 +376,7 @@ def test_transcribe_rejects_path_outside_allowed_roots(client) -> None:
         json={"source_path": "/etc/passwd"},
     )
     assert response.status_code == 400
-    assert response.json()["code"] == "invalid_sample"
+    assert response.json()["code"] == "path_not_allowed"
 
 
 def test_transcribe_missing_source_returns_404(client) -> None:
@@ -770,7 +771,7 @@ def test_render_video_rejects_path_outside_roots(client, monkeypatch) -> None:
         },
     )
     assert response.status_code == 400
-    assert response.json()["code"] == "invalid_sample"
+    assert response.json()["code"] == "path_not_allowed"
 
 
 def test_render_video_rejects_missing_cover(client, monkeypatch) -> None:
@@ -1180,7 +1181,7 @@ def test_render_video_rejects_neither_cover_nor_images(client, monkeypatch) -> N
         json={"audio_path": str(src.resolve())},
     )
     assert response.status_code == 400
-    assert response.json()["code"] == "invalid_sample"
+    assert response.json()["code"] == "invalid_parameter"
 
 
 def test_render_video_rejects_image_outside_roots(client, monkeypatch) -> None:
@@ -1196,7 +1197,7 @@ def test_render_video_rejects_image_outside_roots(client, monkeypatch) -> None:
         },
     )
     assert response.status_code == 400
-    assert response.json()["code"] == "invalid_sample"
+    assert response.json()["code"] == "path_not_allowed"
 
 
 # ── Image generation (B.3) ──────────────────────────────────────────
@@ -1242,7 +1243,7 @@ def test_generate_image_rejects_invalid_aspect(client) -> None:
         json={"prompt": "Valid prompt", "aspect_ratio": "21:9"},
     )
     assert response.status_code == 400
-    assert response.json()["code"] == "invalid_sample"
+    assert response.json()["code"] == "invalid_parameter"
 
 
 def test_generate_image_autoseeds_when_not_provided(client) -> None:

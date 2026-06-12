@@ -210,6 +210,20 @@ def split_into_clone_chunks(text: str) -> list[_CloneChunk]:
     return chunks
 
 
+def chunk_texts_for_engine(text: str, engine: str) -> list[str]:
+    """Return the chunk texts a given engine actually synthesizes.
+
+    Edge-TTS splits at paragraph/sentence level (``split_into_chunks``)
+    while XTTS splits at clause level (``split_into_clone_chunks``).
+    Chapter bookkeeping — ``chunks_total``, takes, chunk map, QC — must
+    mirror the real chunk list of the generation's engine, never assume
+    Edge chunking (MED-CONC-2).
+    """
+    if engine == "xtts-v2":
+        return [chunk.text for chunk in split_into_clone_chunks(text)]
+    return split_into_chunks(text)
+
+
 class TTSEngine:
     """Dual engine: Edge-TTS for system voices, XTTS v2 for voice cloning.
 

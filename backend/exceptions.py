@@ -45,6 +45,20 @@ class SampleNotFound(DomainError):
     code = "sample_not_found"
 
 
+class PathNotAllowedError(DomainError):
+    """A user-supplied path resolves outside the allowed media roots."""
+
+    status_code = 400
+    code = "path_not_allowed"
+
+
+class InvalidParameterError(DomainError):
+    """A request parameter carries a value the endpoint can't work with."""
+
+    status_code = 400
+    code = "invalid_parameter"
+
+
 class SynthesisError(DomainError):
     status_code = 500
     code = "synthesis_failed"
@@ -56,6 +70,8 @@ _USER_FRIENDLY_MESSAGES: dict[str, str] = {
     "unsupported_format": "The selected audio format is not supported. Use MP3, WAV, OGG, or FLAC.",
     "invalid_sample": "The audio sample is invalid or corrupted. Upload a clean .wav or .mp3 file.",
     "sample_not_found": "The voice sample file was not found on disk.",
+    "path_not_allowed": "That file path is outside the folders VoxForge is allowed to use.",
+    "invalid_parameter": "One of the request options has an invalid value. Adjust it and try again.",
     "synthesis_failed": "Audio synthesis failed. Check the logs tab for details.",
 }
 

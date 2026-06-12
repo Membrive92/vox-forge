@@ -26,7 +26,12 @@ import aiosqlite
 from ..catalogs import AUDIO_FORMATS
 from ..database import get_db
 from ..dependencies import get_transcriber, get_video_renderer
-from ..exceptions import InvalidSampleError, SampleNotFound, UnsupportedFormatError
+from ..exceptions import (
+    InvalidParameterError,
+    PathNotAllowedError,
+    SampleNotFound,
+    UnsupportedFormatError,
+)
 from ..paths import MEDIA_ROOTS, STUDIO_COVERS_DIR, is_within_allowed_roots
 from ..schemas import (
     CoverUploadResponse,
@@ -155,7 +160,7 @@ async def edit_audio(request: StudioEditRequest) -> FileResponse:
 
     source = Path(request.source_path)
     if not _is_within_allowed_roots(source):
-        raise InvalidSampleError("Source path is outside allowed directories")
+        raise PathNotAllowedError("Source path is outside allowed directories")
     if not source.exists() or not source.is_file():
         raise SampleNotFound("Source audio not found")
 
@@ -212,7 +217,7 @@ async def transcribe(
     """Run faster-whisper on ``source_path`` and return the SRT + parsed entries."""
     source = Path(request.source_path)
     if not _is_within_allowed_roots(source):
-        raise InvalidSampleError("Source path is outside allowed directories")
+        raise PathNotAllowedError("Source path is outside allowed directories")
     if not source.exists() or not source.is_file():
         raise SampleNotFound("Source audio not found")
 
@@ -271,7 +276,7 @@ async def generate_image(request: GenerateImageRequest) -> GenerateImageResponse
     it under ``STUDIO_COVERS_DIR`` so the slideshow pipeline can use it
     without further upload steps."""
     if request.aspect_ratio not in image_gen.VALID_ASPECT_RATIOS:
-        raise InvalidSampleError(
+        raise InvalidParameterError(
             f"Invalid aspect ratio: {request.aspect_ratio}. "
             f"Valid: {sorted(image_gen.VALID_ASPECT_RATIOS)}"
         )
@@ -312,7 +317,7 @@ async def render_video(
     image_list: list[_VideoImage] | None = request.images if request.images else None
 
     if not image_list and cover_path is None:
-        raise InvalidSampleError("Either cover_path or images must be provided")
+        raise InvalidParameterError("Either cover_path or images must be provided")
 
     # All input paths must live inside one of the allowed Studio roots —
     # same guard as /edit and /audio so a request cannot pull arbitrary
@@ -327,7 +332,7 @@ async def render_video(
         paths_to_check.extend(Path(img.path) for img in image_list)
     for p in paths_to_check:
         if not _is_within_allowed_roots(p):
-            raise InvalidSampleError("Input path is outside allowed directories")
+            raise PathNotAllowedError("Input path is outside allowed directories")
 
     result = await renderer.render(
         audio_path=audio_path,
@@ -376,7 +381,7 @@ async def list_renders(
     limit: int = Query(default=50, ge=1, le=200),
 ) -> StudioRendersResponse:
     if kind is not None and kind not in ("audio", "video"):
-        raise InvalidSampleError(f"Invalid kind: {kind}. Valid: audio, video")
+        raise InvalidParameterError(f"Invalid kind: {kind}. Valid: audio, video")
     rows = await studio_store.list_renders(kind=kind, chapter_id=chapter_id, limit=limit)
     renders = [StudioRender(**row) for row in rows]
     return StudioRendersResponse(renders=renders, count=len(renders))

@@ -16,14 +16,14 @@ without re-running ASR.
 Audio resolution per chunk, in priority order:
 
 1. the take's own ``file_path`` (a regenerated chunk persists it);
-2. the per-chunk MP3 the Edge-TTS path keeps under ``data/jobs/{gen_id}/``
-   (the same files ``_resplice_chapter`` relies on);
+2. the per-chunk audio kept under ``data/jobs/{gen_id}/`` — MP3 for
+   Edge-TTS (the same files ``_resplice_chapter`` relies on), WAV for
+   XTTS clones. Since MED-CONC-2 the chapter takes use the engine's
+   real chunk list, so clone WAV indices align with the takes;
 3. for single-chunk chapters, the whole-generation audio *is* the chunk.
 
-XTTS clone generations persist clause-level WAVs under the job dir whose
-indices do NOT match the take chunking — they are deliberately not used
-(wrong audio would produce false flags). Multi-chunk clone chapters
-therefore report those chunks as skipped until their takes carry audio.
+Chunks with no locatable audio are skipped (score ``None``, never
+flagged) rather than scored against the wrong file.
 """
 from __future__ import annotations
 
@@ -36,9 +36,12 @@ from ..config import settings
 from . import job_store
 from . import project_manager as pm
 from .intelligibility import TranscriberFn, text_similarity, transcribe
-from .tts_engine import split_into_chunks
+from .tts_engine import chunk_texts_for_engine
 
 logger = logging.getLogger(__name__)
+
+# Extension of the per-chunk files each engine persists in the job dir.
+_JOB_CHUNK_EXT: dict[str, str] = {"edge-tts": "mp3", "xtts-v2": "wav"}
 
 
 @dataclass(frozen=True)
@@ -64,10 +67,12 @@ def resolve_chunk_audio(
         if path.exists():
             return path
 
-    # Edge-TTS chapter synthesis persists chunk_NNNN.mp3 under the job
-    # dir (job_id == generation id) with the same indices as the takes.
-    if generation.get("engine") == "edge-tts":
-        path = job_store.chunk_path(generation["id"], index, "mp3")
+    # Chapter synthesis persists per-chunk audio under the job dir
+    # (job_id == generation id) with the same indices as the takes:
+    # chunk_NNNN.mp3 for Edge-TTS, chunk_NNNN.wav for XTTS clones.
+    ext = _JOB_CHUNK_EXT.get(generation.get("engine", ""))
+    if ext is not None:
+        path = job_store.chunk_path(generation["id"], index, ext)
         if path.exists():
             return path
 
@@ -99,7 +104,7 @@ async def run_chapter_qc(
     locatable audio are skipped (score ``None``, never flagged).
     """
     limit = threshold if threshold is not None else settings.intelligibility_threshold
-    chunks = split_into_chunks(chapter["text"])
+    chunks = chunk_texts_for_engine(chapter["text"], generation.get("engine", "edge-tts"))
     takes = await pm.list_takes(generation["id"])
     take_map = {t["chunk_index"]: t for t in takes}
 

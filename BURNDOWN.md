@@ -63,7 +63,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | MED-COR-5 | extract-characters `body: dict` | RESUELTO-PREVIO | `ExtractCharactersRequest` (character_synth.py:45) | 6553c2d |
 | MED-COR-6 | `update_project` `type: ignore` oculta None | RESUELTO-PREVIO | 0 type:ignore; None→404 | 6553c2d |
 | MED-CONC-1 | Progreso leído fuera del lock | RESUELTO-PREVIO | `snapshot()` bajo lock, usado en synthesis.py:120 | 4a88bde |
-| MED-CONC-2 | chunks_total/takes con chunking Edge para perfiles XTTS | **ABIERTO** | chapter_synth.py:81 no resuelve engine antes de trocear | — |
+| MED-CONC-2 | chunks_total/takes con chunking Edge para perfiles XTTS | RESUELTO | `resolve_routing` ANTES de cualquier bookkeeping; `chunk_texts_for_engine` (tts_engine) da la lista real (clause-level para xtts-v2) y la usan generación+progress+takes+chunk map+regen+QC; el engine de la fila es el resuelto (también en error); QC ahora resuelve `chunk_NNNN.wav` del job dir para clones (índices ya alineados); `_resplice_chapter` con guarda explícita edge-tts. Tests: registro feliz con clone stub (3 clone chunks vs 1 edge), fallo sin CUDA conserva engine/chunks reales, QC puntúa WAVs de clon y marca solo el saboteado | F3 |
 | MED-CONC-3 | Scoring CPU bajo semáforo GPU | RESUELTO-PREVIO | clone_engine.py:367 to_thread fuera del lock | a614a96 |
 | MED-PERF-1 | `/analyze/sample` en el event loop | RESUELTO-PREVIO | `_analyze_bytes` vía to_thread (analyze.py:143) | 6553c2d |
 | MED-PERF-2 | N inserts secuenciales de takes | RESUELTO-PREVIO | `create_takes` executemany | 6553c2d |
@@ -71,7 +71,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | MED-PERF-4 | "latest done generation" sin LIMIT 1 | **ABIERTO** | chapter_synth.py:175 escanea en Python | — |
 | MED-PERF-5 | Duración decodificando completo | **ABIERTO (parcial)** | `audio_meta.py` existe y cablea studio/video; falta chapter_synth.py:141 | c14f5a6 parcial |
 | MED-ERR-1 | Sin cleanup si bookkeeping post-síntesis falla | RESUELTO-PREVIO | chapter_synth.py:124-131 try/except + finish() | 6553c2d |
-| MED-ERR-2 | `InvalidSampleError` reusada (mensaje engañoso) | **ABIERTO** | studio.py:160+ sin excepciones de dominio distintas | — |
+| MED-ERR-2 | `InvalidSampleError` reusada (mensaje engañoso) | RESUELTO | `PathNotAllowedError` (400, `path_not_allowed`) e `InvalidParameterError` (400, `invalid_parameter`) + entradas en `_USER_FRIENDLY_MESSAGES`; sustituidas en studio.py (edit/transcribe/render-video paths, aspect ratio, cover-or-images, kind) y experimental.py (idioma); `InvalidSampleError` queda solo para validación real de muestras (uploads, audio_editor, video_renderer); 6 asserts de tests actualizados al código honesto | F3 |
 | MED-INT-1 | Escrituras atómicas sin fsync | RESUELTO-PREVIO | `atomic_io.write_text_atomic` con fsync | 6553c2d |
 | MED-INT-2 | split_text_into_chapters sin cleanup/transacción | RESUELTO-PREVIO | project_manager.py:274-286 collect+unlink | 6553c2d |
 | MED-INT-3 | `studio_renders` huérfanos | RESUELTO-PREVIO | DELETE studio_renders en cascade (project_manager.py:229,232) | 6553c2d |

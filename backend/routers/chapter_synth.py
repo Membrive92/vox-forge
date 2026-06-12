@@ -30,7 +30,7 @@ from ..services import project_manager as pm
 from ..services import qc as qc_service
 from ..services.metadata import AudioMetadata, embed_metadata
 from ..services.progress import registry as progress_registry
-from ..services.tts_engine import TTSEngine, split_into_chunks
+from ..services.tts_engine import TTSEngine, chunk_texts_for_engine
 from ..upload_utils import read_upload_safely, validate_audio_bytes, validate_audio_upload
 from ..utils import cleanup_old_files
 
@@ -110,30 +110,12 @@ async def synthesize_chapter(
         raise UnsupportedFormatError(f"Unsupported format: {fmt}")
 
     cancel_token = create_cancellation_token(http_request)
-    chunks = split_into_chunks(text)
 
     # Chapter-level overrides take priority over project defaults. Lets
     # a book use different narrators per chapter (POV switch,
     # epistolary sections, etc.) without spawning separate projects.
     voice_id = chapter.get("voice_id") or project["voice_id"]
     profile_id = chapter.get("profile_id") or project["profile_id"]
-
-    # Create a generation record
-    gen = await pm.create_generation(
-        chapter_id=chapter_id,
-        voice_id=voice_id,
-        profile_id=profile_id,
-        output_format=fmt,
-        speed=project["speed"],
-        pitch=project["pitch"],
-        volume=project["volume"],
-        engine="edge-tts",
-        chunks_total=len(chunks),
-    )
-    gen_id = gen["id"]
-
-    job_id = gen_id
-    progress_registry.start(job_id, chunks_total=len(chunks), step="synthesizing chapter")
 
     from ..schemas import SynthesisRequest
     request = SynthesisRequest(
@@ -145,6 +127,31 @@ async def synthesize_chapter(
         volume=project["volume"],
         profile_id=profile_id,
     )
+
+    # Resolve routing BEFORE any bookkeeping: a profile with samples
+    # routes to XTTS, whose clause-level chunking differs from Edge's
+    # paragraph chunking. ``chunks_total``, progress and takes must all
+    # mirror the chunk list the engine will actually synthesize
+    # (MED-CONC-2). A bad profile_id fails here, before any row exists.
+    routing = engine.resolve_routing(request)
+    chunks = chunk_texts_for_engine(text, routing.engine)
+
+    # Create a generation record
+    gen = await pm.create_generation(
+        chapter_id=chapter_id,
+        voice_id=voice_id,
+        profile_id=profile_id,
+        output_format=fmt,
+        speed=project["speed"],
+        pitch=project["pitch"],
+        volume=project["volume"],
+        engine=routing.engine,
+        chunks_total=len(chunks),
+    )
+    gen_id = gen["id"]
+
+    job_id = gen_id
+    progress_registry.start(job_id, chunks_total=len(chunks), step="synthesizing chapter")
 
     try:
         result = await engine.synthesize(request, cancel_token=cancel_token, job_id=job_id)
@@ -227,7 +234,9 @@ async def regenerate_chunk(
     if gen is None:
         raise HTTPException(400, "No completed generation to regenerate from")
 
-    chunks = split_into_chunks(chapter["text"])
+    # Re-split with the chunking the generation's engine actually used —
+    # XTTS takes are clause-level, Edge takes are paragraph-level.
+    chunks = chunk_texts_for_engine(chapter["text"], gen["engine"])
     if chunk_index < 0 or chunk_index >= len(chunks):
         raise HTTPException(400, f"chunk_index {chunk_index} out of range (0-{len(chunks) - 1})")
 
@@ -278,14 +287,14 @@ async def regenerate_chunk(
     # Re-splice the whole-chapter audio so the player/export/Studio reflect
     # the regenerated chunk — otherwise this endpoint reports success while
     # ``generation.file_path`` still points at the old audio. This is only
-    # possible when every chunk of the original synthesis is on disk: the
-    # Edge-TTS path keeps them under the job dir (data/jobs/{gen_id}/), so
-    # we overwrite this chunk there and concatenate all chunks in order
-    # with the same 400ms pauses the engine uses. When the mp3 chunks aren't
-    # available (e.g. an XTTS clone, which persists clause-level WAV chunks
-    # under the job dir — a different chunking than the takes use), we leave
-    # the take updated and report that the chapter audio was NOT re-spliced
-    # so the client can warn / offer a full re-synthesis.
+    # possible for Edge-TTS generations, whose per-chunk MP3s live under the
+    # job dir (data/jobs/{gen_id}/) and concatenate with a fixed 400ms pause.
+    # XTTS clones can't be rebuilt from their job-dir WAVs: the master was
+    # post-processed (per-chunk pauses, speed stretch, volume) after
+    # concatenation, so a naive re-splice would silently drop all of that.
+    # In that case we leave the take updated and report that the chapter
+    # audio was NOT re-spliced so the client can warn / offer a full
+    # re-synthesis.
     respliced = await _resplice_chapter(gen, chunks, chunk_index, chunk_audio)
 
     return FileResponse(
@@ -312,6 +321,10 @@ async def _resplice_chapter(
     from ..services import job_store
 
     gen_id = gen["id"]
+    if gen.get("engine") != "edge-tts":
+        # Only Edge masters are a plain concat of their job-dir chunks
+        # (see the caller's comment) — never rebuild other engines.
+        return False
     target_path = gen.get("file_path")
     if not target_path:
         return False
@@ -356,7 +369,7 @@ async def get_chunk_map(chapter_id: str) -> dict:
     if gen is None:
         return {"generation_id": None, "chunks": [], "total": 0}
 
-    chunks = split_into_chunks(chapter["text"])
+    chunks = chunk_texts_for_engine(chapter["text"], gen["engine"])
     takes = await pm.list_takes(gen["id"])
     take_map = {t["chunk_index"]: t for t in takes}
 
