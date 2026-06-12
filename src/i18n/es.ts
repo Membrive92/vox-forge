@@ -477,6 +477,8 @@ export const es = {
   studioSelectChapterHint: "Selecciona un capítulo a la izquierda para cargar su waveform.",
   studioDragHint: "Arrastra sobre el waveform para seleccionar una región. Redimensiona arrastrando sus bordes.",
   studioRemoveOperation: "Quitar operación",
+  studioMoveOpUp: "Subir operación",
+  studioMoveOpDown: "Bajar operación",
 
   // Studio — transcribe panel (B.1)
   studioTranscribeTitle: "Transcripción",

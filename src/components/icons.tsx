@@ -88,6 +88,12 @@ export const ChevDown = () => (
   </svg>
 );
 
+export const ChevUp = () => (
+  <svg viewBox="0 0 24 24" {...base} style={SIZE_XS}>
+    <path d="M6 15l6-6 6 6" />
+  </svg>
+);
+
 export const User = () => (
   <svg viewBox="0 0 24 24" {...base} style={SIZE_SM}>
     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />

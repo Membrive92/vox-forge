@@ -18,6 +18,7 @@ interface Props {
   outputFormat: string;
   onAdd: (op: StudioOperation) => void;
   onRemove: (index: number) => void;
+  onMove: (from: number, to: number) => void;
   onClear: () => void;
   onApply: () => void;
   onApplyPreview: () => void;
@@ -67,6 +68,7 @@ export function EditOperationsPanel({
   outputFormat,
   onAdd,
   onRemove,
+  onMove,
   onClear,
   onApply,
   onApplyPreview,
@@ -367,6 +369,24 @@ export function EditOperationsPanel({
                 >
                   {describeOp(op, t)}
                 </span>
+                <IconButton
+                  aria-label={t.studioMoveOpUp}
+                  variant="ghost"
+                  size="sm"
+                  disabled={idx === 0}
+                  onClick={() => onMove(idx, idx - 1)}
+                >
+                  <Icons.ChevUp />
+                </IconButton>
+                <IconButton
+                  aria-label={t.studioMoveOpDown}
+                  variant="ghost"
+                  size="sm"
+                  disabled={idx === operations.length - 1}
+                  onClick={() => onMove(idx, idx + 1)}
+                >
+                  <Icons.ChevDown />
+                </IconButton>
                 <IconButton
                   aria-label={t.studioRemoveOperation}
                   variant="danger"

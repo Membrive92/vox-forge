@@ -151,6 +151,7 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
             outputFormat={outputFormat}
             onAdd={studio.addOperation}
             onRemove={studio.removeOperation}
+            onMove={studio.moveOperation}
             onClear={studio.clearOperations}
             onApply={handleApply}
             onApplyPreview={handleApplyPreview}

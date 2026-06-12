@@ -127,7 +127,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-28 | Re-import local SynthesisRequest | RESUELTO | `SynthesisRequest` (y `job_store`, mismo patrón en el mismo fichero) importados a nivel de módulo en chapter_synth; cero re-imports locales — F4 |
 | BAJO-29 | WorkbenchTab sobredimensionado | **ABIERTO (parcial)** | 1745→883 (4ba952e); objetivo F4 <600 + partir ChapterCard |
 | BAJO-30 | Prop drilling Voices (~17 props) | **ABIERTO** | VoicesPlusLab.tsx:43+ |
-| BAJO-31 | `moveOperation` sin UI | **ABIERTO** | useStudioSession.ts:168 |
+| BAJO-31 | `moveOperation` sin UI | RESUELTO | Decisión F4: cablear (la opción barata aplicaba — el hook ya era correcto, solo faltaban botones). Botones ↑/↓ por fila en EditOperationsPanel → `studio.moveOperation`; extremos deshabilitados; icono `ChevUp` nuevo + claves i18n es/en; 2 tests UI (reorder + disabled en bordes) — F4 |
 | BAJO-32 | `_PAUSE_TAG_*` muertas | RESUELTO | grep confirmó cero usos (solo definición); constantes + bloque en blanco borrados de tts_engine.py (`CLONE_PAUSE_*` siguen vivas: 3 usos) — F4 |
 | BAJO-33 | Rama fallo `_run_command` sin test | RESUELTO | test_studio.py: exit!=0 con extracto de cola de stderr, ffmpeg ausente, y render sin output file — F1 `test(audit-bajo) BAJO-33` |
 | BAJO-34 | Concat character-cast sin test | RESUELTO | test_workbench.py: spy sobre `AudioSegment.silent` (600ms switch / 300ms mismo personaje, verificado vía X-Audio-Duration) + cleanup de temporales en éxito y en fallo — F1 `test(audit-bajo) BAJO-34` |

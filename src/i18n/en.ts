@@ -479,6 +479,8 @@ export const en: Record<TranslationKey, string> = {
   studioSelectChapterHint: "Select a chapter on the left to load its waveform.",
   studioDragHint: "Drag on the waveform to select a region. Resize by dragging its edges.",
   studioRemoveOperation: "Remove operation",
+  studioMoveOpUp: "Move operation up",
+  studioMoveOpDown: "Move operation down",
 
   // Studio — transcribe panel (B.1)
   studioTranscribeTitle: "Transcription",
