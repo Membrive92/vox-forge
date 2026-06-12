@@ -2,6 +2,7 @@ import { Button } from "@/components/Button";
 import * as Icons from "@/components/icons";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+import { formatClock } from "@/utils/format";
 
 import type { StudioSource } from "@/api/studio";
 
@@ -14,11 +15,10 @@ interface Props {
   onRefresh: () => void;
 }
 
+// "—" for unknown durations; the M:SS rendering itself is the shared helper.
 function formatDuration(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
+  return formatClock(seconds);
 }
 
 export function SourcePicker({ t, sources, loading, selectedId, onSelect, onRefresh }: Props) {

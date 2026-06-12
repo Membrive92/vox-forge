@@ -12,6 +12,10 @@ from .exceptions import InvalidSampleError
 # Max size for a single uploaded file (100 MB).
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
+# Allowed audio file extensions. Single source of truth shared with the
+# routers (chapter upload-audio), so the two allowlists can't drift.
+ALLOWED_AUDIO_EXTS: tuple[str, ...] = (".wav", ".mp3", ".ogg", ".flac", ".webm", ".m4a")
+
 # Allowed audio content types.
 ALLOWED_AUDIO_TYPES: set[str] = {
     "audio/wav",
@@ -49,7 +53,7 @@ def validate_audio_upload(upload: UploadFile) -> None:
     if ctype not in ALLOWED_AUDIO_TYPES:
         # Fallback: allow if filename has a known audio extension
         fname = (upload.filename or "").lower()
-        if not fname.endswith((".wav", ".mp3", ".ogg", ".flac", ".webm", ".m4a")):
+        if not fname.endswith(ALLOWED_AUDIO_EXTS):
             raise InvalidSampleError(
                 f"Unsupported audio type: {upload.content_type}. "
                 "Valid: wav, mp3, ogg, flac, webm, m4a"

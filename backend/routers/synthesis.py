@@ -1,12 +1,13 @@
 """Text-to-speech synthesis endpoint."""
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
-from pydub import AudioSegment
 
+from ..audio_meta import duration_seconds
 from ..cancellation import create_cancellation_token
 from ..dependencies import get_profile_manager, get_tts_engine
 from ..exceptions import ProfileNotFound, UnsupportedFormatError
@@ -106,10 +107,10 @@ async def synthesize_text(
     # Success: tear down the job record and its chunk dir.
     job_store.cleanup_job(job_id)
 
-    try:
-        audio = AudioSegment.from_file(str(result.path))
-        duration = round(len(audio) / 1000.0, 2)
-    except Exception:
+    # Header-based probe (mutagen) instead of decoding the whole audio just
+    # to measure it (BAJO-25); falls back to a size-based estimate.
+    duration = await asyncio.to_thread(duration_seconds, result.path)
+    if duration <= 0:
         size = result.path.stat().st_size
         duration = round(size / 16000, 1) if size > 0 else 0.0
 
@@ -219,11 +220,9 @@ async def resume_job(
     finally:
         cancel_token.finish()
 
-    try:
-        audio = AudioSegment.from_file(str(result.path))
-        duration = round(len(audio) / 1000.0, 2)
-    except Exception:
-        duration = 0.0
+    # Header-based probe; ``duration_seconds`` already falls back to a
+    # pydub decode and finally to 0.0 (BAJO-25).
+    duration = await asyncio.to_thread(duration_seconds, result.path)
 
     embed_metadata(
         result.path,

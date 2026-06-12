@@ -1,13 +1,14 @@
 """Voice profile CRUD endpoints."""
 from __future__ import annotations
 
+import asyncio
 import uuid
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
-from pydub import AudioSegment
 
+from ..audio_meta import duration_seconds
 from ..dependencies import get_profile_manager
 from ..exceptions import ProfileNotFound, SampleNotFound
 from ..paths import VOICES_DIR
@@ -63,15 +64,10 @@ async def create_profile(
         validate_audio_bytes(content)
         sample_path.write_bytes(content)
 
-        try:
-            import shutil
-
-            if not shutil.which("ffprobe"):
-                raise FileNotFoundError("ffprobe not found")
-            audio = AudioSegment.from_file(str(sample_path))
-            sample_duration = round(len(audio) / 1000.0, 1)
-        except Exception:
-            sample_duration = None
+        # Header-based probe (mutagen first, pydub fallback — BAJO-25);
+        # None means "couldn't read it", same as before.
+        probed = await asyncio.to_thread(duration_seconds, sample_path)
+        sample_duration = round(probed, 1) if probed > 0 else None
 
     profile = VoiceProfile(
         name=name,

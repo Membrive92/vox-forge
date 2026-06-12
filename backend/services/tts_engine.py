@@ -126,17 +126,6 @@ CLONE_PAUSE_COMMA_MS = 200      # Short breath pause
 CLONE_PAUSE_SENTENCE_MS = 500   # End of sentence
 CLONE_PAUSE_PARAGRAPH_MS = 900  # Paragraph break
 
-# Marker used to tag chunk boundaries with pause type.
-_PAUSE_TAG_COMMA = "\x01"
-_PAUSE_TAG_SENTENCE = "\x02"
-_PAUSE_TAG_PARAGRAPH = "\x03"
-
-
-
-
-
-
-
 
 @dataclass(frozen=True)
 class _CloneChunk:

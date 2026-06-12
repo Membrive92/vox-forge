@@ -3,13 +3,7 @@ import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
 import type { AudioPlayerState } from "@/hooks/useAudioPlayer";
 import { colors, fonts, typography } from "@/theme/tokens";
-
-function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${String(secs).padStart(2, "0")}`;
-}
+import { formatClock } from "@/utils/format";
 
 // Range of playback rates supported by HTMLAudioElement reliably.
 // Below 0.5 the audio gets choppy in most browsers; above 2 the
@@ -105,7 +99,7 @@ export function InteractivePlayer({
             textAlign: "center",
           }}
         >
-          {formatTime(player.currentTime)} / {formatTime(player.duration)}
+          {formatClock(player.currentTime)} / {formatClock(player.duration)}
         </span>
 
         <div

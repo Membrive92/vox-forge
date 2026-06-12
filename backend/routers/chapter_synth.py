@@ -28,12 +28,19 @@ from ..config import settings
 from ..dependencies import get_tts_engine
 from ..exceptions import UnsupportedFormatError
 from ..paths import OUTPUT_DIR, TEMP_DIR
+from ..schemas import SynthesisRequest
+from ..services import job_store
 from ..services import project_manager as pm
 from ..services import qc as qc_service
 from ..services.metadata import AudioMetadata, embed_metadata
 from ..services.progress import registry as progress_registry
 from ..services.tts_engine import TTSEngine, chunk_texts_for_engine
-from ..upload_utils import read_upload_safely, validate_audio_bytes, validate_audio_upload
+from ..upload_utils import (
+    ALLOWED_AUDIO_EXTS,
+    read_upload_safely,
+    validate_audio_bytes,
+    validate_audio_upload,
+)
 from ..utils import cleanup_old_files
 
 logger = logging.getLogger(__name__)
@@ -119,7 +126,6 @@ async def synthesize_chapter(
     voice_id = chapter.get("voice_id") or project["voice_id"]
     profile_id = chapter.get("profile_id") or project["profile_id"]
 
-    from ..schemas import SynthesisRequest
     request = SynthesisRequest(
         text=text,
         voice_id=voice_id,
@@ -250,7 +256,6 @@ async def regenerate_chunk(
     # The previous implementation always called edge_tts.Communicate
     # directly, which broke regen for any chapter generated with a
     # cloned voice (the user's narrator).
-    from ..schemas import SynthesisRequest
     request = SynthesisRequest(
         text=chunk_text,
         voice_id=gen["voice_id"],
@@ -317,8 +322,6 @@ async def _resplice_chapter(
     Returns True if the full-chapter audio was rebuilt and persisted, False
     if the per-chunk files weren't all available (so only the take changed).
     """
-    from ..services import job_store
-
     gen_id = gen["id"]
     if gen.get("engine") != "edge-tts":
         # Only Edge masters are a plain concat of their job-dir chunks
@@ -443,9 +446,6 @@ async def qc_chapter(chapter_id: str) -> dict:
     }
 
 
-_ALLOWED_UPLOAD_EXTS = (".wav", ".mp3", ".ogg", ".flac", ".webm", ".m4a")
-
-
 @router.post(
     "/{chapter_id}/upload-audio",
     summary="Upload a pre-recorded audio file as a generation of this chapter",
@@ -472,7 +472,7 @@ async def upload_chapter_audio(
     validate_audio_upload(audio)
 
     ext = Path(audio.filename or "").suffix.lower()
-    if ext not in _ALLOWED_UPLOAD_EXTS:
+    if ext not in ALLOWED_AUDIO_EXTS:
         # Browser recorders may leave the filename without extension;
         # derive from content_type when possible.
         ctype = (audio.content_type or "").lower()

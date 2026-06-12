@@ -118,17 +118,17 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | BAJO-19 | Nav sin tablist/tab | RESUELTO-PREVIO | ARIA tabs completo (App.tsx:490+) — d6777a7 |
 | BAJO-20 | `<audio>/<video>` sin nombre accesible | **ABIERTO** | ChapterCard/StudioTab/Recorder/VideoRenderPanel |
 | BAJO-21 | Tooltip Slider `<span>` no enfocable | **ABIERTO** | Slider.tsx:35, EditOperationsPanel ×3 |
-| BAJO-22 | M:SS duplicado | RESUELTO-PREVIO | utils/format.ts — 33abced |
-| BAJO-23 | Anchor de descarga duplicado | RESUELTO-PREVIO | utils/download.ts — d6777a7 |
-| BAJO-24 | `<audio>` oculto duplicado | RESUELTO-PREVIO | components/HiddenAudio.tsx — 9f5bf26 |
-| BAJO-25 | Duración duplicada backend | RESUELTO-PREVIO | audio_meta.py — c14f5a6 (resto en MED-PERF-5) |
+| BAJO-22 | M:SS duplicado | RESUELTO-PREVIO | utils/format.ts — 33abced. Verificación F4: 2 rezagados migrados (`InteractivePlayer.formatTime`, `SourcePicker.formatDuration` que conserva "—" para duración desconocida); los `Xm YYs` de estimación (ChapterCard/SynthTab) y el `M:SS.cc` con centisegundos (EditOperationsPanel) son formatos distintos, no duplicados |
+| BAJO-23 | Anchor de descarga duplicado | RESUELTO-PREVIO | utils/download.ts — d6777a7. Verificación F4: grep `createElement("a")` ⇒ solo download.ts |
+| BAJO-24 | `<audio>` oculto duplicado | RESUELTO-PREVIO | components/HiddenAudio.tsx — 9f5bf26. Verificación F4: los 10 players ocultos usan HiddenAudio; los `<audio controls>` restantes son reproductores visibles, no duplicados |
+| BAJO-25 | Duración duplicada backend | RESUELTO-PREVIO | audio_meta.py — c14f5a6 (resto en MED-PERF-5). Verificación F4: 3 sondas puras rezagadas migradas a `duration_seconds` (synthesis.py ×2 con sus fallbacks intactos, profiles.py upload de muestra sin gate de ffprobe); los `len(seg)/1000` restantes miden AudioSegments ya decodificados para procesado real |
 | BAJO-26 | latest-done inline duplicado | RESUELTO | = MED-PERF-4: los 4 call sites consumen `pm.get_latest_done_generation` — F3 |
-| BAJO-27 | ALLOWED_AUDIO_EXTS duplicada | **ABIERTO** | chapter_synth.py:270 vs upload_utils.py:52 |
-| BAJO-28 | Re-import local SynthesisRequest | **ABIERTO** | chapter_synth.py:88,195 |
+| BAJO-27 | ALLOWED_AUDIO_EXTS duplicada | RESUELTO | `upload_utils.ALLOWED_AUDIO_EXTS` única fuente: la consumen `validate_audio_upload` y el upload-audio de chapter_synth (`_ALLOWED_UPLOAD_EXTS` borrada) — F4 |
+| BAJO-28 | Re-import local SynthesisRequest | RESUELTO | `SynthesisRequest` (y `job_store`, mismo patrón en el mismo fichero) importados a nivel de módulo en chapter_synth; cero re-imports locales — F4 |
 | BAJO-29 | WorkbenchTab sobredimensionado | **ABIERTO (parcial)** | 1745→883 (4ba952e); objetivo F4 <600 + partir ChapterCard |
 | BAJO-30 | Prop drilling Voices (~17 props) | **ABIERTO** | VoicesPlusLab.tsx:43+ |
 | BAJO-31 | `moveOperation` sin UI | **ABIERTO** | useStudioSession.ts:168 |
-| BAJO-32 | `_PAUSE_TAG_*` muertas | **ABIERTO** | tts_engine.py:106-108 |
+| BAJO-32 | `_PAUSE_TAG_*` muertas | RESUELTO | grep confirmó cero usos (solo definición); constantes + bloque en blanco borrados de tts_engine.py (`CLONE_PAUSE_*` siguen vivas: 3 usos) — F4 |
 | BAJO-33 | Rama fallo `_run_command` sin test | RESUELTO | test_studio.py: exit!=0 con extracto de cola de stderr, ffmpeg ausente, y render sin output file — F1 `test(audit-bajo) BAJO-33` |
 | BAJO-34 | Concat character-cast sin test | RESUELTO | test_workbench.py: spy sobre `AudioSegment.silent` (600ms switch / 300ms mismo personaje, verificado vía X-Audio-Duration) + cleanup de temporales en éxito y en fallo — F1 `test(audit-bajo) BAJO-34` |
 | BAJO-35 | Invariante semáforo sin test | RESUELTO-PREVIO | test_clone_engine: holds_gpu_semaphore — a614a96 |
