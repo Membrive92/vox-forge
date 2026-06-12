@@ -15,16 +15,6 @@ type Schema = components["schemas"];
 
 export type ProfileDTO = Schema["VoiceProfile"];
 export type SynthesisRequestDTO = Schema["SynthesisRequest"];
-export type ProfileUpdateDTO = Schema["ProfileUpdate"];
-export type SampleUploadResponseDTO = Schema["SampleUploadResponse"];
-export type HealthResponseDTO = Schema["HealthResponse"];
-export type LogEntryDTO = Schema["LogEntry"];
-export type PronunciationEntryDTO = Schema["PronunciationEntry"];
-export type IncompleteJobSummaryDTO = Schema["IncompleteJobSummary"];
-export type JobProgressResponseDTO = Schema["JobProgressResponse"];
-export type StudioSourceDTO = Schema["StudioSource"];
-export type StudioEditRequestDTO = Schema["StudioEditRequest"];
-export type StudioOperationDTO = Schema["StudioOperation"];
 
 export interface ApiErrorBody {
   detail: string;

@@ -116,17 +116,6 @@ export const radii = {
 } as const;
 
 /**
- * Responsive breakpoints. Use inside media queries or style calculations.
- * Mobile-first: write styles for mobile, then override with `@media (min-width: X)`.
- */
-export const breakpoints = {
-  sm: 640,
-  md: 768,
-  lg: 1024,
-  xl: 1280,
-} as const;
-
-/**
  * Animation timings. Use `transitions.fast` for interactive state changes
  * (hover, active), `base` for panels and layouts, `slow` for decorative.
  * All changes respect `prefers-reduced-motion` via a global CSS rule.

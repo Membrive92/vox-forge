@@ -9,16 +9,11 @@ import type { components } from "./generated";
 export type Project = components["schemas"]["ProjectResponse"];
 export type Chapter = components["schemas"]["ChapterResponse"];
 export type Generation = components["schemas"]["GenerationResponse"];
-export type Take = components["schemas"]["TakeResponse"];
 
 // ── Projects ────────────────────────────────────────────────────────
 
 export function listProjects(): Promise<Project[]> {
   return getJson<Project[]>("/projects");
-}
-
-export function getProject(id: string): Promise<Project> {
-  return getJson<Project>(`/projects/${id}`);
 }
 
 export function createProject(data: Partial<Omit<Project, "id" | "created_at" | "updated_at">> & { name: string }): Promise<Project> {
@@ -55,12 +50,8 @@ export function splitIntoChapters(projectId: string, text: string, delimiter: "h
   return postJson<Chapter[]>(`/projects/${projectId}/split`, { text, delimiter });
 }
 
-// ── Generations & Takes ─────────────────────────────────────────────
+// ── Generations ─────────────────────────────────────────────────────
 
 export function listGenerations(chapterId: string): Promise<Generation[]> {
   return getJson<Generation[]>(`/projects/chapters/${chapterId}/generations`);
-}
-
-export function listTakes(generationId: string): Promise<Take[]> {
-  return getJson<Take[]>(`/projects/generations/${generationId}/takes`);
 }

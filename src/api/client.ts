@@ -165,25 +165,3 @@ export interface AudioResponse {
   engine: string;
   requestId: string | undefined;
 }
-
-export async function postJsonForAudio<B>(
-  path: string,
-  body: B,
-  signal?: AbortSignal,
-): Promise<AudioResponse> {
-  const opts: RequestOptions = {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  };
-  if (signal) opts.signal = signal;
-  const res = await request(path, opts);
-  const duration = Number.parseFloat(res.headers.get("X-Audio-Duration") ?? "0");
-  const sizeBytes = Number.parseInt(res.headers.get("X-Audio-Size") ?? "0", 10);
-  const chunks = Number.parseInt(res.headers.get("X-Audio-Chunks") ?? "1", 10);
-  const textLength = Number.parseInt(res.headers.get("X-Text-Length") ?? "0", 10);
-  const engine = res.headers.get("X-Audio-Engine") ?? "edge-tts";
-  const requestId = res.headers.get("X-Request-ID") ?? undefined;
-  const blob = await res.blob();
-  return { blob, duration, sizeBytes, chunks, textLength, engine, requestId };
-}

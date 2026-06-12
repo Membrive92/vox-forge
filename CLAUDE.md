@@ -208,7 +208,6 @@ src/
 │   ├── PromptDialog.tsx       # Accessible window.prompt replacement
 │   ├── Slider.tsx             # Accessible range input with info tooltip
 │   ├── InteractivePlayer.tsx  # Scrubber, +/-10s, playback rates, time display
-│   ├── WaveformEditor.tsx     # wavesurfer.js interactive waveform with regions
 │   ├── WaveformVisualizer.tsx # DPR-aware animated canvas (decorative)
 │   ├── ErrorBoundary.tsx      # Friendly crash UI (navigator.language → locale)
 │   ├── AudioRecorder.tsx      # Microphone recording (MediaRecorder API)
@@ -226,7 +225,6 @@ src/
 │   ├── useErrorBadge.ts       # Polls /logs/error-count for nav badge
 │   └── useToast.ts            # Timer + notification state
 ├── features/
-│   ├── tabs.ts                # Tab type + order + old-to-new mapping
 │   ├── state.ts               # Shared SynthSettings + ProfileDraft interfaces
 │   ├── projects/              # Workbench (default tab)
 │   │   ├── WorkbenchTab.tsx   # Sidebar + chapter cards
@@ -238,11 +236,11 @@ src/
 │   │   ├── QuickSynthTab.tsx  # Mode toggle wrapper
 │   │   ├── SynthTab.tsx       # Standard TTS panel (editor, player, export)
 │   │   └── ExperimentalTab.tsx # Cross-lingual cloning panel
-│   ├── voices-unified/        # Voices, profiles, compare in one tab
+│   ├── voices-unified/        # Voices, profiles and the lab in one tab
 │   │   ├── VoicesUnifiedTab.tsx  # Sections + quality analyzer wiring
 │   │   ├── VoicesTab.tsx      # System voices grid + sample upload
 │   │   ├── ProfilesTab.tsx    # Profile cards
-│   │   └── CompareTab.tsx     # A/B + quick preview all profiles
+│   │   └── synthFormContext.tsx  # Synth-form state for the Voices subtree
 │   ├── audio-tools/           # Voice conversion + DSP effects
 │   │   ├── AudioToolsTab.tsx  # Mode toggle wrapper
 │   │   ├── ConvertTab.tsx     # OpenVoice change-voice mode

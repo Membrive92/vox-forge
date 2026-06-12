@@ -75,13 +75,6 @@ export const Globe = () => (
   </svg>
 );
 
-export const Settings = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={SIZE_MD}>
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-  </svg>
-);
-
 export const ChevDown = () => (
   <svg viewBox="0 0 24 24" {...base} style={SIZE_XS}>
     <path d="M6 9l6 6 6-6" />
@@ -91,13 +84,6 @@ export const ChevDown = () => (
 export const ChevUp = () => (
   <svg viewBox="0 0 24 24" {...base} style={SIZE_XS}>
     <path d="M6 15l6-6 6 6" />
-  </svg>
-);
-
-export const User = () => (
-  <svg viewBox="0 0 24 24" {...base} style={SIZE_SM}>
-    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
   </svg>
 );
 
@@ -115,13 +101,6 @@ export const Book = () => (
   <svg viewBox="0 0 24 24" {...base} strokeWidth="1.5" style={SIZE_MD}>
     <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
-  </svg>
-);
-
-/** Zap — Quick Synth (fast one-shot synthesis). */
-export const Zap = () => (
-  <svg viewBox="0 0 24 24" {...base} strokeWidth="1.5" style={SIZE_MD}>
-    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
   </svg>
 );
 

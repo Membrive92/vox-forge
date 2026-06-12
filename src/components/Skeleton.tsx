@@ -42,17 +42,3 @@ export function Skeleton({
     />
   );
 }
-
-/**
- * Convenience for rendering multiple rows of skeleton lines
- * (e.g., for a list of cards or rows).
- */
-export function SkeletonRows({ rows = 3, gap = 8, height = 16 }: { rows?: number; gap?: number; height?: number }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap }}>
-      {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} height={height} width={`${100 - i * 5}%`} />
-      ))}
-    </div>
-  );
-}

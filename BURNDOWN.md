@@ -169,6 +169,16 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 
 ---
 
+## F4 — Barrido instrumentado (2026-06-12)
+
+Herramientas: `vulture backend/ --min-confidence 90` (pip, dev-only, NO añadido a requirements) y `npx ts-prune -p tsconfig.json` (`npx knip` descartado: barre el vendor de `img_generation_module` y no es scopeable sin config dedicada). Cada candidato verificado a mano con grep antes de borrar.
+
+**Borrado (confirmado muerto)**: `postJsonForAudio` (client.ts; `AudioResponse` se queda, lo usa synthesis.ts) · `getProject` + `listTakes` + tipo `Take` (api/projects.ts) · `SkeletonRows` (Skeleton.tsx) · `WaveformEditor.tsx` completo (supersedido por StudioWaveform) · `CompareTab.tsx` completo (retirado de la UI en Sprint C, sin consumidores; solo usaba claves i18n genéricas aún vivas) · iconos `Settings`/`User`/`Zap` · `breakpoints` (tokens.ts) · 10 alias DTO sin uso en api/types.ts (quedan `ProfileDTO`, `SynthesisRequestDTO`, `ApiErrorBody`). CLAUDE.md actualizado (WaveformEditor/CompareTab/tabs.ts fuera del árbol documentado).
+
+**Falsos positivos (no re-investigar)**: `metadata.py:33 import mutagen` — sonda deliberada de disponibilidad en try/except ImportError · `generated.ts paths/webhooks/$defs` — fichero AUTO, nunca se edita · `i18n/index.ts getTranslations` — usado en App/ErrorBoundary; ts-prune no resuelve bien el alias `@/i18n`.
+
+**TODO/FIXME/XXX**: grep en `src/` y `backend/` ⇒ cero coincidencias; nada que convertir en ids.
+
 ## Pasos HUMANO-PENDIENTE (instrucciones de una línea)
 
 - **PROD-05**: `cd img_generation_module && python -m pipeline engine up` → exportar los 2 workflows (SETUP_PROVISIONING §5) → rellenar `docs/BENCHMARK.md`.
