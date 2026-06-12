@@ -194,8 +194,9 @@ def _install_stubs() -> None:
         sys.modules["openvoice.api"] = openvoice_api
         sys.modules["openvoice.se_extractor"] = openvoice_se
 
-    # Stub faster_whisper so the Studio transcriber can be imported and
-    # exercised without the real model download.
+    # Stub faster_whisper so the Studio transcriber and the
+    # intelligibility scorer (VOZ-08) can be imported and exercised
+    # without the real model download (not in requirements-ci.txt).
     if "faster_whisper" not in sys.modules:
         fw = types.ModuleType("faster_whisper")
         fw.WhisperModel = _FakeWhisperModel  # type: ignore[attr-defined]

@@ -154,10 +154,11 @@ class TestCloneEngineUnit:
                 format_config=AUDIO_FORMATS["mp3"],
             )
             assert chunk_count == 3
-            # Exact count depends on candidates and retries; just verify it ran
-            from backend.services.clone_engine import _CANDIDATES_PER_CHUNK, _MAX_RETRIES
+            # Exact count depends on adaptive escalation; just verify it ran
+            # within the 2-initial / 4-max candidate budget per chunk (VOZ-08).
+            from backend.services.clone_engine import _CANDIDATES_PER_CHUNK, _MAX_CANDIDATES
             assert call_count >= 3 * _CANDIDATES_PER_CHUNK
-            assert call_count <= 3 * _CANDIDATES_PER_CHUNK * (1 + _MAX_RETRIES)
+            assert call_count <= 3 * _MAX_CANDIDATES
             assert path.exists()
             path.unlink(missing_ok=True)
 
@@ -290,6 +291,144 @@ class TestCloneEngineUnit:
         assert XTTS_LANGUAGES["en"] == "en"
         assert "es" in XTTS_LANGUAGES
         assert "en" in XTTS_LANGUAGES
+
+
+# ---------------------------------------------------------------------------
+# 1b. ASR-in-the-loop candidate re-ranking (VOZ-08)
+#
+# Final candidate selection is decided by measured intelligibility
+# (services/intelligibility.py); _score_audio only pre-filters obvious
+# hallucinations. Budget: 2 candidates, +2 adaptive (4 max) when the
+# best falls below settings.intelligibility_threshold.
+# ---------------------------------------------------------------------------
+
+
+def _engine_with_traceable_candidates() -> tuple[object, list[str]]:
+    """CloneEngine whose fake model writes each candidate's own filename
+    as its content, so the winning candidate is identifiable from the
+    final output bytes."""
+    from unittest.mock import MagicMock
+
+    from backend.services.clone_engine import CloneEngine
+
+    engine = CloneEngine()
+    engine._device = "cpu"
+    generated: list[str] = []
+
+    def fake_tts_to_file(text, speaker_wav, language, file_path, **_kwargs):
+        name = Path(file_path).name
+        generated.append(name)
+        Path(file_path).write_bytes(name.encode())
+
+    fake_model = MagicMock()
+    fake_model.tts_to_file = fake_tts_to_file
+    engine._model = fake_model
+    return engine, generated
+
+
+def _intelligibility_by_candidate(scores: dict[int, float], calls: list[int]):
+    """Fake ``score_intelligibility`` keyed by the candidate index parsed
+    from the filename (``{file_id}_cand{N}.wav``)."""
+    import re
+
+    async def fake(audio_path, expected_text, *, language=None, transcriber=None):
+        match = re.search(r"_cand(\d+)\.wav$", audio_path.name)
+        assert match is not None, f"unexpected candidate name: {audio_path.name}"
+        index = int(match.group(1))
+        calls.append(index)
+        return scores[index]
+
+    return fake
+
+
+class TestCandidateReranking:
+    """synthesize_chunk must pick by intelligibility, not signal score."""
+
+    @pytest.mark.asyncio
+    async def test_sabotaged_candidate_loses_against_faithful(self) -> None:
+        """cand0 is fluent-but-wrong (sabotaged), cand1 speaks the text:
+        the faithful one must win, and no escalation happens because the
+        best is above threshold."""
+        from backend.services import clone_engine
+
+        engine, generated = _engine_with_traceable_candidates()
+        calls: list[int] = []
+        fake_score = _intelligibility_by_candidate({0: 0.55, 1: 0.97}, calls)
+
+        with patch.object(
+            type(engine), "is_available",
+            new_callable=lambda: property(lambda self: True),
+        ), patch.object(clone_engine, "score_intelligibility", fake_score):
+            output = await engine.synthesize_chunk("Hola mundo.", "ref.wav")
+
+        try:
+            assert output.read_bytes().decode().endswith("_cand1.wav"), (
+                "the most intelligible candidate must be selected"
+            )
+            assert len(generated) == clone_engine._CANDIDATES_PER_CHUNK, (
+                "no adaptive escalation when best >= threshold"
+            )
+        finally:
+            output.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_adaptive_scaling_triggers_only_below_threshold(self) -> None:
+        """First round all below threshold ⇒ exactly one extra round of 2
+        (4 total), and the round-one candidates are NOT re-transcribed."""
+        from backend.services import clone_engine
+
+        engine, generated = _engine_with_traceable_candidates()
+        calls: list[int] = []
+        fake_score = _intelligibility_by_candidate(
+            {0: 0.40, 1: 0.50, 2: 0.95, 3: 0.60}, calls,
+        )
+
+        with patch.object(
+            type(engine), "is_available",
+            new_callable=lambda: property(lambda self: True),
+        ), patch.object(clone_engine, "score_intelligibility", fake_score):
+            output = await engine.synthesize_chunk("Hola mundo.", "ref.wav")
+
+        try:
+            assert len(generated) == clone_engine._MAX_CANDIDATES
+            assert output.read_bytes().decode().endswith("_cand2.wav")
+            assert sorted(calls) == [0, 1, 2, 3], (
+                "each candidate must be ASR-scored exactly once (cached)"
+            )
+        finally:
+            output.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_accepts_best_available_with_warning_when_all_below(
+        self, caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """If even the escalated round stays below threshold, the best
+        available candidate is accepted and a warning is logged."""
+        import logging
+
+        from backend.services import clone_engine
+
+        engine, generated = _engine_with_traceable_candidates()
+        calls: list[int] = []
+        fake_score = _intelligibility_by_candidate(
+            {0: 0.40, 1: 0.50, 2: 0.45, 3: 0.60}, calls,
+        )
+
+        with patch.object(
+            type(engine), "is_available",
+            new_callable=lambda: property(lambda self: True),
+        ), patch.object(clone_engine, "score_intelligibility", fake_score), \
+                caplog.at_level(logging.WARNING, logger="backend.services.clone_engine"):
+            output = await engine.synthesize_chunk("Hola mundo.", "ref.wav")
+
+        try:
+            assert len(generated) == clone_engine._MAX_CANDIDATES
+            assert output.read_bytes().decode().endswith("_cand3.wav")
+            assert "best-available" in caplog.text, (
+                "accepting a below-threshold candidate must warn"
+            )
+        finally:
+            output.unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------------------

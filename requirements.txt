@@ -36,8 +36,11 @@ pillow
 # ── TTS engines ─────────────────────────────────────────────────────
 edge-tts
 
-# ── Speech-to-text (Studio video subtitles) ─────────────────────────
+# ── Speech-to-text (Studio video subtitles + candidate re-ranking) ──
 faster-whisper
+
+# Text similarity for ASR-in-the-loop intelligibility scoring (VOZ-08)
+rapidfuzz
 
 # ── GPU: voice cloning + conversion ─────────────────────────────────
 # XTTS v2 via Coqui TTS. Needs torch + transformers.

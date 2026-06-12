@@ -1,6 +1,7 @@
 """Service instances exposed as FastAPI dependencies."""
 from __future__ import annotations
 
+from .config import settings
 from .paths import PROFILES_FILE
 from .services.convert_engine import ConvertEngine
 from .services.profile_manager import ProfileManager
@@ -11,7 +12,7 @@ from .services.video_renderer import VideoRenderer
 _profile_manager = ProfileManager(PROFILES_FILE)
 _tts_engine = TTSEngine(_profile_manager)
 _convert_engine = ConvertEngine()
-_transcriber = Transcriber()
+_transcriber = Transcriber(settings.whisper_model)
 _video_renderer = VideoRenderer()
 
 

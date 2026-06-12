@@ -24,6 +24,7 @@ from ..exceptions import SynthesisError
 from ..gpu_lock import gpu_semaphore
 from ..paths import OUTPUT_DIR, TEMP_DIR
 from .castilian_warmup import time_stretch_wav
+from .intelligibility import score_intelligibility
 from .job_store import chunk_path as job_chunk_path
 
 if TYPE_CHECKING:
@@ -66,13 +67,26 @@ _XTTS_QUALITY_PARAMS = {
     "sound_norm_refs": True,
 }
 
-# Generate each chunk N times and pick the best one (fewest artifacts).
-_CANDIDATES_PER_CHUNK = 8
+# Candidate budget (VOZ-08 — ASR-in-the-loop re-ranking).
+#
+# The old design generated 8 candidates per chunk (plus up to 4 blind
+# retry rounds) and picked one by signal statistics alone, which is
+# blind to diction: a fluent candidate with the wrong words scored
+# perfectly. Final selection is now decided by measured intelligibility
+# (faster-whisper transcription vs the expected text, see
+# services/intelligibility.py), so the blind 8-sample sweep is wasted
+# GPU: start with 2 candidates and escalate with 2 more (4 max) only
+# when the best falls below settings.intelligibility_threshold.
+_CANDIDATES_PER_CHUNK = 2
+_ADAPTIVE_EXTRA_CANDIDATES = 2
+_MAX_CANDIDATES = 4
 
-# If the best candidate's score exceeds this threshold, regenerate.
-# Clean audio scores 3-8. Lower threshold = stricter quality gate.
-_QUALITY_THRESHOLD = 8.0
-_MAX_RETRIES = 4
+# Cheap signal pre-filter cutoff (_score_audio units). Candidates above
+# it look like hallucinations (clean audio scores 3-8, hallucinations
+# 15+) and are discarded before paying an ASR pass. If EVERY candidate
+# in a round exceeds it, all are kept: the signal scorer is evidently
+# uninformative for that chunk and intelligibility decides alone.
+_PREFILTER_THRESHOLD = 8.0
 
 
 class CloneEngine:
@@ -179,7 +193,7 @@ class CloneEngine:
             pass  # If trimming fails, keep original audio
 
     def _score_audio(self, path: Path) -> float:
-        """Score an audio file by quality (lower = better).
+        """Score an audio file by signal quality (lower = better).
 
         Combines three metrics to detect hallucinations:
         1. Energy variance — artifacts cause sudden spikes
@@ -187,6 +201,11 @@ class CloneEngine:
         3. Silence ratio — too much silence indicates model confusion
 
         Clean audio typically scores 3-8. Hallucinations score 15+.
+
+        Role since VOZ-08: cheap PRE-FILTER only. It discards obviously
+        broken candidates before the ASR pass; the final selection is
+        made by measured intelligibility (it is blind to diction — a
+        fluent candidate with the wrong words scores perfectly here).
         """
         try:
             audio = AudioSegment.from_wav(str(path))
@@ -236,7 +255,7 @@ class CloneEngine:
         Holds the shared GPU semaphore only for THIS one inference, so other
         GPU work (a second chapter, /convert, experimental) can interleave
         between candidates instead of waiting behind the whole
-        8-candidates × retries loop + CPU scoring.
+        candidates loop + scoring.
 
         Speed policy (VOZ-04): XTTS's native ``speed`` kwarg is NEVER
         forwarded — with long speaker_wavs the model locks onto the
@@ -331,6 +350,41 @@ class CloneEngine:
             )
         return candidates
 
+    async def _rank_by_intelligibility(
+        self,
+        candidates: list[Path],
+        expected_text: str,
+        language: str,
+        intel_scores: dict[Path, float],
+    ) -> None:
+        """Score not-yet-ranked candidates and record them in ``intel_scores``.
+
+        Two stages per new batch:
+        1. Cheap signal pre-filter (``_score_audio``, CPU, off the event
+           loop and outside any GPU lock): candidates over
+           ``_PREFILTER_THRESHOLD`` are dropped before paying a
+           transcription. If the WHOLE batch exceeds it, all are kept —
+           the signal scorer carries no information for this chunk and
+           intelligibility decides alone.
+        2. ASR intelligibility (``score_intelligibility``, holds the GPU
+           semaphore per transcription) for each survivor.
+
+        Already-scored paths are skipped, so the adaptive escalation
+        round never re-transcribes round-one candidates.
+        """
+        fresh = [c for c in candidates if c not in intel_scores]
+        signal = [(c, await asyncio.to_thread(self._score_audio, c)) for c in fresh]
+        survivors = [c for c, s in signal if s <= _PREFILTER_THRESHOLD]
+        if not survivors:
+            survivors = fresh
+        dropped = len(fresh) - len(survivors)
+        if dropped:
+            logger.info("Pre-filter discarded %d/%d candidates before ASR", dropped, len(fresh))
+        for candidate in survivors:
+            intel_scores[candidate] = await score_intelligibility(
+                candidate, expected_text, language=language,
+            )
+
     async def synthesize_chunk(
         self,
         text: str,
@@ -340,9 +394,11 @@ class CloneEngine:
     ) -> Path:
         """Synthesize a single chunk using voice cloning.
 
-        Generates N candidates, scores each, and picks the cleanest.
-        If the best candidate exceeds the quality threshold, retries
-        up to _MAX_RETRIES additional rounds to get a clean take.
+        Generates 2 candidates and picks the one that most intelligibly
+        speaks the expected text (ASR re-ranking, VOZ-08; the signal
+        scorer only pre-filters obvious hallucinations). If the best
+        falls below ``settings.intelligibility_threshold``, generates
+        2 more (4 max) and accepts the best available with a warning.
         Always at natural cadence — speed is a post-stretch concern
         of ``synthesize_long``.
         """
@@ -354,48 +410,49 @@ class CloneEngine:
         xtts_lang = XTTS_LANGUAGES.get(language, "es")
         file_id = str(uuid.uuid4())[:12]
         all_candidates: list[Path] = []
+        intel_scores: dict[Path, float] = {}
+        threshold = settings.intelligibility_threshold
 
         try:
-            # The GPU semaphore is now held per-inference inside
-            # _generate_one, so it's released between candidates and rounds.
-            # Scoring is CPU-only — run it off the event loop (to_thread) and
-            # outside any GPU lock so it can't block other work.
+            # The GPU semaphore is held per-inference inside _generate_one
+            # (and per-transcription inside score_intelligibility), so it's
+            # released between candidates and rounds and other GPU work can
+            # interleave.
             candidates = await self._generate_candidates(
                 text, str(speaker_wav), xtts_lang, file_id, _CANDIDATES_PER_CHUNK,
                 cancel_token=cancel_token,
             )
             all_candidates.extend(candidates)
+            await self._rank_by_intelligibility(all_candidates, text, xtts_lang, intel_scores)
+            best, best_intel = max(intel_scores.items(), key=lambda kv: kv[1])
 
-            scored = [(c, await asyncio.to_thread(self._score_audio, c)) for c in all_candidates]
-            scored.sort(key=lambda x: x[1])
-            best_score = scored[0][1]
-
-            # Retry if best candidate is below quality threshold
-            retry = 0
-            while best_score > _QUALITY_THRESHOLD and retry < _MAX_RETRIES:
-                retry += 1
+            # Adaptive escalation: one extra round only when the best
+            # candidate doesn't reach the intelligibility threshold.
+            if best_intel < threshold and len(all_candidates) < _MAX_CANDIDATES:
                 logger.info(
-                    "Best score %.2f exceeds threshold %.1f, retry %d/%d",
-                    best_score, _QUALITY_THRESHOLD, retry, _MAX_RETRIES,
+                    "Best intelligibility %.3f below threshold %.2f — generating %d more candidates",
+                    best_intel, threshold, _ADAPTIVE_EXTRA_CANDIDATES,
                 )
                 extra = await self._generate_candidates(
                     text, str(speaker_wav), xtts_lang, file_id,
-                    _CANDIDATES_PER_CHUNK, offset=len(all_candidates),
+                    _ADAPTIVE_EXTRA_CANDIDATES, offset=len(all_candidates),
                     cancel_token=cancel_token,
                 )
                 all_candidates.extend(extra)
-                scored = [(c, await asyncio.to_thread(self._score_audio, c)) for c in all_candidates]
-                scored.sort(key=lambda x: x[1])
-                best_score = scored[0][1]
+                await self._rank_by_intelligibility(all_candidates, text, xtts_lang, intel_scores)
+                best, best_intel = max(intel_scores.items(), key=lambda kv: kv[1])
 
-            best = scored[0][0]
-            logger.info(
-                "Best candidate: %s (score %.2f) from %d total [best scores: %s]",
-                best.name,
-                best_score,
-                len(scored),
-                ", ".join(f"{s[1]:.2f}" for s in scored[:5]),
-            )
+            if best_intel < threshold:
+                logger.warning(
+                    "Accepting best-available candidate %s with intelligibility %.3f "
+                    "below threshold %.2f (%d candidates tried)",
+                    best.name, best_intel, threshold, len(all_candidates),
+                )
+            else:
+                logger.info(
+                    "Best candidate: %s (intelligibility %.3f) from %d generated",
+                    best.name, best_intel, len(all_candidates),
+                )
 
             # Move best to final output path, trim silences, delete the rest
             output_path = TEMP_DIR / f"{file_id}_clone.wav"

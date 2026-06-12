@@ -147,7 +147,7 @@ campaña audit-fixes `c3c2228..d48eaab` (19 commits, 2026-06-08/10).
 | VOZ-05 | F2 | Tests de stretch/clamp/no-stacking | RESUELTO — `tests/test_audio_stretch.py` con pedalboard real (1 s × 0.8 ⇒ 1.25 s, no-op en epsilon, clamp+warning, spy de pasada única en `process`) + política speed-nunca-a-XTTS en `test_clone_engine.py` — F2 `fix(voz) VOZ-01..05` |
 | VOZ-06 | F2 | A/B de escucha 0.9×/1.15× | HUMANO-PENDIENTE (listo para escuchar: F2 mergeado) |
 | VOZ-07 | F9 | resemble-enhance como op Studio | DIFERIDO (opcional; tras F8) |
-| VOZ-08 | F2b | Re-ranking candidatos con ASR (`intelligibility.py`) | ABIERTO |
+| VOZ-08 | F2b | Re-ranking candidatos con ASR (`intelligibility.py`) | RESUELTO — núcleo compartido `services/intelligibility.py` (`score_intelligibility`: faster-whisper lazy singleton bajo `gpu_semaphore`, ambos textos por `normalize_for_tts`, `rapidfuzz.fuzz.ratio`; transcriber inyectable, reutilizable por QC-01); en `clone_engine` la selección final es por inteligibilidad con `_score_audio` como pre-filtro barato; presupuesto adaptativo 2+2 (máx 4, antes 8 ciegos) con umbral `settings.intelligibility_threshold` (0.90) y warning al aceptar bajo umbral; settings `whisper_model`/`intelligibility_threshold` vía env; `rapidfuzz` en requirements + requirements-ci; tests: saboteado pierde, escalado solo bajo umbral, "Dr." vs "Doctor" concuerdan — F2b `feat(voz) VOZ-08` |
 | VOZ-09 | F2b | Reabrir sampler XTTS (tras VOZ-08; A/B HUMANO) | ABIERTO |
 | VOZ-10 | F2b | Conditioning multi-muestra (schema+UI+migración) | ABIERTO |
 | VOZ-11 | F2b | Fine-tuning: script + doc (entrena HUMANO) | ABIERTO (prep) |

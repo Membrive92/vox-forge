@@ -27,6 +27,10 @@ audioop-lts; python_version >= "3.13"
 # Image generation placeholder (Studio scenes)
 pillow
 
+# Text similarity for intelligibility scoring (services/intelligibility.py
+# imports it at module load; faster-whisper itself is stubbed in conftest)
+rapidfuzz
+
 # Test runner
 pytest
 pytest-asyncio

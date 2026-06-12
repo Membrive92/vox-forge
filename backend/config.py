@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +39,16 @@ class Settings(BaseSettings):
     # Synthesis limits
     max_text_length: int = 500_000
     chunk_max_chars: int = 3_000  # Max chars per chunk for Edge-TTS
+
+    # Voice quality — ASR-in-the-loop candidate re-ranking (VOZ-08).
+    # faster-whisper model used to transcribe XTTS candidates (and Studio
+    # subtitles). Override via VOXFORGE_WHISPER_MODEL (e.g. "medium").
+    whisper_model: str = "small"
+    # Minimum intelligibility (normalized fuzz ratio, 0-1, of transcribed
+    # vs expected text) a clone candidate must reach. Below it the engine
+    # escalates to extra candidates before accepting the best available.
+    # Override via VOXFORGE_INTELLIGIBILITY_THRESHOLD.
+    intelligibility_threshold: float = Field(default=0.90, ge=0.0, le=1.0)
 
     # Maintenance
     cleanup_max_age_hours: int = 24
