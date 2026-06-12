@@ -985,6 +985,145 @@ class TestFinetunedCheckpointLoading:
 
 
 # ---------------------------------------------------------------------------
+# 4c. Multi-sample conditioning (VOZ-10)
+#
+# XTTS accepts a LIST in speaker_wav and averages the conditioning
+# latents. Profiles store up to 5 samples; routing resolves every one
+# that exists on disk and the engine forwards the full list.
+# ---------------------------------------------------------------------------
+
+
+class TestMultiSampleConditioning:
+    """The profile's full sample list must reach XTTS as speaker_wav."""
+
+    @pytest.mark.asyncio
+    async def test_resolve_routing_collects_all_existing_samples(self) -> None:
+        """Samples missing on disk are skipped; the rest keep their order."""
+        from backend.dependencies import get_profile_manager, get_tts_engine
+        from backend.paths import VOICES_DIR
+        from backend.schemas import SynthesisRequest, VoiceProfile
+
+        pm = get_profile_manager()
+        for name in ("ms_a.wav", "ms_b.wav"):
+            (VOICES_DIR / name).write_bytes(b"RIFF" + b"\x00" * 100)
+        profile = VoiceProfile(
+            name="Multi",
+            voice_id="es-ES-AlvaroNeural",
+            samples=["ms_a.wav", "ms_missing.wav", "ms_b.wav"],
+        )
+        await pm.create(profile)
+
+        engine = get_tts_engine()
+        request = SynthesisRequest(
+            text="Hola", voice_id="es-ES-AlvaroNeural", profile_id=profile.id,
+        )
+        routing = engine.resolve_routing(request)
+
+        try:
+            assert [p.name for p in routing.sample_paths] == ["ms_a.wav", "ms_b.wav"]
+            assert routing.engine == "xtts-v2"
+        finally:
+            for name in ("ms_a.wav", "ms_b.wav"):
+                (VOICES_DIR / name).unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_generate_one_forwards_sample_list_to_xtts(self, tmp_path) -> None:
+        from backend.services.clone_engine import CloneEngine
+
+        engine = CloneEngine()
+        captured: dict = {}
+
+        def fake_tts_to_file(**kwargs):
+            captured.update(kwargs)
+            Path(str(kwargs["file_path"])).write_bytes(b"RIFF" + b"\x00" * 100)
+
+        fake_model = MagicMock()
+        fake_model.tts_to_file = fake_tts_to_file
+        engine._model = fake_model
+
+        await engine._generate_one(
+            "hola", ["a.wav", "b.wav"], "es", tmp_path / "o.wav",
+        )
+        assert captured["speaker_wav"] == ["a.wav", "b.wav"]
+
+    @pytest.mark.asyncio
+    async def test_synthesize_chunk_normalizes_single_path_to_list(self) -> None:
+        """A lone Path still reaches the model as a one-element list."""
+        from backend.services import clone_engine
+
+        engine = clone_engine.CloneEngine()
+        engine._device = "cpu"
+        captured: dict = {}
+
+        def fake_tts_to_file(**kwargs):
+            captured.update(kwargs)
+            Path(str(kwargs["file_path"])).write_bytes(b"RIFF" + b"\x00" * 100)
+
+        fake_model = MagicMock()
+        fake_model.tts_to_file = fake_tts_to_file
+        engine._model = fake_model
+
+        async def fake_score(audio_path, expected_text, *, language=None, transcriber=None):
+            return 0.95
+
+        with patch.object(
+            type(engine), "is_available",
+            new_callable=lambda: property(lambda self: True),
+        ), patch.object(clone_engine, "score_intelligibility", fake_score):
+            output = await engine.synthesize_chunk("Hola.", Path("ref.wav"))
+
+        try:
+            assert captured["speaker_wav"] == [str(Path("ref.wav"))]
+        finally:
+            output.unlink(missing_ok=True)
+
+    @pytest.mark.asyncio
+    async def test_synthesize_routes_full_sample_list_to_clone_engine(
+        self, tmp_path,
+    ) -> None:
+        """End to end: a 2-sample profile makes TTSEngine pass BOTH
+        resolved paths to CloneEngine.synthesize_long."""
+        from backend.dependencies import get_profile_manager, get_tts_engine
+        from backend.paths import VOICES_DIR
+        from backend.schemas import SynthesisRequest, VoiceProfile
+
+        pm = get_profile_manager()
+        for name in ("msl_a.wav", "msl_b.wav"):
+            (VOICES_DIR / name).write_bytes(b"RIFF" + b"\x00" * 100)
+        profile = VoiceProfile(
+            name="MultiLong",
+            voice_id="es-ES-AlvaroNeural",
+            samples=["msl_a.wav", "msl_b.wav"],
+        )
+        await pm.create(profile)
+
+        out = tmp_path / "out.mp3"
+        out.write_bytes(b"ID3\x04\x00" + b"\x00" * 64)
+        fake_clone = MagicMock()
+        fake_clone.synthesize_long = AsyncMock(return_value=(out, 1))
+
+        engine = get_tts_engine()
+        request = SynthesisRequest(
+            text="Hola mundo.",
+            voice_id="es-ES-AlvaroNeural",
+            output_format="mp3",
+            profile_id=profile.id,
+        )
+        with patch.object(engine, "_clone_engine", fake_clone):
+            result = await engine.synthesize(request)
+
+        try:
+            assert result.engine == "xtts-v2"
+            kwargs = fake_clone.synthesize_long.await_args.kwargs
+            assert [Path(p).name for p in kwargs["speaker_wav"]] == [
+                "msl_a.wav", "msl_b.wav",
+            ]
+        finally:
+            for name in ("msl_a.wav", "msl_b.wav"):
+                (VOICES_DIR / name).unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
 # 5. Sampler parameters (VOZ-09)
 #
 # The decoding params were strangled to near-greedy emergency values

@@ -5299,6 +5299,10 @@
             "type": "number",
             "title": "Silence Ratio"
           },
+          "rhythm_sps": {
+            "type": "number",
+            "title": "Rhythm Sps"
+          },
           "rating": {
             "type": "string",
             "enum": [
@@ -5327,11 +5331,12 @@
           "snr_db",
           "clip_ratio",
           "silence_ratio",
+          "rhythm_sps",
           "rating",
           "issues"
         ],
         "title": "SampleAnalysisResponse",
-        "description": "Quality metrics for a voice sample (see ``_analyze_bytes``)."
+        "description": "Quality metrics for a voice sample (see ``_analyze_bytes``).\n\n``rhythm_sps`` is an approximate speech rate in syllables/second\n(VOZ-10 curation aid — see ``_estimate_rhythm``)."
       },
       "SampleUploadResponse": {
         "properties": {

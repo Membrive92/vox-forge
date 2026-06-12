@@ -62,10 +62,14 @@ async def convert_voice(
         if profile is None:
             source_path.unlink(missing_ok=True)
             raise ProfileNotFound(f"Profile not found: {profile_id}")
-        if profile.sample_filename:
-            candidate = VOICES_DIR / profile.sample_filename
+        # OpenVoice extracts a single tone-color embedding, so unlike
+        # XTTS conditioning (VOZ-10) only one reference is used: the
+        # first stored sample that exists on disk.
+        for sample in profile.samples:
+            candidate = VOICES_DIR / sample
             if candidate.exists():
                 target_path = candidate
+                break
 
     if target_path is None and target_sample is not None:
         validate_audio_upload(target_sample)

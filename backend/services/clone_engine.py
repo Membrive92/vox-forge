@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -95,6 +96,21 @@ _MAX_CANDIDATES = 4
 # in a round exceeds it, all are kept: the signal scorer is evidently
 # uninformative for that chunk and intelligibility decides alone.
 _PREFILTER_THRESHOLD = 8.0
+
+# What callers may pass as conditioning reference(s).
+SpeakerWav = str | Path | Sequence[str | Path]
+
+
+def _speaker_wav_list(speaker_wav: SpeakerWav) -> list[str]:
+    """Normalize to the ``list[str]`` form XTTS accepts (VOZ-10).
+
+    XTTS computes conditioning latents from every file in the list and
+    averages them, so multi-sample profiles get a more stable voice than
+    any single clip. A lone path becomes a one-element list.
+    """
+    if isinstance(speaker_wav, (str, Path)):
+        return [str(speaker_wav)]
+    return [str(p) for p in speaker_wav]
 
 
 class CloneEngine:
@@ -271,11 +287,14 @@ class CloneEngine:
     async def _generate_one(
         self,
         text: str,
-        speaker_wav: str,
+        speaker_wav: list[str],
         language: str,
         output_path: Path,
     ) -> None:
         """Generate a single audio file (one attempt).
+
+        ``speaker_wav`` is always the list form (see ``_speaker_wav_list``):
+        XTTS averages the conditioning latents over every file in it.
 
         Holds the shared GPU semaphore only for THIS one inference, so other
         GPU work (a second chapter, /convert, experimental) can interleave
@@ -353,7 +372,7 @@ class CloneEngine:
     async def _generate_candidates(
         self,
         text: str,
-        speaker_wav: str,
+        speaker_wav: list[str],
         language: str,
         file_id: str,
         count: int,
@@ -413,11 +432,15 @@ class CloneEngine:
     async def synthesize_chunk(
         self,
         text: str,
-        speaker_wav: str | Path,
+        speaker_wav: SpeakerWav,
         language: str = "es",
         cancel_token: CancellationToken | None = None,
     ) -> Path:
         """Synthesize a single chunk using voice cloning.
+
+        ``speaker_wav`` may be one path or a list of paths (VOZ-10 —
+        multi-sample profiles pass every stored sample and XTTS averages
+        the conditioning latents).
 
         Generates 2 candidates and picks the one that most intelligibly
         speaks the expected text (ASR re-ranking, VOZ-08; the signal
@@ -432,6 +455,7 @@ class CloneEngine:
 
         self.load_model()
 
+        speaker_wavs = _speaker_wav_list(speaker_wav)
         xtts_lang = XTTS_LANGUAGES.get(language, "es")
         file_id = str(uuid.uuid4())[:12]
         all_candidates: list[Path] = []
@@ -444,7 +468,7 @@ class CloneEngine:
             # released between candidates and rounds and other GPU work can
             # interleave.
             candidates = await self._generate_candidates(
-                text, str(speaker_wav), xtts_lang, file_id, _CANDIDATES_PER_CHUNK,
+                text, speaker_wavs, xtts_lang, file_id, _CANDIDATES_PER_CHUNK,
                 cancel_token=cancel_token,
             )
             all_candidates.extend(candidates)
@@ -459,7 +483,7 @@ class CloneEngine:
                     best_intel, threshold, _ADAPTIVE_EXTRA_CANDIDATES,
                 )
                 extra = await self._generate_candidates(
-                    text, str(speaker_wav), xtts_lang, file_id,
+                    text, speaker_wavs, xtts_lang, file_id,
                     _ADAPTIVE_EXTRA_CANDIDATES, offset=len(all_candidates),
                     cancel_token=cancel_token,
                 )
@@ -523,7 +547,7 @@ class CloneEngine:
     async def synthesize_long(
         self,
         chunks: list,  # list[_CloneChunk] from tts_engine
-        speaker_wav: str | Path,
+        speaker_wav: SpeakerWav,
         language: str,
         output_format: str,
         format_config: dict,
@@ -532,6 +556,9 @@ class CloneEngine:
         job_id: str | None = None,
     ) -> tuple[Path, int]:
         """Synthesize multiple chunks with cloning and concatenate.
+
+        ``speaker_wav`` accepts one path or the profile's full sample
+        list (VOZ-10) — it is forwarded to every chunk synthesis.
 
         Each chunk has its own pause_ms that determines the silence
         inserted after it (comma=200ms, sentence=500ms, paragraph=900ms).

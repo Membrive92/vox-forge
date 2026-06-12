@@ -19,7 +19,11 @@ router = APIRouter(prefix="/analyze", tags=["analyze"])
 
 
 class SampleAnalysisResponse(BaseModel):
-    """Quality metrics for a voice sample (see ``_analyze_bytes``)."""
+    """Quality metrics for a voice sample (see ``_analyze_bytes``).
+
+    ``rhythm_sps`` is an approximate speech rate in syllables/second
+    (VOZ-10 curation aid — see ``_estimate_rhythm``).
+    """
 
     duration_s: float
     sample_rate: int
@@ -29,8 +33,38 @@ class SampleAnalysisResponse(BaseModel):
     snr_db: float
     clip_ratio: float
     silence_ratio: float
+    rhythm_sps: float
     rating: Literal["excellent", "good", "fair", "poor"]
     issues: list[str]
+
+
+# Windows quieter than this are treated as silence (matches the silence
+# ratio analysis below).
+_SILENCE_DBFS = -40.0
+
+
+def _estimate_rhythm(window_dbfs: list[float], window_ms: int) -> float:
+    """Approximate speech rate in syllables/second.
+
+    Counts local maxima of the windowed energy envelope — syllable
+    nuclei show up as energy bursts — over the duration of actual speech
+    (non-silent windows only). A cheap, dependency-free approximation:
+    useful for comparing conditioning samples against the target
+    narration tempo (Castilian narration sits around 5-7 syl/s), not for
+    linguistics.
+    """
+    speech_windows = sum(1 for e in window_dbfs if e >= _SILENCE_DBFS)
+    if speech_windows == 0:
+        return 0.0
+    peaks = 0
+    for i in range(1, len(window_dbfs) - 1):
+        cur = window_dbfs[i]
+        if cur < _SILENCE_DBFS:
+            continue
+        if cur > window_dbfs[i - 1] and cur >= window_dbfs[i + 1]:
+            peaks += 1
+    speech_seconds = speech_windows * (window_ms / 1000.0)
+    return round(peaks / speech_seconds, 2)
 
 
 def _analyze_bytes(content: bytes) -> dict:
@@ -74,13 +108,16 @@ def _analyze_bytes(content: bytes) -> dict:
         total_windows = 0
         silent_windows = 0
         window_energies: list[float] = []
+        window_dbfs: list[float] = []
         for i in range(0, len(seg) - window_ms, window_ms):
             w = seg[i: i + window_ms]
             total_windows += 1
-            if w.dBFS < -40:
+            if w.dBFS < _SILENCE_DBFS:
                 silent_windows += 1
             window_energies.append(w.rms)
+            window_dbfs.append(w.dBFS)
         silence_ratio = silent_windows / total_windows if total_windows > 0 else 0
+        rhythm_sps = _estimate_rhythm(window_dbfs, window_ms)
 
         # SNR estimate: RMS of loudest 50% vs RMS of quietest 25%.
         if window_energies:
@@ -124,6 +161,7 @@ def _analyze_bytes(content: bytes) -> dict:
             "snr_db": round(snr_db, 1),
             "clip_ratio": round(clip_ratio, 5),
             "silence_ratio": round(silence_ratio, 3),
+            "rhythm_sps": rhythm_sps,
             "rating": rating,
             "issues": issues,
         }

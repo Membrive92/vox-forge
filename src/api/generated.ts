@@ -2191,6 +2191,9 @@ export interface components {
         /**
          * SampleAnalysisResponse
          * @description Quality metrics for a voice sample (see ``_analyze_bytes``).
+         *
+         *     ``rhythm_sps`` is an approximate speech rate in syllables/second
+         *     (VOZ-10 curation aid � see ``_estimate_rhythm``).
          */
         SampleAnalysisResponse: {
             /** Duration S */
@@ -2209,6 +2212,8 @@ export interface components {
             clip_ratio: number;
             /** Silence Ratio */
             silence_ratio: number;
+            /** Rhythm Sps */
+            rhythm_sps: number;
             /**
              * Rating
              * @enum {string}

@@ -40,16 +40,21 @@ class SynthesisResult:
 
 @dataclass(frozen=True)
 class RoutingDecision:
-    """Resolved profile data plus which engine a request will route to."""
+    """Resolved profile data plus which engine a request will route to.
 
-    sample_path: Path | None
+    ``sample_paths`` carries EVERY stored profile sample that exists on
+    disk (VOZ-10): XTTS accepts a list in ``speaker_wav`` and averages
+    the conditioning latents. An empty list routes to Edge-TTS.
+    """
+
+    sample_paths: list[Path]
     voice_id: str
     language: str
     castilian_anchor: bool
 
     @property
     def engine(self) -> str:
-        return "xtts-v2" if self.sample_path is not None else "edge-tts"
+        return "xtts-v2" if self.sample_paths else "edge-tts"
 
 
 # Regex to split at sentence boundaries (preserving the delimiter).
@@ -232,7 +237,7 @@ class TTSEngine:
         router to persist the real engine on the crash-safe ``JobRecord``
         (a resumed XTTS job must not be replayed as Edge-TTS).
         """
-        sample_path: Path | None = None
+        sample_paths: list[Path] = []
         language = "es"
         voice_id = request.voice_id
         castilian_anchor = False
@@ -246,13 +251,15 @@ class TTSEngine:
             voice_id = profile.voice_id
             language = profile.language
             castilian_anchor = profile.castilian_anchor
-            if profile.sample_filename:
-                candidate = VOICES_DIR / profile.sample_filename
+            # Every stored sample that exists on disk joins the XTTS
+            # conditioning list (VOZ-10).
+            for sample in profile.samples:
+                candidate = VOICES_DIR / sample
                 if candidate.exists():
-                    sample_path = candidate
+                    sample_paths.append(candidate)
 
         return RoutingDecision(
-            sample_path=sample_path,
+            sample_paths=sample_paths,
             voice_id=voice_id,
             language=language,
             castilian_anchor=castilian_anchor,
@@ -277,10 +284,10 @@ class TTSEngine:
 
         routing = self.resolve_routing(request)
 
-        # Route to clone engine if we have a sample
-        if routing.sample_path is not None:
+        # Route to clone engine if we have at least one sample
+        if routing.sample_paths:
             return await self._synthesize_cloned(
-                request, routing.sample_path, routing.language, cancel_token, job_id,
+                request, routing.sample_paths, routing.language, cancel_token, job_id,
                 castilian_anchor=routing.castilian_anchor,
             )
 
@@ -423,35 +430,43 @@ class TTSEngine:
     async def _synthesize_cloned(
         self,
         request: SynthesisRequest,
-        sample_path: Path,
+        sample_paths: list[Path],
         language: str,
         cancel_token: CancellationToken | None = None,
         job_id: str | None = None,
         *,
         castilian_anchor: bool = False,
     ) -> SynthesisResult:
-        """Synthesize text using XTTS v2 voice cloning."""
-        logger.info("Using XTTS v2 cloning with sample: %s", sample_path.name)
+        """Synthesize text using XTTS v2 voice cloning.
+
+        The full ``sample_paths`` list goes to XTTS as ``speaker_wav``
+        (VOZ-10): the model averages the conditioning latents across all
+        samples, which stabilizes the cloned voice versus a single clip.
+        """
+        logger.info(
+            "Using XTTS v2 cloning with %d sample(s): %s",
+            len(sample_paths), ", ".join(p.name for p in sample_paths),
+        )
         clone = self._get_clone_engine()
 
         # Audio anchor: if the profile is flagged, prepend the configured
-        # Castilian reference voice to its sample so XTTS hears Castilian
-        # articulation first when computing the speaker embedding. The
-        # anchored file is a temp wav we clean up after synthesis.
-        speaker_wav_path = sample_path
+        # Castilian reference voice to the FIRST (primary) sample so XTTS
+        # hears Castilian articulation first when computing the speaker
+        # embedding. The remaining samples join the conditioning list
+        # untouched. The anchored file is a temp wav cleaned up after
+        # synthesis.
+        speaker_wavs: list[Path] = list(sample_paths)
         anchor_temp: Path | None = None
         if castilian_anchor:
             from .castilian_warmup import build_anchored_speaker_wav, get_reference_voice
             ref = get_reference_voice()
             if ref is not None:
-                from ..paths import TEMP_DIR
-                import uuid as _uuid
-                anchor_temp = TEMP_DIR / f"{_uuid.uuid4().hex[:8]}_anchored.wav"
-                build_anchored_speaker_wav(sample_path, ref, anchor_temp)
-                speaker_wav_path = anchor_temp
+                anchor_temp = TEMP_DIR / f"{uuid.uuid4().hex[:8]}_anchored.wav"
+                build_anchored_speaker_wav(sample_paths[0], ref, anchor_temp)
+                speaker_wavs[0] = anchor_temp
                 logger.info(
                     "Castilian anchor active: prepended %s to %s",
-                    ref.name, sample_path.name,
+                    ref.name, sample_paths[0].name,
                 )
             else:
                 logger.warning(
@@ -474,7 +489,7 @@ class TTSEngine:
         try:
             path, chunk_count = await clone.synthesize_long(
                 chunks=chunks,
-                speaker_wav=speaker_wav_path,
+                speaker_wav=speaker_wavs,
                 language=language,
                 output_format=request.output_format,
                 format_config=fmt_cfg,

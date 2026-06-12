@@ -490,11 +490,13 @@ class TestProfileCastilianAnchor:
         ref_file.write_bytes(b"RIFF" + b"\x00" * 100)
         monkeypatch.setattr(cw_mod, "REFERENCE_VOICES_DIR", ref_dir)
 
-        # Capture what speaker_wav synthesize_long actually receives
-        captured_speaker_wav: list[Path] = []
+        # Capture what speaker_wav synthesize_long actually receives.
+        # Since VOZ-10 it is the profile's sample LIST; the anchored
+        # file must replace the first (primary) sample.
+        captured_speaker_wav: list[list[Path]] = []
 
         async def fake_synth_long(*, speaker_wav, **kwargs):
-            captured_speaker_wav.append(Path(speaker_wav))
+            captured_speaker_wav.append([Path(p) for p in speaker_wav])
             out = tmp_path / "out.mp3"
             out.write_bytes(b"\xff\xfb\x90\x00")
             return out, 1
@@ -517,14 +519,14 @@ class TestProfileCastilianAnchor:
 
         with patch("backend.services.tts_engine.split_into_clone_chunks", return_value=["Hola mundo."]):
             await engine._synthesize_cloned(
-                request, sample, "es", castilian_anchor=True,
+                request, [sample], "es", castilian_anchor=True,
             )
 
         assert len(captured_speaker_wav) == 1
-        # The speaker_wav passed to XTTS is NOT the user's raw sample —
-        # it's the temp anchored file we built.
-        assert captured_speaker_wav[0] != sample
-        assert captured_speaker_wav[0].name.endswith("_anchored.wav")
+        # The primary speaker_wav passed to XTTS is NOT the user's raw
+        # sample — it's the temp anchored file we built.
+        assert captured_speaker_wav[0][0] != sample
+        assert captured_speaker_wav[0][0].name.endswith("_anchored.wav")
 
     @pytest.mark.asyncio
     async def test_synthesis_without_anchor_uses_raw_sample(
@@ -544,10 +546,10 @@ class TestProfileCastilianAnchor:
         (ref_dir / "castilian.wav").write_bytes(b"RIFF" + b"\x00" * 100)
         monkeypatch.setattr(cw_mod, "REFERENCE_VOICES_DIR", ref_dir)
 
-        captured: list[Path] = []
+        captured: list[list[Path]] = []
 
         async def fake_synth_long(*, speaker_wav, **kwargs):
-            captured.append(Path(speaker_wav))
+            captured.append([Path(p) for p in speaker_wav])
             out = tmp_path / "out.mp3"
             out.write_bytes(b"\xff\xfb\x90\x00")
             return out, 1
@@ -569,8 +571,8 @@ class TestProfileCastilianAnchor:
 
         from unittest.mock import patch
         with patch("backend.services.tts_engine.split_into_clone_chunks", return_value=["Hola."]):
-            await engine._synthesize_cloned(request, sample, "es")
+            await engine._synthesize_cloned(request, [sample], "es")
 
         assert len(captured) == 1
-        # Without the flag we pass the raw sample through unchanged.
-        assert captured[0] == sample
+        # Without the flag we pass the raw sample list through unchanged.
+        assert captured[0] == [sample]

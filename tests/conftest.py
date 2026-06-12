@@ -54,9 +54,16 @@ class _FakeAudioSegment:
     frame_rate = 44100
     sample_width = 2  # bytes -> 16 bit
     max_dBFS = -3.0
+    # Constant speech-level energy so the /analyze windowed metrics
+    # (silence ratio, SNR, rhythm) run deterministically.
+    dBFS = -20.0
+    rms = 1000
 
     def __init__(self, duration_ms: int = 1000) -> None:
         self._duration_ms = duration_ms
+
+    def get_array_of_samples(self) -> list[int]:
+        return [100] * 1024  # far below the clipping threshold
 
     def __len__(self) -> int:
         return self._duration_ms
