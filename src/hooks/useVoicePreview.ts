@@ -67,6 +67,7 @@ export function useVoicePreview(): VoicePreviewState {
         voiceId,
         format: "mp3",
         speed: 100,
+        pauseScale: 1,
         pitch: 0,
         volume: 80,
         ...(profileId !== undefined ? { profileId } : {}),

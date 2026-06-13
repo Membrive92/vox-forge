@@ -72,6 +72,8 @@ export function SynthFormProvider({ lang, setLang, t, onToast, onShowVoices, chi
   const [selectedVoice, setSelectedVoice] = useState<string>(initialVoice);
   const [format, setFormat] = useState<AudioFormat>("mp3");
   const [speed, setSpeed] = useState(100);
+  // Pacing lever (P2): pause multiplier, decoupled from speed. 1.0 = base.
+  const [pauseScale, setPauseScale] = useState(1.0);
   const [pitch, setPitch] = useState(0);
   const [volume, setVolume] = useState(80);
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
@@ -97,10 +99,11 @@ export function SynthFormProvider({ lang, setLang, t, onToast, onShowVoices, chi
     selectedVoice, setSelectedVoice,
     format, setFormat,
     speed, setSpeed,
+    pauseScale, setPauseScale,
     pitch, setPitch,
     volume, setVolume,
     activeProfileId, setActiveProfileId,
-  }), [lang, setLang, selectedVoice, format, speed, pitch, volume, activeProfileId]);
+  }), [lang, setLang, selectedVoice, format, speed, pauseScale, pitch, volume, activeProfileId]);
 
   const draft: ProfileDraft = useMemo(() => ({
     name: newProfileName, setName: setNewProfileName,

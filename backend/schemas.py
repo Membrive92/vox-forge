@@ -30,6 +30,15 @@ class SynthesisRequest(BaseModel):
     voice_id: str = Field(..., description="Voice ID (e.g. es-ES-AlvaroNeural)")
     output_format: str = Field(default="mp3", description="mp3 | wav | ogg | flac")
     speed: int = Field(default=100, ge=50, le=200, description="Speed in % (50-200)")
+    # Pacing lever (P2): scales the inter-chunk pauses without touching the
+    # audio — the artifact-free way to make narration feel measured.
+    # Decoupled from ``speed`` (articulation): 1.0 = the P1 base pauses
+    # (no-op), 2.5 = pauses 2.5x longer. The speech inside each chunk is
+    # never stretched.
+    pause_scale: float = Field(
+        default=1.0, ge=1.0, le=2.5,
+        description="Inter-chunk pause multiplier (1.0=base, up to 2.5)",
+    )
     pitch: int = Field(default=0, ge=-10, le=10, description="Pitch in semitones")
     volume: int = Field(default=80, ge=0, le=100, description="Volume in %")
     profile_id: Optional[str] = Field(default=None, description="Profile ID (optional)")

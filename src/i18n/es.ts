@@ -12,6 +12,8 @@ export const es = {
   speed: "Velocidad",
   synthSpeedInfo: "Ajusta la cadencia del narrador (lo apresurada o pausada que suena la voz al generar). Para escuchar más rápido o más lento sin regenerar, usa la velocidad del reproductor.",
   synthSpeedDegraded: "En voces clonadas, alejarse de 100% estira el audio y por encima de ±10–15% la voz suena metálica. La velocidad de escucha vive en el reproductor (reversible); este control es para la cadencia del narrador.",
+  pacing: "Ritmo / pausas",
+  synthPacingInfo: "Alarga las pausas entre frases y párrafos sin tocar el audio: el modo gratis y sin artefactos de que la narración suene más pausada. La Velocidad cambia la articulación (cómo de rápido se habla); el Ritmo solo cambia los silencios. 1.0× deja las pausas base.",
   pitch: "Tono",
   volume: "Volumen",
   generate: "Generar Audio",

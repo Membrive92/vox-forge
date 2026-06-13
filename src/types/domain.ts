@@ -42,6 +42,8 @@ export interface SynthesisParams {
   voiceId: string;
   format: AudioFormat;
   speed: number;
+  /** Inter-chunk pause multiplier (P2). 1.0 = base pauses (no-op). */
+  pauseScale: number;
   pitch: number;
   volume: number;
   profileId?: string | undefined;

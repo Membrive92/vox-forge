@@ -1273,6 +1273,137 @@ class TestSamplerParams:
         )
 
 
+# ---------------------------------------------------------------------------
+# 6. Pacing lever — pause_scale (P2)
+#
+# pause_scale lengthens the inter-chunk silences WITHOUT touching the
+# speech. 1.0 is a no-op (the P1 base pauses); a higher value multiplies
+# only the AudioSegment.silent() durations. The factor must reach both the
+# cloned path (synthesize_long) and the Edge path (EDGE_PAUSE_MS gap).
+# ---------------------------------------------------------------------------
+
+
+async def _run_clone_pauses(tmp_path, pause_scale: float) -> tuple[int, list[int]]:
+    """Run ``synthesize_long`` over two chunks (one sentence pause between
+    them) and return ``(chunk_count, captured_silence_durations)``.
+
+    The conftest fake ``AudioSegment.silent`` is wrapped to record every
+    ``duration`` it receives, then restored — so back-to-back calls at
+    different scales never leak into each other's capture list.
+    """
+    from backend.services import clone_engine
+    from backend.services.tts_engine import _CloneChunk, CLONE_PAUSE_SENTENCE_MS
+
+    engine = clone_engine.CloneEngine()
+
+    async def fake_chunk(text, speaker_wav, language, cancel_token=None):
+        p = tmp_path / f"chunk_{abs(hash(text)) % 10000}.wav"
+        p.write_bytes(b"RIFF" + b"\x00" * 100)
+        return p
+
+    engine.synthesize_chunk = fake_chunk  # type: ignore[method-assign]
+
+    captured: list[int] = []
+    original = clone_engine.AudioSegment.silent
+
+    def spy(*, duration: int = 0, **kw):
+        captured.append(duration)
+        return original(duration=duration, **kw)
+
+    clone_engine.AudioSegment.silent = staticmethod(spy)  # type: ignore[assignment]
+    try:
+        chunks = [
+            _CloneChunk(text="Hola mundo.", pause_ms=CLONE_PAUSE_SENTENCE_MS),
+            _CloneChunk(text="Adios mundo.", pause_ms=0),
+        ]
+        path, count = await engine.synthesize_long(
+            chunks=chunks,
+            speaker_wav=tmp_path / "ref.wav",
+            language="es",
+            output_format="mp3",
+            format_config={"format": "mp3", "codec": None, "parameters": []},
+            pause_scale=pause_scale,
+        )
+        path.unlink(missing_ok=True)
+    finally:
+        clone_engine.AudioSegment.silent = original  # type: ignore[assignment]
+    return count, captured
+
+
+class TestPauseScaleClonePath:
+    """``synthesize_long`` scales inter-chunk pauses by ``pause_scale``."""
+
+    @pytest.mark.asyncio
+    async def test_scale_1_is_noop(self, tmp_path) -> None:
+        from backend.services.tts_engine import CLONE_PAUSE_SENTENCE_MS
+
+        count, silences = await _run_clone_pauses(tmp_path, 1.0)
+        assert count == 2
+        assert silences == [CLONE_PAUSE_SENTENCE_MS], (
+            "pause_scale=1.0 must insert the unscaled base pause"
+        )
+
+    @pytest.mark.asyncio
+    async def test_scale_grows_total_duration_only_via_pauses(
+        self, tmp_path
+    ) -> None:
+        """A 2.0x scale doubles the inserted silence; the two 1000ms speech
+        chunks are untouched, so the whole growth comes from the pause."""
+        from backend.services.tts_engine import CLONE_PAUSE_SENTENCE_MS
+
+        _, base = await _run_clone_pauses(tmp_path, 1.0)
+        _, scaled = await _run_clone_pauses(tmp_path, 2.0)
+
+        assert base == [CLONE_PAUSE_SENTENCE_MS]
+        assert scaled == [round(CLONE_PAUSE_SENTENCE_MS * 2.0)]
+        # Speech is two fake 1000ms clips regardless of scale; total grows
+        # solely by the extra silence.
+        speech_ms = 2 * 1000
+        assert (speech_ms + scaled[0]) - (speech_ms + base[0]) == CLONE_PAUSE_SENTENCE_MS
+
+
+class TestPauseScaleEdgePath:
+    """The Edge inter-chunk gap is scaled by the request's ``pause_scale``."""
+
+    @pytest.mark.asyncio
+    async def test_edge_gap_scales(self, monkeypatch) -> None:
+        from backend.schemas import SynthesisRequest
+        from backend.dependencies import get_tts_engine
+        from backend.services import tts_engine
+        from backend.services.tts_engine import EDGE_PAUSE_MS
+
+        captured: list[int] = []
+        real_silent = tts_engine.AudioSegment.silent
+
+        def spy(*, duration: int = 0, **kw):
+            captured.append(duration)
+            return real_silent(duration=duration, **kw)
+
+        monkeypatch.setattr(tts_engine.AudioSegment, "silent", staticmethod(spy))
+        # Force multi-chunk so the gap path runs (single short text would
+        # take the single-chunk fast path with no inserted gap).
+        monkeypatch.setattr(
+            tts_engine, "split_into_chunks", lambda _t: ["First.", "Second."]
+        )
+
+        engine = get_tts_engine()
+        request = SynthesisRequest(
+            text="First. Second.",
+            voice_id="es-ES-AlvaroNeural",
+            output_format="wav",
+            pause_scale=2.0,
+        )
+        result = await engine.synthesize(request)
+        result.path.unlink(missing_ok=True)
+
+        assert round(EDGE_PAUSE_MS * 2.0) in captured, (
+            "Edge inter-chunk gap must be scaled by pause_scale"
+        )
+        assert EDGE_PAUSE_MS not in captured, (
+            "with pause_scale=2.0 the unscaled gap must never be inserted"
+        )
+
+
 async def test_generate_one_holds_gpu_semaphore_per_inference(tmp_path) -> None:
     """The GPU semaphore is held during the inference and released after.
 

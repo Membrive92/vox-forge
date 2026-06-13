@@ -2866,6 +2866,12 @@ export interface components {
              */
             speed: number;
             /**
+             * Pause Scale
+             * @description Inter-chunk pause multiplier (1.0=base, up to 2.5)
+             * @default 1
+             */
+            pause_scale: number;
+            /**
              * Pitch
              * @description Pitch in semitones
              * @default 0

@@ -380,8 +380,11 @@ class TTSEngine:
                     combined = AudioSegment.from_mp3(str(temp_files[0]))
                 else:
                     combined = AudioSegment.empty()
-                    # Audiobook-cadence gap between Edge chunks (P1a).
-                    pause = AudioSegment.silent(duration=EDGE_PAUSE_MS)
+                    # Audiobook-cadence gap between Edge chunks (P1a),
+                    # scaled by the request's pacing lever (P2). 1.0 = no-op.
+                    pause = AudioSegment.silent(
+                        duration=round(EDGE_PAUSE_MS * request.pause_scale)
+                    )
                     for j, tf in enumerate(temp_files):
                         segment = AudioSegment.from_mp3(str(tf))
                         if j > 0:
@@ -517,6 +520,7 @@ class TTSEngine:
                 format_config=fmt_cfg,
                 cancel_token=cancel_token,
                 speed=xtts_speed,
+                pause_scale=request.pause_scale,
                 job_id=job_id,
             )
         finally:

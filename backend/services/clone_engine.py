@@ -568,6 +568,7 @@ class CloneEngine:
         format_config: dict,
         cancel_token: CancellationToken | None = None,
         speed: float = 1.0,
+        pause_scale: float = 1.0,
         job_id: str | None = None,
     ) -> tuple[Path, int]:
         """Synthesize multiple chunks with cloning and concatenate.
@@ -576,7 +577,10 @@ class CloneEngine:
         list (VOZ-10) — it is forwarded to every chunk synthesis.
 
         Each chunk has its own pause_ms that determines the silence
-        inserted after it (comma=200ms, sentence=500ms, paragraph=900ms).
+        inserted after it (comma=250ms, sentence=650ms, paragraph=1300ms).
+        ``pause_scale`` (P2) multiplies that silence — 1.0 is a no-op, a
+        higher value lengthens the breaths without touching the speech
+        (the artifact-free pacing lever, separate from ``speed``).
 
         ``speed`` is never forwarded to XTTS (see ``_generate_one``):
         every chunk is synthesized at natural cadence and the
@@ -635,7 +639,10 @@ class CloneEngine:
                 combined += segment
                 pause_ms = chunk.pause_ms if hasattr(chunk, "pause_ms") else 500
                 if pause_ms > 0 and j < len(temp_files) - 1:
-                    combined += AudioSegment.silent(duration=pause_ms)
+                    # P2: scale the breath without touching the speech.
+                    combined += AudioSegment.silent(
+                        duration=round(pause_ms * pause_scale)
+                    )
 
             # Speed is resolved HERE, never inside XTTS: one Rubber Band
             # post-stretch over the natural-cadence master (no-op within

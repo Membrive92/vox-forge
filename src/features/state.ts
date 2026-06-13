@@ -11,6 +11,9 @@ export interface SynthSettings {
   setFormat: (v: AudioFormat) => void;
   speed: number;
   setSpeed: (v: number) => void;
+  /** Pacing lever (P2): inter-chunk pause multiplier, 1.0 = base pauses. */
+  pauseScale: number;
+  setPauseScale: (v: number) => void;
   pitch: number;
   setPitch: (v: number) => void;
   volume: number;

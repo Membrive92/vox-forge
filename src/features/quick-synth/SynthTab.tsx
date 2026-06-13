@@ -127,6 +127,7 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
         voiceId: settings.selectedVoice,
         format: settings.format,
         speed: settings.speed,
+        pauseScale: settings.pauseScale,
         pitch: settings.pitch,
         volume: settings.volume,
         profileId: settings.activeProfileId ?? undefined,
@@ -489,6 +490,16 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
             degradedBelow={85}
             degradedAbove={115}
             degradedInfo={t.synthSpeedDegraded}
+          />
+          <Slider
+            label={t.pacing}
+            value={settings.pauseScale}
+            onChange={settings.setPauseScale}
+            min={1}
+            max={2.5}
+            step={0.1}
+            unit="x"
+            info={t.synthPacingInfo}
           />
           <Slider label={t.pitch} value={settings.pitch} onChange={settings.setPitch} min={-10} max={10} unit="st" />
           <Slider label={t.volume} value={settings.volume} onChange={settings.setVolume} min={0} max={100} unit="%" />

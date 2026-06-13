@@ -74,6 +74,9 @@ export function QuickPreview({
           voiceId,
           format: outputFormat as "mp3" | "wav" | "ogg" | "flac",
           speed,
+          // Quick audition uses the base pauses; the dedicated Pacing
+          // control lives in the synth form (P2).
+          pauseScale: 1,
           pitch,
           volume,
           profileId: profileId ?? undefined,

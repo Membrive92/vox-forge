@@ -28,6 +28,7 @@ export async function synthesize(
     voice_id: params.voiceId,
     output_format: params.format,
     speed: params.speed,
+    pause_scale: params.pauseScale,
     pitch: params.pitch,
     volume: params.volume,
     profile_id: params.profileId ?? null,
