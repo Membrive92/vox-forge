@@ -12,6 +12,8 @@ export const en: Record<TranslationKey, string> = {
   voice: "Voice",
   format: "Format",
   speed: "Speed",
+  synthSpeedInfo: "Adjusts the narrator's cadence (how rushed or measured the voice sounds when generated). To listen faster or slower without regenerating, use the player's speed.",
+  synthSpeedDegraded: "On cloned voices, moving away from 100% stretches the audio and beyond ±10-15% the voice sounds metallic. Listening speed lives in the player (reversible); this control is for the narrator's cadence.",
   pitch: "Pitch",
   volume: "Volume",
   generate: "Generate Audio",

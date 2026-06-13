@@ -122,9 +122,17 @@ def split_into_chunks(text: str, max_chars: int | None = None) -> list[str]:
 
 # Pause types and their durations in milliseconds.
 # Used by CloneEngine to insert natural pauses between chunks.
-CLONE_PAUSE_COMMA_MS = 200      # Short breath pause
-CLONE_PAUSE_SENTENCE_MS = 500   # End of sentence
-CLONE_PAUSE_PARAGRAPH_MS = 900  # Paragraph break
+# Tuned toward audiobook norms (P1a): the previous values (200/500/900)
+# felt rushed for narration. Longer pauses are the lossless lever for a
+# "measured" cadence — they cost zero audio quality (no stretch).
+CLONE_PAUSE_COMMA_MS = 250      # Short breath pause
+CLONE_PAUSE_SENTENCE_MS = 650   # End of sentence
+CLONE_PAUSE_PARAGRAPH_MS = 1300  # Paragraph break
+
+# Fixed gap Edge-TTS inserts between its (paragraph/sentence-level) chunks.
+# Edge chunks are coarse, so this maps to the sentence-pause norm (P1a:
+# raised 400 -> 650 to match the cloned-path audiobook cadence).
+EDGE_PAUSE_MS = 650
 
 
 @dataclass(frozen=True)
@@ -146,10 +154,8 @@ def split_into_clone_chunks(text: str) -> list[_CloneChunk]:
     the XTTS tokenizer limit (~239 chars), split further at commas.
     Commas inside short sentences stay — the model handles them fine.
 
-    Pauses inserted by pydub:
-      - Between sentences  → 500ms
-      - Between paragraphs → 900ms
-      - At comma splits    → 200ms
+    Pauses inserted by pydub are the named CLONE_PAUSE_*_MS constants
+    (sentence / paragraph / comma), tuned toward audiobook cadence.
     """
     text = normalize_for_tts(text)
     paragraphs = re.split(r"\n\s*\n", text.strip())
@@ -374,8 +380,8 @@ class TTSEngine:
                     combined = AudioSegment.from_mp3(str(temp_files[0]))
                 else:
                     combined = AudioSegment.empty()
-                    # 400ms pause between paragraphs for natural narration
-                    pause = AudioSegment.silent(duration=400)
+                    # Audiobook-cadence gap between Edge chunks (P1a).
+                    pause = AudioSegment.silent(duration=EDGE_PAUSE_MS)
                     for j, tf in enumerate(temp_files):
                         segment = AudioSegment.from_mp3(str(tf))
                         if j > 0:

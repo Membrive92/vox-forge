@@ -277,6 +277,37 @@ def test_clone_chunks_last_chunk_no_pause() -> None:
     assert result[-1].pause_ms == 0
 
 
+def test_audiobook_pause_defaults() -> None:
+    """P1a: inter-chunk pauses are tuned toward audiobook cadence — the
+    lossless lever for a measured narration (no audio stretch)."""
+    from backend.services import tts_engine
+
+    assert tts_engine.CLONE_PAUSE_COMMA_MS == 250
+    assert tts_engine.CLONE_PAUSE_SENTENCE_MS == 650
+    assert tts_engine.CLONE_PAUSE_PARAGRAPH_MS == 1300
+    assert tts_engine.EDGE_PAUSE_MS == 650
+
+
+def test_clone_chunks_emit_audiobook_pauses() -> None:
+    """The new pause defaults must actually feed concatenation: a
+    sentence break carries SENTENCE_MS and a paragraph break PARAGRAPH_MS."""
+    from backend.services.tts_engine import (
+        CLONE_PAUSE_PARAGRAPH_MS,
+        CLONE_PAUSE_SENTENCE_MS,
+        split_into_clone_chunks,
+    )
+
+    text = "First sentence. Second sentence.\n\nNew paragraph here."
+    result = split_into_clone_chunks(text)
+
+    pauses = [c.pause_ms for c in result]
+    # The sentence break inside the first paragraph uses SENTENCE_MS; the
+    # paragraph boundary uses the longer PARAGRAPH_MS.
+    assert CLONE_PAUSE_SENTENCE_MS in pauses
+    assert CLONE_PAUSE_PARAGRAPH_MS in pauses
+    assert result[-1].pause_ms == 0  # tail never carries a pause
+
+
 def test_clone_chunks_vs_edge_chunks_count() -> None:
     """Clone chunks should be more numerous than Edge-TTS chunks."""
     from backend.services.tts_engine import split_into_chunks, split_into_clone_chunks

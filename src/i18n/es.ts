@@ -10,6 +10,8 @@ export const es = {
   voice: "Voz",
   format: "Formato",
   speed: "Velocidad",
+  synthSpeedInfo: "Ajusta la cadencia del narrador (lo apresurada o pausada que suena la voz al generar). Para escuchar más rápido o más lento sin regenerar, usa la velocidad del reproductor.",
+  synthSpeedDegraded: "En voces clonadas, alejarse de 100% estira el audio y por encima de ±10–15% la voz suena metálica. La velocidad de escucha vive en el reproductor (reversible); este control es para la cadencia del narrador.",
   pitch: "Tono",
   volume: "Volumen",
   generate: "Generar Audio",

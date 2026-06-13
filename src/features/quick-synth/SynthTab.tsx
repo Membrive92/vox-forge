@@ -478,7 +478,18 @@ export function SynthTab({ t, text, setText, settings, onToast }: SynthTabProps)
         </div>
 
         <div>
-          <Slider label={t.speed} value={settings.speed} onChange={settings.setSpeed} min={50} max={200} unit="%" />
+          <Slider
+            label={t.speed}
+            value={settings.speed}
+            onChange={settings.setSpeed}
+            min={50}
+            max={200}
+            unit="%"
+            info={t.synthSpeedInfo}
+            degradedBelow={85}
+            degradedAbove={115}
+            degradedInfo={t.synthSpeedDegraded}
+          />
           <Slider label={t.pitch} value={settings.pitch} onChange={settings.setPitch} min={-10} max={10} unit="st" />
           <Slider label={t.volume} value={settings.volume} onChange={settings.setVolume} min={0} max={100} unit="%" />
         </div>

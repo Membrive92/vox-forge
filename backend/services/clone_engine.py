@@ -186,13 +186,23 @@ class CloneEngine:
             torch.cuda.empty_cache()
 
     @staticmethod
-    def _trim_silences(path: Path, silence_thresh_db: int = -40, min_silence_ms: int = 150) -> None:
+    def _trim_silences(
+        path: Path,
+        silence_thresh_db: int = -40,
+        min_silence_ms: int = 150,
+        leading_gap_ms: int = 180,
+    ) -> None:
         """Remove internal silences from a generated chunk.
 
-        XTTS v2 inserts phantom pauses at arbitrary points. This
-        detects silence segments longer than min_silence_ms and
-        replaces them with a short 80ms gap (just enough for a
-        natural breath, not a noticeable pause).
+        XTTS v2 inserts phantom pauses at arbitrary points. This detects
+        silence segments longer than min_silence_ms and replaces them
+        with a short 80ms gap (just enough for a natural breath, not a
+        noticeable pause) — that aggressive trim is the hallucination
+        defence and stays.
+
+        The OPENING silence is the exception (P1b): a chunk that begins
+        with a silence keeps a ~leading_gap_ms breath instead of being
+        crushed to 80ms, so the start of a sentence doesn't feel rushed.
 
         Modifies the file in place.
         """
@@ -218,8 +228,13 @@ class CloneEngine:
                 # Keep the speech before this silence
                 if start > prev_end:
                     result += audio[prev_end:start]
-                # Replace silence with short gap
-                result += short_gap
+                # The leading silence (one that opens the chunk) keeps a
+                # natural breath; mid-utterance phantom pauses are crushed.
+                if start <= prev_end == 0:
+                    gap_ms = min(leading_gap_ms, end - start)
+                    result += AudioSegment.silent(duration=gap_ms)
+                else:
+                    result += short_gap
                 prev_end = end
 
             # Append remaining audio after last silence
