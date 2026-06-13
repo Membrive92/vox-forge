@@ -16,7 +16,7 @@ import {
 import { logger } from "@/logging/logger";
 
 import { useEditSession } from "./useEditSession";
-import { useTranscription } from "./useTranscription";
+import { useTranscription, type TranscribeOptions } from "./useTranscription";
 import { useVideoRender } from "./useVideoRender";
 
 export interface StudioSession {
@@ -33,6 +33,9 @@ export interface StudioSession {
   // Phase B.1 — transcription
   transcript: TranscribeResult | null;
   isTranscribing: boolean;
+  // S2 — confidence of the last chapter-text alignment (null when the last
+  // run was a plain Whisper transcription).
+  alignmentConfidence: number | null;
 
   // Phase B.2 — video render
   cover: CoverUploadResult | null;
@@ -60,7 +63,7 @@ export interface StudioSessionApi {
   cancelApply: () => void;
   download: (filenameHint?: string) => void;
 
-  transcribe: (language?: string) => Promise<void>;
+  transcribe: (options?: TranscribeOptions) => Promise<void>;
   cancelTranscribe: () => void;
   clearTranscript: () => void;
 
@@ -171,6 +174,7 @@ export function useStudioSession(): StudioSessionApi {
       isPreviewMode: edit.isPreviewMode,
       transcript: transcription.transcript,
       isTranscribing: transcription.isTranscribing,
+      alignmentConfidence: transcription.alignmentConfidence,
       cover: video.cover,
       isUploadingCover: video.isUploadingCover,
       videoBlob: video.videoBlob,

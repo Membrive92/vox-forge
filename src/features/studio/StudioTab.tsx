@@ -244,7 +244,9 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
             enabled={session.selected !== null}
             isTranscribing={session.isTranscribing}
             transcript={session.transcript}
-            onTranscribe={(lang) => void studio.transcribe(lang)}
+            canUseChapterText={session.selected?.chapter_id != null}
+            alignmentConfidence={session.alignmentConfidence}
+            onTranscribe={(options) => void studio.transcribe(options)}
             onCancel={studio.cancelTranscribe}
           />
 

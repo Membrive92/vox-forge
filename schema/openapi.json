@@ -2733,6 +2733,48 @@
         }
       }
     },
+    "/api/studio/transcribe-aligned": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Align a chapter's known text to a Studio audio file (S2)",
+        "description": "Subtitles from the SOURCE text synced to the voice (S2).\n\nWhisper runs with word-level timestamps; the known chapter text is\naligned onto that timeline so the SRT shows the EXACT script (correct\nproper/fantasy names), not the ASR's guess. ``source_text`` may be\ninline or read from ``chapter_id``.",
+        "operationId": "transcribe_aligned_api_studio_transcribe_aligned_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranscribeAlignedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlignedSubtitlesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/scenes/detect": {
       "post": {
         "tags": [
@@ -3481,6 +3523,55 @@
           "errors"
         ],
         "title": "ActivityResponse"
+      },
+      "AlignedSubtitlesResponse": {
+        "properties": {
+          "srt_path": {
+            "type": "string",
+            "title": "Srt Path"
+          },
+          "duration_s": {
+            "type": "number",
+            "title": "Duration S"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "alignment_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Alignment Confidence"
+          },
+          "word_level": {
+            "type": "boolean",
+            "title": "Word Level"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/SrtEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "srt_path",
+          "duration_s",
+          "language",
+          "engine",
+          "alignment_confidence",
+          "word_level",
+          "entries"
+        ],
+        "title": "AlignedSubtitlesResponse",
+        "description": "Aligned-subtitles result: SOURCE text on the audio timeline."
       },
       "AmbienceListResponse": {
         "properties": {
@@ -6822,6 +6913,57 @@
           "created_at"
         ],
         "title": "TakeResponse"
+      },
+      "TranscribeAlignedRequest": {
+        "properties": {
+          "source_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Source Path"
+          },
+          "source_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Text",
+            "description": "Chapter text to align. Omit to read it from chapter_id."
+          },
+          "chapter_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter Id",
+            "description": "Read the chapter text from the DB instead of source_text."
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "description": "ISO code (es, en, ...). None -> auto-detect."
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_path"
+        ],
+        "title": "TranscribeAlignedRequest",
+        "description": "Align a known chapter text to a Studio audio file (S2).\n\nExactly one text source is required: either ``source_text`` inline or\n``chapter_id`` (the backend reads ``chapters.text``). The result is an\nSRT carrying the SOURCE words (correct proper/fantasy names) with the\naudio's word-level timings."
       },
       "TranscribeRequest": {
         "properties": {

@@ -511,6 +511,8 @@ export const en: Record<TranslationKey, string> = {
   studioTranscribeEmpty: "No transcription yet.",
   studioTranscribeDone: "{n} segments · {w} words · {engine}",
   studioTranscribeLangHint: "Language (leave blank for auto)",
+  studioTranscribeUseChapterText: "Use the chapter text (correct names)",
+  studioTranscribeAlignedBadge: "aligned {pct}%",
 
   // Studio — video render panel (B.2)
   studioVideoTitle: "Video render",

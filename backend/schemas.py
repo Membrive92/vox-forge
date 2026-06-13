@@ -262,6 +262,46 @@ class TranscribeResponse(BaseModel):
     entries: list[SrtEntry]
 
 
+class TranscribeAlignedRequest(BaseModel):
+    """Align a known chapter text to a Studio audio file (S2).
+
+    Exactly one text source is required: either ``source_text`` inline or
+    ``chapter_id`` (the backend reads ``chapters.text``). The result is an
+    SRT carrying the SOURCE words (correct proper/fantasy names) with the
+    audio's word-level timings.
+    """
+
+    source_path: str = Field(..., min_length=1)
+    source_text: Optional[str] = Field(
+        default=None,
+        description="Chapter text to align. Omit to read it from chapter_id.",
+    )
+    chapter_id: Optional[str] = Field(
+        default=None,
+        description="Read the chapter text from the DB instead of source_text.",
+    )
+    language: Optional[str] = Field(
+        default=None,
+        description="ISO code (es, en, ...). None -> auto-detect.",
+    )
+
+
+class AlignedSubtitlesResponse(BaseModel):
+    """Aligned-subtitles result: SOURCE text on the audio timeline."""
+
+    srt_path: str
+    duration_s: float
+    language: str
+    engine: str
+    # How well the source matched what Whisper heard, in [0, 1]. Low values
+    # warn the FE that the audio may not speak this text.
+    alignment_confidence: float = Field(..., ge=0.0, le=1.0)
+    # True when faster-whisper supplied per-word timings; False means the
+    # build degraded to segment-level anchors (still monotonic).
+    word_level: bool
+    entries: list[SrtEntry]
+
+
 class DetectScenesRequest(BaseModel):
     """Group a transcript's SRT into ~N-second scenes (one image slot each)."""
 

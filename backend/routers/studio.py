@@ -43,6 +43,7 @@ from ..paths import (
     is_within_allowed_roots,
 )
 from ..schemas import (
+    AlignedSubtitlesResponse,
     CoverUploadResponse,
     DetectedScene,
     DetectScenesRequest,
@@ -60,10 +61,18 @@ from ..schemas import (
     StudioRendersResponse,
     StudioSource,
     StudioSourcesResponse,
+    TranscribeAlignedRequest,
     TranscribeRequest,
     TranscribeResponse,
 )
-from ..services import image_gen, media_store, scene_detect, studio_store
+from ..services import (
+    image_gen,
+    media_store,
+    project_manager,
+    scene_detect,
+    studio_store,
+    subtitle_alignment,
+)
 from ..services.audio_editor import EditOperation, apply_operations
 from ..services.transcriber import Transcriber
 from ..services.video_renderer import VideoRenderer
@@ -253,6 +262,71 @@ async def transcribe(
         language=result.language,
         engine=result.engine,
         entries=entries,
+    )
+
+
+@router.post(
+    "/transcribe-aligned",
+    summary="Align a chapter's known text to a Studio audio file (S2)",
+    response_model=AlignedSubtitlesResponse,
+)
+async def transcribe_aligned(
+    request: TranscribeAlignedRequest,
+    transcriber: Transcriber = Depends(get_transcriber),
+) -> AlignedSubtitlesResponse:
+    """Subtitles from the SOURCE text synced to the voice (S2).
+
+    Whisper runs with word-level timestamps; the known chapter text is
+    aligned onto that timeline so the SRT shows the EXACT script (correct
+    proper/fantasy names), not the ASR's guess. ``source_text`` may be
+    inline or read from ``chapter_id``.
+    """
+    source = Path(request.source_path)
+    if not _is_within_allowed_roots(source):
+        raise PathNotAllowedError("Source path is outside allowed directories")
+    if not source.exists() or not source.is_file():
+        raise SampleNotFound("Source audio not found")
+
+    # Resolve the authoritative text: inline source_text wins; otherwise
+    # read chapters.text from the DB. An empty result is a client error —
+    # there is nothing to align to.
+    source_text = (request.source_text or "").strip()
+    if not source_text and request.chapter_id:
+        chapter = await project_manager.get_chapter(request.chapter_id)
+        if chapter is None:
+            raise SampleNotFound(f"Chapter not found: {request.chapter_id}")
+        source_text = str(chapter.get("text") or "").strip()
+    if not source_text:
+        raise InvalidParameterError(
+            "source_text or a chapter_id with text is required"
+        )
+
+    result = await transcriber.transcribe_async(
+        source, language=request.language, word_timestamps=True
+    )
+    entries, confidence, word_level = subtitle_alignment.align_source_to_audio(
+        source_text,
+        words=result.words,
+        segments=result.segments,
+        duration_s=result.duration_s,
+    )
+    srt_path = subtitle_alignment.write_aligned_srt(entries, source.stem)
+
+    logger.info(
+        "Studio aligned subtitles: %s -> %s (%d entries, word_level=%s, conf=%.3f, %s)",
+        source.name, srt_path.name, len(entries), word_level, confidence, result.engine,
+    )
+    return AlignedSubtitlesResponse(
+        srt_path=str(srt_path.resolve()),
+        duration_s=result.duration_s,
+        language=result.language,
+        engine=result.engine,
+        alignment_confidence=confidence,
+        word_level=word_level,
+        entries=[
+            SrtEntry(index=e.index, start_s=e.start, end_s=e.end, text=e.text)
+            for e in entries
+        ],
     )
 
 

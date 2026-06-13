@@ -1153,6 +1153,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/transcribe-aligned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Align a chapter's known text to a Studio audio file (S2)
+         * @description Subtitles from the SOURCE text synced to the voice (S2).
+         *
+         *     Whisper runs with word-level timestamps; the known chapter text is
+         *     aligned onto that timeline so the SRT shows the EXACT script (correct
+         *     proper/fantasy names), not the ASR's guess. ``source_text`` may be
+         *     inline or read from ``chapter_id``.
+         */
+        post: operations["transcribe_aligned_api_studio_transcribe_aligned_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/scenes/detect": {
         parameters: {
             query?: never;
@@ -1477,6 +1502,26 @@ export interface components {
             disk: components["schemas"]["DiskUsage"];
             /** Errors */
             errors: components["schemas"]["ActivityError"][];
+        };
+        /**
+         * AlignedSubtitlesResponse
+         * @description Aligned-subtitles result: SOURCE text on the audio timeline.
+         */
+        AlignedSubtitlesResponse: {
+            /** Srt Path */
+            srt_path: string;
+            /** Duration S */
+            duration_s: number;
+            /** Language */
+            language: string;
+            /** Engine */
+            engine: string;
+            /** Alignment Confidence */
+            alignment_confidence: number;
+            /** Word Level */
+            word_level: boolean;
+            /** Entries */
+            entries: components["schemas"]["SrtEntry"][];
         };
         /** AmbienceListResponse */
         AmbienceListResponse: {
@@ -2866,6 +2911,34 @@ export interface components {
             status: string;
             /** Created At */
             created_at: string;
+        };
+        /**
+         * TranscribeAlignedRequest
+         * @description Align a known chapter text to a Studio audio file (S2).
+         *
+         *     Exactly one text source is required: either ``source_text`` inline or
+         *     ``chapter_id`` (the backend reads ``chapters.text``). The result is an
+         *     SRT carrying the SOURCE words (correct proper/fantasy names) with the
+         *     audio's word-level timings.
+         */
+        TranscribeAlignedRequest: {
+            /** Source Path */
+            source_path: string;
+            /**
+             * Source Text
+             * @description Chapter text to align. Omit to read it from chapter_id.
+             */
+            source_text?: string | null;
+            /**
+             * Chapter Id
+             * @description Read the chapter text from the DB instead of source_text.
+             */
+            chapter_id?: string | null;
+            /**
+             * Language
+             * @description ISO code (es, en, ...). None -> auto-detect.
+             */
+            language?: string | null;
         };
         /**
          * TranscribeRequest
@@ -5042,6 +5115,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranscribeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcribe_aligned_api_studio_transcribe_aligned_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranscribeAlignedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlignedSubtitlesResponse"];
                 };
             };
             /** @description Validation Error */

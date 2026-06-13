@@ -133,13 +133,32 @@ class _FakeTorch:
             pass
 
 
+class _FakeWhisperWord:
+    """Mimics a ``faster_whisper`` word with start/end timings."""
+
+    def __init__(self, word: str, start: float, end: float) -> None:
+        self.word = word
+        self.start = start
+        self.end = end
+
+
 class _FakeWhisperSegment:
     """Mimics a ``faster_whisper`` segment just enough for the transcriber."""
 
-    def __init__(self, start: float, end: float, text: str) -> None:
+    def __init__(
+        self,
+        start: float,
+        end: float,
+        text: str,
+        words: list[_FakeWhisperWord] | None = None,
+    ) -> None:
         self.start = start
         self.end = end
         self.text = text
+        # ``.words`` is populated by the real model only when
+        # ``word_timestamps=True``; mirror that so the aligned-subtitles
+        # path (S2) can be exercised without a real model.
+        self.words = words
 
 
 class _FakeWhisperInfo:
@@ -148,8 +167,27 @@ class _FakeWhisperInfo:
         self.duration = duration
 
 
+def _evenly_timed_words(text: str, start: float, end: float) -> list[_FakeWhisperWord]:
+    """Spread ``text`` words evenly across ``[start, end]`` for the stub."""
+    tokens = text.split()
+    if not tokens:
+        return []
+    step = (end - start) / len(tokens)
+    return [
+        _FakeWhisperWord(tok, start + step * i, start + step * (i + 1))
+        for i, tok in enumerate(tokens)
+    ]
+
+
 class _FakeWhisperModel:
-    """Returns 3 deterministic fake segments; no model download needed."""
+    """Returns 3 deterministic fake segments; no model download needed.
+
+    When ``word_timestamps=True`` each segment also carries a ``.words``
+    list with per-word timings, mirroring real faster-whisper behaviour so
+    the aligned-subtitles path (S2) is exercised in CI. The transcribed
+    text deliberately differs from any aligned source text (it is the
+    ASR's "guess"), proving alignment uses the SOURCE words.
+    """
 
     def __init__(self, *_: object, **__: object) -> None:
         pass
@@ -160,12 +198,22 @@ class _FakeWhisperModel:
         *,
         language: str | None = None,
         beam_size: int = 5,
+        word_timestamps: bool = False,
     ) -> tuple[list[_FakeWhisperSegment], _FakeWhisperInfo]:
         _ = beam_size  # silence unused
+        spans = [
+            (0.0, 2.0, "Fake transcription line one."),
+            (2.0, 4.0, "Line two of fake text."),
+            (4.0, 6.0, "Final line."),
+        ]
         segments = [
-            _FakeWhisperSegment(0.0, 2.0, "Fake transcription line one."),
-            _FakeWhisperSegment(2.0, 4.0, "Line two of fake text."),
-            _FakeWhisperSegment(4.0, 6.0, "Final line."),
+            _FakeWhisperSegment(
+                start,
+                end,
+                text,
+                words=_evenly_timed_words(text, start, end) if word_timestamps else None,
+            )
+            for start, end, text in spans
         ]
         return iter(segments), _FakeWhisperInfo(language=language or "en", duration=6.0)
 

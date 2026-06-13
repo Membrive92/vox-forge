@@ -97,6 +97,58 @@ export function transcribeSource(
   );
 }
 
+/** Backend ``AlignedSubtitlesResponse`` — SOURCE text on the audio timeline. */
+interface AlignedSubtitlesResponse {
+  srt_path: string;
+  duration_s: number;
+  language: string;
+  engine: string;
+  alignment_confidence: number;
+  word_level: boolean;
+  entries: SrtEntry[];
+}
+
+/** A transcript backed by the chapter's known text (S2). Slots into the
+ * same `transcript` state as {@link transcribeSource} — the render flow
+ * already burns `srt_path` — plus the alignment quality signals. */
+export interface AlignedTranscribeResult extends TranscribeResult {
+  /** How well the source matched what Whisper heard, in [0, 1]. */
+  alignmentConfidence: number;
+  /** True when faster-whisper supplied per-word timings (vs. segment-level). */
+  wordLevel: boolean;
+}
+
+/**
+ * Align a chapter's known text to the audio so subtitles show the EXACT
+ * script (correct proper/fantasy names) synced to the voice (S2). Pass
+ * `sourceText` inline, or `chapterId` to read `chapters.text` server-side.
+ */
+export async function transcribeAligned(
+  sourcePath: string,
+  options: { sourceText?: string; chapterId?: string; language?: string } = {},
+  signal?: AbortSignal,
+): Promise<AlignedTranscribeResult> {
+  const body: Record<string, unknown> = { source_path: sourcePath };
+  if (options.sourceText !== undefined) body["source_text"] = options.sourceText;
+  if (options.chapterId !== undefined) body["chapter_id"] = options.chapterId;
+  if (options.language !== undefined) body["language"] = options.language;
+  const res = await postJson<AlignedSubtitlesResponse>(
+    "/studio/transcribe-aligned",
+    body,
+    signal,
+  );
+  return {
+    srt_path: res.srt_path,
+    duration_s: res.duration_s,
+    word_count: res.entries.reduce((n, e) => n + e.text.split(/\s+/).filter(Boolean).length, 0),
+    language: res.language,
+    engine: res.engine,
+    entries: res.entries,
+    alignmentConfidence: res.alignment_confidence,
+    wordLevel: res.word_level,
+  };
+}
+
 // ── Scene detection (PROD-03) ─────────────────────────────────────
 
 export interface DetectedScene {

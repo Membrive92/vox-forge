@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
@@ -37,6 +37,20 @@ class SrtSegment:
 
 
 @dataclass(frozen=True)
+class SrtWord:
+    """A single word with its start/end timestamps in seconds.
+
+    Produced only when faster-whisper runs with ``word_timestamps=True``
+    and the installed version exposes ``segment.words``; otherwise the
+    result's ``words`` list is empty (graceful degradation).
+    """
+
+    word: str
+    start: float
+    end: float
+
+
+@dataclass(frozen=True)
 class TranscriptionResult:
     srt_path: Path
     duration_s: float
@@ -44,6 +58,10 @@ class TranscriptionResult:
     language: str
     engine: str
     segments: list[SrtSegment]
+    # Word-level timings flattened across all segments. Empty when the
+    # faster-whisper build doesn't surface them (S2 degrades to
+    # segment-level alignment).
+    words: list[SrtWord] = field(default_factory=list)
 
 
 class Transcriber:
@@ -75,20 +93,40 @@ class Transcriber:
         self,
         audio_path: Path,
         language: str | None = None,
+        *,
+        word_timestamps: bool = False,
     ) -> TranscriptionResult:
         if not audio_path.exists() or not audio_path.is_file():
             raise InvalidSampleError(f"Audio not found: {audio_path}")
 
         model = self._load()
         try:
+            # ``word_timestamps`` makes faster-whisper attach a ``.words``
+            # list (each with start/end) to every segment. The aligned
+            # subtitles path (S2) needs it; the plain SRT path doesn't, so
+            # it's opt-in to keep that call cheap and unchanged.
             segments_iter, info = model.transcribe(  # type: ignore[attr-defined]
                 str(audio_path),
                 language=language,
                 beam_size=5,
+                word_timestamps=word_timestamps,
             )
-            segments = _to_segments(segments_iter)
+            # Materialize once: the segments iterator is single-pass and we
+            # need both segment text and the flattened word list from it.
+            raw_segments = list(segments_iter)
+            segments = _to_segments(raw_segments)
+            words = _to_words(raw_segments) if word_timestamps else []
         except Exception as exc:  # noqa: BLE001
             raise InvalidSampleError(f"Transcription failed: {exc}") from exc
+
+        if word_timestamps and not words:
+            # The model ran but this faster-whisper build did not surface
+            # per-word timings; callers fall back to segment-level timing.
+            logger.warning(
+                "word_timestamps requested but no words returned for %s "
+                "(faster-whisper build may not expose segment.words)",
+                audio_path.name,
+            )
 
         srt_path = _write_srt(segments, audio_path.stem)
         word_count = sum(len(s.text.split()) for s in segments)
@@ -99,15 +137,22 @@ class Transcriber:
             language=str(getattr(info, "language", "")),
             engine=f"{_ENGINE_PREFIX}:{self._model_name}",
             segments=segments,
+            words=words,
         )
 
     async def transcribe_async(
         self,
         audio_path: Path,
         language: str | None = None,
+        *,
+        word_timestamps: bool = False,
     ) -> TranscriptionResult:
         """Run the blocking transcribe on a worker thread."""
-        return await asyncio.to_thread(self.transcribe, audio_path, language)
+        return await asyncio.to_thread(
+            lambda: self.transcribe(
+                audio_path, language, word_timestamps=word_timestamps
+            )
+        )
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
@@ -124,6 +169,31 @@ def _to_segments(raw: Iterable[object]) -> list[SrtSegment]:
                 text=str(getattr(seg, "text", "")).strip(),
             )
         )
+    return out
+
+
+def _to_words(raw: Iterable[object]) -> list[SrtWord]:
+    """Flatten ``segment.words`` across all segments into one timeline.
+
+    Tolerant of builds that don't populate ``.words`` (returns the words
+    seen, possibly none) and of word entries missing fields.
+    """
+    out: list[SrtWord] = []
+    for seg in raw:
+        seg_words = getattr(seg, "words", None)
+        if not seg_words:
+            continue
+        for w in seg_words:
+            text = str(getattr(w, "word", "")).strip()
+            if not text:
+                continue
+            out.append(
+                SrtWord(
+                    word=text,
+                    start=float(getattr(w, "start", 0.0)),
+                    end=float(getattr(w, "end", 0.0)),
+                )
+            )
     return out
 
 

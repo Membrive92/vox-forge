@@ -11,7 +11,13 @@ interface Props {
   enabled: boolean;
   isTranscribing: boolean;
   transcript: TranscribeResult | null;
-  onTranscribe: (language?: string) => void;
+  /** S2: true when the selected source is a chapter generation, so the
+   * chapter's known text can be aligned to the audio. */
+  canUseChapterText: boolean;
+  /** Confidence of the last chapter-text alignment, or null if the last
+   * run was a plain Whisper transcription. */
+  alignmentConfidence: number | null;
+  onTranscribe: (options?: { language?: string; useChapterText?: boolean }) => void;
   onCancel: () => void;
   onEntryClick?: (entry: SrtEntry) => void;
 }
@@ -21,11 +27,17 @@ export function TranscribePanel({
   enabled,
   isTranscribing,
   transcript,
+  canUseChapterText,
+  alignmentConfidence,
   onTranscribe,
   onCancel,
   onEntryClick,
 }: Props) {
   const [language, setLanguage] = useState("");
+  // S2: default ON whenever we have a chapter script — that is the whole
+  // point for audiobooks (correct proper/fantasy names synced to voice).
+  const [useChapterText, setUseChapterText] = useState(true);
+  const aligning = canUseChapterText && useChapterText;
 
   return (
     <div
@@ -54,12 +66,38 @@ export function TranscribePanel({
             variant="primary"
             size="sm"
             disabled={!enabled}
-            onClick={() => onTranscribe(language.trim() || undefined)}
+            onClick={() =>
+              onTranscribe({
+                ...(language.trim() ? { language: language.trim() } : {}),
+                useChapterText: aligning,
+              })
+            }
           >
             {transcript ? t.studioTranscribeRegen : t.studioTranscribeStart}
           </Button>
         )}
       </div>
+
+      {/* S2: align the chapter's known text instead of a Whisper guess. */}
+      {canUseChapterText ? (
+        <label
+          style={{
+            marginTop: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: typography.size.xs,
+            color: colors.textDim,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={useChapterText}
+            onChange={(e) => setUseChapterText(e.target.checked)}
+          />
+          {t.studioTranscribeUseChapterText}
+        </label>
+      ) : null}
 
       <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
         <label style={{ fontSize: typography.size.xs, color: colors.textDim }}>
@@ -96,6 +134,12 @@ export function TranscribePanel({
               .replace("{n}", String(transcript.entries.length))
               .replace("{w}", String(transcript.word_count))
               .replace("{engine}", transcript.engine)}
+            {alignmentConfidence !== null
+              ? ` · ${t.studioTranscribeAlignedBadge.replace(
+                  "{pct}",
+                  String(Math.round(alignmentConfidence * 100)),
+                )}`
+              : ""}
           </p>
           <ul
             style={{

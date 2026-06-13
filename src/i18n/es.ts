@@ -509,6 +509,8 @@ export const es = {
   studioTranscribeEmpty: "Sin transcripción todavía.",
   studioTranscribeDone: "{n} segmentos · {w} palabras · {engine}",
   studioTranscribeLangHint: "Idioma (vacío = auto)",
+  studioTranscribeUseChapterText: "Usar el texto del capítulo (nombres correctos)",
+  studioTranscribeAlignedBadge: "alineado {pct}%",
 
   // Studio — video render panel (B.2)
   studioVideoTitle: "Render de vídeo",

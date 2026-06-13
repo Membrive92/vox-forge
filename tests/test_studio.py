@@ -400,6 +400,203 @@ def test_transcribe_forwards_language_to_model(client) -> None:
     assert response.json()["language"] == "es"
 
 
+# ── Service: subtitle alignment (S2) ────────────────────────────────
+
+
+# A source line with a fantasy proper name Whisper would never spell
+# right — the whole point of aligning from the known text.
+_SOURCE_TEXT = (
+    "Aelyndor crossed the bridge of Vharûn. "
+    "The Zyrithian gates opened slowly. "
+    "Silence fell over the valley."
+)
+
+
+def test_align_uses_source_words_not_transcription(client) -> None:
+    """Aligned entries must carry the SOURCE proper names, never the
+    ASR's "Fake transcription" guess."""
+    from backend.services.transcriber import Transcriber
+    from backend.services import subtitle_alignment
+
+    src = _seed_source("align_src.mp3")
+    result = Transcriber().transcribe(src, word_timestamps=True)
+    assert result.words, "stub must surface word timestamps when requested"
+
+    entries, confidence, word_level = subtitle_alignment.align_source_to_audio(
+        _SOURCE_TEXT,
+        words=result.words,
+        segments=result.segments,
+        duration_s=result.duration_s,
+    )
+    assert word_level is True
+    joined = " ".join(e.text for e in entries)
+    # Source words survive; ASR mistakes do not leak in.
+    assert "Aelyndor" in joined
+    assert "Vharûn" in joined
+    assert "Zyrithian" in joined
+    assert "Fake" not in joined and "transcription" not in joined
+    # The stub text differs from the source, so confidence is < 1 but real.
+    assert 0.0 <= confidence < 1.0
+
+
+def test_align_is_monotonic(client) -> None:
+    """Entry timings never go backwards and stay inside the audio span."""
+    from backend.services.transcriber import Transcriber
+    from backend.services import subtitle_alignment
+
+    src = _seed_source("align_mono.mp3")
+    result = Transcriber().transcribe(src, word_timestamps=True)
+    entries, _conf, _wl = subtitle_alignment.align_source_to_audio(
+        _SOURCE_TEXT,
+        words=result.words,
+        segments=result.segments,
+        duration_s=result.duration_s,
+    )
+    assert len(entries) >= 1
+    prev_end = 0.0
+    for e in entries:
+        assert e.start <= e.end
+        assert e.start >= prev_end - 1e-6  # monotonic, allow fp slack
+        assert e.end <= result.duration_s + 1e-6
+        prev_end = e.end
+    # Indices are 1-based and contiguous.
+    assert [e.index for e in entries] == list(range(1, len(entries) + 1))
+
+
+def test_align_degrades_without_word_timestamps(client) -> None:
+    """With no word timings, alignment falls back to segment anchors and
+    still emits the source text monotonically."""
+    from backend.services import subtitle_alignment
+    from backend.services.transcriber import SrtSegment
+
+    segments = [
+        SrtSegment(index=1, start=0.0, end=3.0, text="something he said"),
+        SrtSegment(index=2, start=3.0, end=6.0, text="and then more"),
+    ]
+    entries, confidence, word_level = subtitle_alignment.align_source_to_audio(
+        _SOURCE_TEXT,
+        words=[],  # build without word_timestamps
+        segments=segments,
+        duration_s=6.0,
+    )
+    assert word_level is False
+    assert len(entries) >= 1
+    assert "Aelyndor" in " ".join(e.text for e in entries)
+    prev_end = 0.0
+    for e in entries:
+        assert e.start >= prev_end - 1e-6
+        prev_end = e.end
+
+
+def test_align_empty_source_yields_no_entries(client) -> None:
+    from backend.services import subtitle_alignment
+
+    entries, confidence, word_level = subtitle_alignment.align_source_to_audio(
+        "",
+        words=[],
+        segments=[],
+        duration_s=6.0,
+    )
+    assert entries == []
+
+
+# ── Router: /api/studio/transcribe-aligned (S2) ─────────────────────
+
+
+def test_transcribe_aligned_with_inline_text(client) -> None:
+    src = _seed_source("aligned_inline.mp3")
+    response = client.post(
+        "/api/studio/transcribe-aligned",
+        json={"source_path": str(src.resolve()), "source_text": _SOURCE_TEXT},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["word_level"] is True
+    assert 0.0 <= body["alignment_confidence"] <= 1.0
+    assert body["srt_path"].endswith(".srt")
+    assert len(body["entries"]) >= 1
+    joined = " ".join(e["text"] for e in body["entries"])
+    assert "Aelyndor" in joined and "Zyrithian" in joined
+
+    # The written SRT on disk carries the SOURCE words, not the ASR guess.
+    from backend.paths import STUDIO_SUBS_DIR
+
+    srt_text = (STUDIO_SUBS_DIR / Path(body["srt_path"]).name).read_text(
+        encoding="utf-8"
+    )
+    assert "Aelyndor" in srt_text
+    assert "Fake transcription" not in srt_text
+
+
+def test_transcribe_aligned_reads_chapter_text(client) -> None:
+    """When only chapter_id is given, the chapter's text is aligned."""
+    import asyncio
+
+    from backend.paths import OUTPUT_DIR
+    from backend.services import project_manager
+
+    project = client.post(
+        "/api/projects",
+        json={"name": "Aligned Project", "voice_id": "es-ES-AlvaroNeural"},
+    ).json()
+    chapter = client.post(
+        f"/api/projects/{project['id']}/chapters",
+        json={"title": "Cap", "text": _SOURCE_TEXT, "sort_order": 0},
+    ).json()
+
+    src = _seed_source("aligned_chapter.mp3")
+    response = client.post(
+        "/api/studio/transcribe-aligned",
+        json={"source_path": str(src.resolve()), "chapter_id": chapter["id"]},
+    )
+    assert response.status_code == 200, response.text
+    joined = " ".join(e["text"] for e in response.json()["entries"])
+    assert "Vharûn" in joined
+    _ = (asyncio, OUTPUT_DIR, project_manager)  # imports kept for parity
+
+
+def test_transcribe_aligned_requires_text(client) -> None:
+    """No source_text and no chapter_id -> 400 invalid parameter."""
+    src = _seed_source("aligned_notext.mp3")
+    response = client.post(
+        "/api/studio/transcribe-aligned",
+        json={"source_path": str(src.resolve())},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_parameter"
+
+
+def test_transcribe_aligned_missing_chapter_returns_404(client) -> None:
+    src = _seed_source("aligned_badchapter.mp3")
+    response = client.post(
+        "/api/studio/transcribe-aligned",
+        json={"source_path": str(src.resolve()), "chapter_id": "does-not-exist"},
+    )
+    assert response.status_code == 404
+
+
+def test_transcribe_aligned_rejects_path_outside_roots(client) -> None:
+    response = client.post(
+        "/api/studio/transcribe-aligned",
+        json={"source_path": "/etc/passwd", "source_text": _SOURCE_TEXT},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "path_not_allowed"
+
+
+def test_transcribe_aligned_missing_source_returns_404(client) -> None:
+    from backend.paths import OUTPUT_DIR
+
+    response = client.post(
+        "/api/studio/transcribe-aligned",
+        json={
+            "source_path": str((OUTPUT_DIR / "no_such_aligned.mp3").resolve()),
+            "source_text": _SOURCE_TEXT,
+        },
+    )
+    assert response.status_code == 404
+
+
 # ── Router: /api/studio/scenes/detect (PROD-03) ─────────────────────
 
 
