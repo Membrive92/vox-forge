@@ -145,7 +145,7 @@ export interface VideoOptions {
 export const DEFAULT_VIDEO_OPTIONS: VideoOptions = {
   resolution: "1920x1080",
   ken_burns: true,
-  waveform_overlay: true,
+  waveform_overlay: false,
   title_text: null,
   subtitles_mode: "burn",
   crossfade_s: 1.0,

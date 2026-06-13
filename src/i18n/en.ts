@@ -530,7 +530,7 @@ export const en: Record<TranslationKey, string> = {
   studioVideoSubsNone: "No subtitles",
   studioVideoSubsBurn: "Burn into the video",
   studioVideoSubsSoft: "Soft track",
-  studioVideoSubsNeedTranscript: "Transcribe first to use subtitles",
+  studioVideoSubsNeedTranscript: "Subtitles need a transcript — use the “Transcription” panel above (press “Transcribe”) first, then pick a mode here.",
   studioVideoRender: "Render video",
   studioVideoRenderSlideshow: "Render slideshow ({n} images)",
   studioVideoRendering: "Rendering…",

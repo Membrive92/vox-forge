@@ -528,7 +528,7 @@ export const es = {
   studioVideoSubsNone: "Sin subtítulos",
   studioVideoSubsBurn: "Quemados en el vídeo",
   studioVideoSubsSoft: "Pista separada",
-  studioVideoSubsNeedTranscript: "Transcribe primero para usar subtítulos",
+  studioVideoSubsNeedTranscript: "Los subtítulos necesitan transcripción — usa el panel “Transcripción” de arriba (pulsa “Transcribir”) primero y luego elige un modo aquí.",
   studioVideoRender: "Renderizar vídeo",
   studioVideoRenderSlideshow: "Renderizar slideshow ({n} imágenes)",
   studioVideoRendering: "Renderizando…",

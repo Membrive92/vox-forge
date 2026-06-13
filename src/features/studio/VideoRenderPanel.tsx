@@ -61,7 +61,7 @@ export function VideoRenderPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [resolution, setResolution] = useState<VideoOptions["resolution"]>("1920x1080");
   const [kenBurns, setKenBurns] = useState(true);
-  const [waveform, setWaveform] = useState(true);
+  const [waveform, setWaveform] = useState(false);
   const [titleText, setTitleText] = useState("");
   const [subsMode, setSubsMode] = useState<VideoOptions["subtitles_mode"]>(
     hasTranscript ? "burn" : "none",
@@ -78,6 +78,14 @@ export function VideoRenderPanel({
   useEffect(() => {
     if (!hasTranscript) setSubsMode("none");
   }, [hasTranscript]);
+
+  // Onda + subtítulos quemados se solapan visualmente: cuando el usuario
+  // elige "burn" apagamos la onda automáticamente para que el vídeo por
+  // defecto salga limpio (S1). Si luego quiere ambos, puede reactivar la
+  // onda a mano.
+  useEffect(() => {
+    if (subsMode === "burn") setWaveform(false);
+  }, [subsMode]);
 
   const handleFile = (file: File | undefined): void => {
     if (!file) return;
