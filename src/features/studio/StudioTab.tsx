@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { getStudioAudioUrl } from "@/api/studio";
+import { getStudioAudioUrl, type MediaAsset } from "@/api/studio";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
 
 import { EditOperationsPanel } from "./EditOperationsPanel";
+import { ImagesPanel } from "./ImagesPanel";
 import { RecentRenders } from "./RecentRenders";
 import { SourcePicker } from "./SourcePicker";
 import { StudioWaveform, type StudioRegion, type StudioWaveformHandle } from "./StudioWaveform";
 import { TranscribePanel } from "./TranscribePanel";
 import { useStudioSession } from "./useStudioSession";
 import { VideoRenderPanel } from "./VideoRenderPanel";
+
+type StudioMode = "audio" | "images" | "montage";
 
 interface Props {
   t: Translations;
@@ -25,6 +28,7 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
   const waveformRef = useRef<StudioWaveformHandle>(null);
   const [region, setRegion] = useState<StudioRegion | null>(null);
   const [outputFormat, setOutputFormat] = useState<string>("mp3");
+  const [mode, setMode] = useState<StudioMode>("audio");
   const previousAppliedRef = useRef<Blob | null>(null);
 
   useEffect(() => {
@@ -107,6 +111,14 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
     setRegion(null);
   };
 
+  // "Usar como portada": drop the asset into the video cover slot and
+  // surface the Audio body where that slot lives.
+  const handleUseAsCover = (asset: MediaAsset): void => {
+    studio.setCoverFromAsset(asset);
+    setMode("audio");
+    onToast(t.studioMediaBinCoverSet);
+  };
+
   return (
     <div>
       <header style={{ marginBottom: 20 }}>
@@ -121,10 +133,15 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
           {t.tabStudio}
         </h2>
         <p style={{ margin: "4px 0 0", fontSize: typography.size.sm, color: colors.textDim }}>
-          {t.studioTagline}
+          {mode === "images" ? t.studioImagesTagline : t.studioTagline}
         </p>
       </header>
 
+      <ModeToggle t={t} mode={mode} onChange={setMode} />
+
+      {mode === "images" ? (
+        <ImagesPanel t={t} onToast={onToast} onUseAsCover={handleUseAsCover} />
+      ) : (
       <div className="vf-studio-grid">
         <SourcePicker
           t={t}
@@ -266,6 +283,64 @@ export function StudioTab({ t, onToast, pendingSourceId, onPendingSourceConsumed
           />
         </div>
       </div>
+      )}
+    </div>
+  );
+}
+
+// ── Mode toggle (Audio | Imágenes | Montaje) ─────────────────────────
+
+interface ModeToggleProps {
+  t: Translations;
+  mode: StudioMode;
+  onChange: (mode: StudioMode) => void;
+}
+
+function ModeToggle({ t, mode, onChange }: ModeToggleProps) {
+  const items: { id: StudioMode; label: string; disabled?: boolean; hint?: string }[] = [
+    { id: "audio", label: t.studioModeAudio },
+    { id: "images", label: t.studioModeImages },
+    { id: "montage", label: t.studioModeMontage, disabled: true, hint: t.studioModeMontageSoon },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label={t.tabStudio}
+      style={{ display: "flex", gap: 6, marginBottom: 18 }}
+    >
+      {items.map((item) => {
+        const active = mode === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            disabled={item.disabled}
+            title={item.hint ?? ""}
+            onClick={() => !item.disabled && onChange(item.id)}
+            style={{
+              padding: "7px 16px",
+              fontSize: typography.size.sm,
+              fontWeight: 700,
+              borderRadius: radii.md,
+              background: active ? colors.primarySoft : "transparent",
+              color: item.disabled ? colors.textFaint : active ? colors.primaryLight : colors.textDim,
+              border: `1px solid ${active ? colors.primaryBorder : colors.borderFaint}`,
+              cursor: item.disabled ? "not-allowed" : "pointer",
+              opacity: item.disabled ? 0.6 : 1,
+              fontFamily: fonts.sans,
+            }}
+          >
+            {item.label}
+            {item.disabled && item.hint ? (
+              <span style={{ marginLeft: 6, fontSize: typography.size.xs, fontWeight: 500 }}>
+                ({item.hint})
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }

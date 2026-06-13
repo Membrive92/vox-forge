@@ -5,6 +5,7 @@ import {
   listStudioRenders,
   listStudioSources,
   type CoverUploadResult,
+  type MediaAsset,
   type StudioOperation,
   type StudioRender,
   type StudioSource,
@@ -64,6 +65,7 @@ export interface StudioSessionApi {
   clearTranscript: () => void;
 
   setCover: (file: File) => Promise<void>;
+  setCoverFromAsset: (asset: MediaAsset) => void;
   clearCover: () => void;
   renderCurrent: (
     options: Partial<VideoOptions>,
@@ -192,6 +194,7 @@ export function useStudioSession(): StudioSessionApi {
     cancelTranscribe: transcription.cancelTranscribe,
     clearTranscript: transcription.clearTranscript,
     setCover: video.setCover,
+    setCoverFromAsset: video.setCoverFromAsset,
     clearCover: video.clearCover,
     renderCurrent: video.renderCurrent,
     cancelRender: video.cancelRender,

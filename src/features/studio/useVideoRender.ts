@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isAbortError } from "@/api/client";
 import {
+  mediaFileUrl,
   renderVideo,
   uploadCover,
   type CoverUploadResult,
+  type MediaAsset,
   type StudioSource,
   type TranscribeResult,
   type VideoImage,
@@ -28,6 +30,11 @@ export interface VideoRender {
   isRendering: boolean;
 
   setCover: (file: File) => Promise<void>;
+  /** Select a library asset as the cover (T2I-2 "Usar como portada").
+   * Preview-only for now: the render endpoint needs an absolute path
+   * the client can't resolve from an id, so this populates the cover
+   * slot for display and the render-path wiring lands with T2I-3/M5. */
+  setCoverFromAsset: (asset: MediaAsset) => void;
   clearCover: () => void;
   renderCurrent: (
     options: Partial<VideoOptions>,
@@ -85,6 +92,21 @@ export function useVideoRender(
       setIsUploadingCover(false);
     }
   }, [reportError]);
+
+  const setCoverFromAsset = useCallback((asset: MediaAsset) => {
+    // The render endpoint validates an absolute filesystem path under the
+    // allowed Studio roots; a media asset only exposes its id + a
+    // relative filename, so we can't build that path client-side yet.
+    // Populate the cover slot for display (served by id) and defer the
+    // render-path resolution to T2I-3/M5, where the backend will accept
+    // an asset id directly.
+    setCoverState({
+      filename: asset.filename,
+      path: mediaFileUrl(asset.id),
+      size_kb: 0,
+      content_type: "image/png",
+    });
+  }, []);
 
   const clearCover = useCallback(() => setCoverState(null), []);
 
@@ -177,6 +199,7 @@ export function useVideoRender(
     videoMeta,
     isRendering,
     setCover,
+    setCoverFromAsset,
     clearCover,
     renderCurrent,
     cancelRender,

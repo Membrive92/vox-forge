@@ -8,6 +8,11 @@ import {
   postForm,
   postJson,
 } from "./client";
+import type {
+  MediaAssetDTO,
+  MediaAssetsResponseDTO,
+  MediaGenerateRequestDTO,
+} from "./types";
 
 export type EditOperationType =
   | "trim"
@@ -242,6 +247,108 @@ export function generateImage(
   };
   if (seed !== undefined) body["seed"] = seed;
   return postJson<GenerateImageResult>("/studio/generate-image", body, signal);
+}
+
+// ── Media library (T2I-2 / UX-03 M1-M2) ──────────────────────────
+
+/** CamelCase view of a ``media_assets`` row. The backend serves the
+ * binary by id, so the client never touches ``filename`` directly —
+ * use {@link mediaFileUrl}. */
+export interface MediaAsset {
+  id: string;
+  kind: "image" | "clip";
+  filename: string;
+  thumbFilename: string | null;
+  origin: "upload" | "imported" | "generated";
+  sourcePath: string | null;
+  metaJson: string | null;
+  width: number | null;
+  height: number | null;
+  durationS: number | null;
+  prompt: string | null;
+  seed: number | null;
+  aspectRatio: string | null;
+  createdAt: string;
+}
+
+function toMediaAsset(dto: MediaAssetDTO): MediaAsset {
+  return {
+    id: dto.id,
+    kind: (dto.kind === "clip" ? "clip" : "image"),
+    filename: dto.filename,
+    thumbFilename: dto.thumb_filename ?? null,
+    origin: (dto.origin as MediaAsset["origin"]),
+    sourcePath: dto.source_path ?? null,
+    metaJson: dto.meta_json ?? null,
+    width: dto.width ?? null,
+    height: dto.height ?? null,
+    durationS: dto.duration_s ?? null,
+    prompt: dto.prompt ?? null,
+    seed: dto.seed ?? null,
+    aspectRatio: dto.aspect_ratio ?? null,
+    createdAt: dto.created_at,
+  };
+}
+
+export interface GenerateIntoLibraryInput {
+  prompt: string;
+  aspectRatio?: ImageAspectRatio;
+  seed?: number;
+  count?: number;
+}
+
+/** Generate ``count`` images straight into the media library. Each one
+ * becomes its own asset row (``origin='generated'``); the batch runs
+ * sequentially on the backend (one shared GPU). */
+export async function generateIntoLibrary(
+  input: GenerateIntoLibraryInput,
+  signal?: AbortSignal,
+): Promise<MediaAsset[]> {
+  const body: MediaGenerateRequestDTO = {
+    prompt: input.prompt,
+    aspect_ratio: input.aspectRatio ?? "16:9",
+    count: input.count ?? 1,
+  };
+  if (input.seed !== undefined) body.seed = input.seed;
+  const res = await postJson<MediaAssetsResponseDTO, MediaGenerateRequestDTO>(
+    "/studio/media/generate",
+    body,
+    signal,
+  );
+  return res.assets.map(toMediaAsset);
+}
+
+export interface ListMediaOptions {
+  kind?: "image" | "clip";
+  origin?: "upload" | "imported" | "generated";
+  /** Case-insensitive substring match against the prompt. */
+  query?: string;
+}
+
+export async function listMedia(
+  options: ListMediaOptions = {},
+  signal?: AbortSignal,
+): Promise<MediaAsset[]> {
+  const params = new URLSearchParams();
+  if (options.kind) params.set("kind", options.kind);
+  if (options.origin) params.set("origin", options.origin);
+  if (options.query) params.set("q", options.query);
+  const qs = params.toString();
+  const res = await getJson<MediaAssetsResponseDTO>(
+    `/studio/media${qs ? `?${qs}` : ""}`,
+    signal,
+  );
+  return res.assets.map(toMediaAsset);
+}
+
+export async function deleteMedia(assetId: string): Promise<void> {
+  await deleteResource(`/studio/media/${assetId}`);
+}
+
+/** Direct URL to an asset's bytes, served by id. Use as an ``<img>``
+ * src; pass ``thumb`` for the 256px thumbnail. */
+export function mediaFileUrl(assetId: string, thumb = false): string {
+  return `${API_BASE}/studio/media/file/${encodeURIComponent(assetId)}${thumb ? "?thumb=true" : ""}`;
 }
 
 export async function renderVideo(

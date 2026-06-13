@@ -20,7 +20,8 @@ export type JobKind =
   | "conversion"
   | "video-render"
   | "transcription"
-  | "cross-lingual";
+  | "cross-lingual"
+  | "image-gen";
 
 /** "done" entries linger briefly in the tray before being removed. */
 export type JobStatus = "running" | "done";

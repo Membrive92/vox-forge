@@ -15,6 +15,9 @@ type Schema = components["schemas"];
 
 export type ProfileDTO = Schema["VoiceProfile"];
 export type SynthesisRequestDTO = Schema["SynthesisRequest"];
+export type MediaAssetDTO = Schema["MediaAsset"];
+export type MediaAssetsResponseDTO = Schema["MediaAssetsResponse"];
+export type MediaGenerateRequestDTO = Schema["MediaGenerateRequest"];
 
 export interface ApiErrorBody {
   detail: string;

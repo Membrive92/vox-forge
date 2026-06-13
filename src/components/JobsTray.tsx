@@ -30,6 +30,7 @@ function kindLabel(t: Translations, kind: JobKind): string {
     case "video-render": return t.jobKindVideoRender;
     case "transcription": return t.jobKindTranscription;
     case "cross-lingual": return t.jobKindCrossLingual;
+    case "image-gen": return t.jobKindImageGen;
   }
 }
 
