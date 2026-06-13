@@ -41,7 +41,7 @@ from ..exceptions import (
     ImageProviderUnavailableError,
     ImageWorkflowError,
 )
-from ..paths import STUDIO_COVERS_DIR
+from ..paths import STUDIO_COVERS_DIR, STUDIO_MEDIA_DIR, STUDIO_MEDIA_THUMBS_DIR
 from .engine_unload import unload_gpu_engines
 
 logger = logging.getLogger(__name__)
@@ -572,3 +572,150 @@ async def generate_image(
         p.name, prompt[:60], aspect, seed, filename,
     )
     return filepath
+
+
+# ── Library-aware generation (T2I-1) ────────────────────────────────
+
+
+# Default thumbnail edge in pixels (PIL ``Image.thumbnail`` preserves aspect).
+THUMBNAIL_MAX_PX = 256
+
+
+@dataclass(frozen=True)
+class LibraryImage:
+    """A generation written into the media library.
+
+    ``filename`` / ``thumb_filename`` are relative to ``STUDIO_MEDIA_DIR``
+    (the row stores them as-is); ``sidecar`` carries the reproducibility
+    record (SPEC_PIPELINE §3 shape) already merged into ``meta``.
+    """
+
+    filename: str
+    thumb_filename: str
+    width: int
+    height: int
+    seed: int
+    aspect_ratio: str
+    size_kb: float
+    provider: str
+    meta: dict[str, Any]
+
+
+def _png_dimensions(png_bytes: bytes) -> tuple[int, int]:
+    """(width, height) of an in-memory PNG via PIL."""
+    import io
+
+    with Image.open(io.BytesIO(png_bytes)) as img:
+        return img.width, img.height
+
+
+def _write_thumbnail(png_bytes: bytes, dest: Path) -> None:
+    """Write a ``THUMBNAIL_MAX_PX`` PNG thumbnail (aspect preserved).
+
+    Blocking PIL work — call via ``asyncio.to_thread``.
+    """
+    import io
+
+    with Image.open(io.BytesIO(png_bytes)) as img:
+        img = img.convert("RGB")
+        img.thumbnail((THUMBNAIL_MAX_PX, THUMBNAIL_MAX_PX))
+        img.save(dest, format="PNG", optimize=True)
+
+
+def _build_sidecar(
+    *,
+    provider: str,
+    prompt: str,
+    seed: int,
+    width: int,
+    height: int,
+    created_at: str,
+    elapsed_s: float,
+) -> dict[str, Any]:
+    """Reproducibility sidecar in the img_generation_module shape
+    (SPEC_PIPELINE §3): ``params`` + ``models`` + ``workflow`` + ``timings``
+    + ``created_at``. The placeholder provider has no real models/workflow,
+    so those stay empty — an imported module asset and an in-app one read
+    the same way."""
+    return {
+        "schema": 1,
+        "kind": "image",
+        "created_at": created_at,
+        "provider": provider,
+        "params": {"prompt": prompt, "negative": "", "seed": seed,
+                   "width": width, "height": height},
+        "models": {},
+        "workflow": {},
+        "timings": {"exec_s": round(elapsed_s, 3)},
+    }
+
+
+async def generate_into_library(
+    prompt: str,
+    aspect: str = "16:9",
+    seed: int | None = None,
+    provider: ImageProvider | None = None,
+) -> LibraryImage:
+    """Generate an image and persist it into the media library.
+
+    Writes the PNG + a sidecar JSON (SPEC_PIPELINE §3 shape) + a 256px
+    thumbnail under ``STUDIO_MEDIA_DIR``. Returns the metadata the router
+    needs to insert a ``media_assets`` row. Does NOT touch the existing
+    ``generate_image()`` path that ``VideoRenderPanel`` still uses.
+    """
+    if not prompt or not prompt.strip():
+        raise ValueError("Prompt must be non-empty")
+    if aspect not in VALID_ASPECT_RATIOS:
+        raise ValueError(
+            f"Invalid aspect ratio: {aspect}. Valid: {sorted(VALID_ASPECT_RATIOS)}"
+        )
+
+    p = provider or get_provider()
+    if seed is None:
+        seed = random.randint(0, 2**31 - 1)
+
+    started = time.monotonic()
+    png_bytes = await p.generate_async(prompt=prompt, aspect=aspect, seed=seed)
+    elapsed_s = time.monotonic() - started
+    created_at = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime()) or ""
+
+    width, height = await asyncio.to_thread(_png_dimensions, png_bytes)
+
+    STUDIO_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    STUDIO_MEDIA_THUMBS_DIR.mkdir(parents=True, exist_ok=True)
+    stem = f"gen_{str(uuid.uuid4())[:12]}"
+    filename = f"{stem}.png"
+    thumb_filename = f"{stem}.png"  # relative to the thumbs subdir
+
+    (STUDIO_MEDIA_DIR / filename).write_bytes(png_bytes)
+    await asyncio.to_thread(
+        _write_thumbnail, png_bytes, STUDIO_MEDIA_THUMBS_DIR / thumb_filename
+    )
+
+    sidecar = _build_sidecar(
+        provider=p.name, prompt=prompt, seed=seed,
+        width=width, height=height, created_at=created_at, elapsed_s=elapsed_s,
+    )
+    # Sidecar JSON next to the PNG so a module-imported asset and an
+    # in-app one are read the same way (plan §3).
+    (STUDIO_MEDIA_DIR / f"{stem}.json").write_text(
+        json.dumps(sidecar, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+    size_kb = round(len(png_bytes) / 1024, 1)
+    logger.info(
+        "Library image generated: provider=%s prompt=%r aspect=%s seed=%s "
+        "(%dx%d, %.1f KB) -> %s",
+        p.name, prompt[:60], aspect, seed, width, height, size_kb, filename,
+    )
+    return LibraryImage(
+        filename=filename,
+        thumb_filename=thumb_filename,
+        width=width,
+        height=height,
+        seed=seed,
+        aspect_ratio=aspect,
+        size_kb=size_kb,
+        provider=p.name,
+        meta=sidecar,
+    )

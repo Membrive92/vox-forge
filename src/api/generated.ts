@@ -1237,6 +1237,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/media/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate library images from a prompt
+         * @description Generate ``count`` images into the media library.
+         *
+         *     Each image is rendered via the configured provider, written into
+         *     ``STUDIO_MEDIA_DIR`` with a sidecar + 256px thumbnail, and inserted as
+         *     a ``media_assets`` row (``origin='generated'``). The batch is strictly
+         *     sequential � the GPU runs one diffusion job at a time (plan �7).
+         */
+        post: operations["generate_media_api_studio_media_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List media library assets (newest first) */
+        get: operations["list_media_api_studio_media_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/media/{asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a media asset (row + files) */
+        delete: operations["delete_media_api_studio_media__asset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/media/file/{asset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Serve a media asset by id
+         * @description Serve an asset's binary BY ID � the filename comes from the row,
+         *     never from the request, so there is no path-traversal surface.
+         */
+        get: operations["get_media_file_api_studio_media_file__asset_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/render-video": {
         parameters: {
             query?: never;
@@ -2203,6 +2283,79 @@ export interface components {
             duration_s: number;
             /** Operations */
             operations: string[];
+        };
+        /**
+         * MediaAsset
+         * @description A persisted library asset (image or clip).
+         *
+         *     ``filename`` / ``thumb_filename`` are relative to
+         *     ``data/studio/media/`` � never absolute. Serve via
+         *     ``GET /api/studio/media/file/{id}``; the client never reads the path.
+         */
+        MediaAsset: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Filename */
+            filename: string;
+            /** Thumb Filename */
+            thumb_filename?: string | null;
+            /** Origin */
+            origin: string;
+            /** Source Path */
+            source_path?: string | null;
+            /** Meta Json */
+            meta_json?: string | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
+            /** Duration S */
+            duration_s?: number | null;
+            /** Prompt */
+            prompt?: string | null;
+            /** Seed */
+            seed?: number | null;
+            /** Aspect Ratio */
+            aspect_ratio?: string | null;
+            /** Created At */
+            created_at: string;
+        };
+        /** MediaAssetsResponse */
+        MediaAssetsResponse: {
+            /** Assets */
+            assets: components["schemas"]["MediaAsset"][];
+            /** Count */
+            count: number;
+        };
+        /**
+         * MediaGenerateRequest
+         * @description Generate one or more library images from a prompt.
+         *
+         *     ``count`` images are produced sequentially (one shared GPU) and each
+         *     becomes its own ``media_assets`` row.
+         */
+        MediaGenerateRequest: {
+            /** Prompt */
+            prompt: string;
+            /**
+             * Aspect Ratio
+             * @description 16:9 | 9:16 | 1:1 | 4:3
+             * @default 16:9
+             */
+            aspect_ratio: string;
+            /**
+             * Seed
+             * @description Optional base seed; later images in a batch step off it.
+             */
+            seed?: number | null;
+            /**
+             * Count
+             * @description How many images to generate (1-4, sequential).
+             * @default 1
+             */
+            count: number;
         };
         /** MixRequest */
         MixRequest: {
@@ -5017,6 +5170,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageProviderStatusResponse"];
+                };
+            };
+        };
+    };
+    generate_media_api_studio_media_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaAssetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_media_api_studio_media_get: {
+        parameters: {
+            query?: {
+                /** @description image | clip */
+                kind?: string | null;
+                /** @description upload | imported | generated */
+                origin?: string | null;
+                /** @description Substring match against the prompt */
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaAssetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_media_api_studio_media__asset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_media_file_api_studio_media_file__asset_id__get: {
+        parameters: {
+            query?: {
+                /** @description Serve the thumbnail instead */
+                thumb?: boolean;
+            };
+            header?: never;
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

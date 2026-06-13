@@ -390,3 +390,57 @@ class ImageProviderStatusResponse(BaseModel):
     available: bool
     server_url: Optional[str] = None
     error: Optional[str] = None
+
+
+# ── Media library (T2I-1 / UX-03 phases M1-M2) ──────────────────────
+
+
+class MediaGenerateRequest(BaseModel):
+    """Generate one or more library images from a prompt.
+
+    ``count`` images are produced sequentially (one shared GPU) and each
+    becomes its own ``media_assets`` row.
+    """
+
+    prompt: str = Field(..., min_length=1, max_length=500)
+    aspect_ratio: str = Field(
+        default="16:9",
+        description="16:9 | 9:16 | 1:1 | 4:3",
+    )
+    seed: Optional[int] = Field(
+        default=None, ge=0, le=2**31 - 1,
+        description="Optional base seed; later images in a batch step off it.",
+    )
+    count: int = Field(
+        default=1, ge=1, le=4,
+        description="How many images to generate (1-4, sequential).",
+    )
+
+
+class MediaAsset(BaseModel):
+    """A persisted library asset (image or clip).
+
+    ``filename`` / ``thumb_filename`` are relative to
+    ``data/studio/media/`` — never absolute. Serve via
+    ``GET /api/studio/media/file/{id}``; the client never reads the path.
+    """
+
+    id: str
+    kind: str
+    filename: str
+    thumb_filename: Optional[str] = None
+    origin: str
+    source_path: Optional[str] = None
+    meta_json: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    duration_s: Optional[float] = None
+    prompt: Optional[str] = None
+    seed: Optional[int] = None
+    aspect_ratio: Optional[str] = None
+    created_at: str
+
+
+class MediaAssetsResponse(BaseModel):
+    assets: list[MediaAsset]
+    count: int

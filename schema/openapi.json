@@ -2880,6 +2880,234 @@
         }
       }
     },
+    "/api/studio/media/generate": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Generate library images from a prompt",
+        "description": "Generate ``count`` images into the media library.\n\nEach image is rendered via the configured provider, written into\n``STUDIO_MEDIA_DIR`` with a sidecar + 256px thumbnail, and inserted as\na ``media_assets`` row (``origin='generated'``). The batch is strictly\nsequential — the GPU runs one diffusion job at a time (plan §7).",
+        "operationId": "generate_media_api_studio_media_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaGenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaAssetsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/media": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "List media library assets (newest first)",
+        "operationId": "list_media_api_studio_media_get",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "image | clip",
+              "title": "Kind"
+            },
+            "description": "image | clip"
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "upload | imported | generated",
+              "title": "Origin"
+            },
+            "description": "upload | imported | generated"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Substring match against the prompt",
+              "title": "Q"
+            },
+            "description": "Substring match against the prompt"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaAssetsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/media/{asset_id}": {
+      "delete": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Delete a media asset (row + files)",
+        "operationId": "delete_media_api_studio_media__asset_id__delete",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Delete Media Api Studio Media  Asset Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/studio/media/file/{asset_id}": {
+      "get": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "Serve a media asset by id",
+        "description": "Serve an asset's binary BY ID — the filename comes from the row,\nnever from the request, so there is no path-traversal surface.",
+        "operationId": "get_media_file_api_studio_media_file__asset_id__get",
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Asset Id"
+            }
+          },
+          {
+            "name": "thumb",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Serve the thumbnail instead",
+              "default": false,
+              "title": "Thumb"
+            },
+            "description": "Serve the thumbnail instead"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/studio/render-video": {
       "post": {
         "tags": [
@@ -5052,6 +5280,204 @@
         ],
         "title": "MasterChapterResponse",
         "description": "Result of the one-click mastering action (UX-02)."
+      },
+      "MediaAsset": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "thumb_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Filename"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
+          "source_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Path"
+          },
+          "meta_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meta Json"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "aspect_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aspect Ratio"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "filename",
+          "origin",
+          "created_at"
+        ],
+        "title": "MediaAsset",
+        "description": "A persisted library asset (image or clip).\n\n``filename`` / ``thumb_filename`` are relative to\n``data/studio/media/`` — never absolute. Serve via\n``GET /api/studio/media/file/{id}``; the client never reads the path."
+      },
+      "MediaAssetsResponse": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/MediaAsset"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets",
+          "count"
+        ],
+        "title": "MediaAssetsResponse"
+      },
+      "MediaGenerateRequest": {
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "title": "Aspect Ratio",
+            "description": "16:9 | 9:16 | 1:1 | 4:3",
+            "default": "16:9"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed",
+            "description": "Optional base seed; later images in a batch step off it."
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "description": "How many images to generate (1-4, sequential).",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "title": "MediaGenerateRequest",
+        "description": "Generate one or more library images from a prompt.\n\n``count`` images are produced sequentially (one shared GPU) and each\nbecomes its own ``media_assets`` row."
       },
       "MixRequest": {
         "properties": {

@@ -35,7 +35,13 @@ from ..exceptions import (
     SampleNotFound,
     UnsupportedFormatError,
 )
-from ..paths import MEDIA_ROOTS, STUDIO_COVERS_DIR, is_within_allowed_roots
+from ..paths import (
+    MEDIA_ROOTS,
+    STUDIO_COVERS_DIR,
+    STUDIO_MEDIA_DIR,
+    STUDIO_MEDIA_THUMBS_DIR,
+    is_within_allowed_roots,
+)
 from ..schemas import (
     CoverUploadResponse,
     DetectedScene,
@@ -44,6 +50,9 @@ from ..schemas import (
     GenerateImageRequest,
     GenerateImageResponse,
     ImageProviderStatusResponse,
+    MediaAsset,
+    MediaAssetsResponse,
+    MediaGenerateRequest,
     RenderVideoRequest,
     SrtEntry,
     StudioEditRequest,
@@ -54,7 +63,7 @@ from ..schemas import (
     TranscribeRequest,
     TranscribeResponse,
 )
-from ..services import image_gen, scene_detect, studio_store
+from ..services import image_gen, media_store, scene_detect, studio_store
 from ..services.audio_editor import EditOperation, apply_operations
 from ..services.transcriber import Transcriber
 from ..services.video_renderer import VideoRenderer
@@ -358,6 +367,144 @@ async def image_provider_status() -> ImageProviderStatusResponse:
         server_url=status.server_url,
         error=status.error,
     )
+
+
+# ── Media library (T2I-1 / UX-03 phases M1-M2) ──────────────────────
+
+
+def _asset_from_row(row: dict[str, object]) -> MediaAsset:
+    """Build the response model from a ``media_assets`` row."""
+    return MediaAsset(**row)  # type: ignore[arg-type]
+
+
+@router.post(
+    "/media/generate",
+    summary="Generate library images from a prompt",
+    response_model=MediaAssetsResponse,
+)
+async def generate_media(request: MediaGenerateRequest) -> MediaAssetsResponse:
+    """Generate ``count`` images into the media library.
+
+    Each image is rendered via the configured provider, written into
+    ``STUDIO_MEDIA_DIR`` with a sidecar + 256px thumbnail, and inserted as
+    a ``media_assets`` row (``origin='generated'``). The batch is strictly
+    sequential — the GPU runs one diffusion job at a time (plan §7)."""
+    if request.aspect_ratio not in image_gen.VALID_ASPECT_RATIOS:
+        raise InvalidParameterError(
+            f"Invalid aspect ratio: {request.aspect_ratio}. "
+            f"Valid: {sorted(image_gen.VALID_ASPECT_RATIOS)}"
+        )
+
+    import random as _random  # local so tests can monkeypatch the module
+    provider = image_gen.get_provider()
+    base_seed = (
+        request.seed if request.seed is not None
+        else _random.randint(0, 2**31 - 1)
+    )
+
+    assets: list[MediaAsset] = []
+    for offset in range(request.count):
+        # Step the seed per image so a batch isn't N identical frames; a
+        # caller-fixed seed still drives the first one deterministically.
+        seed = (base_seed + offset) % (2**31)
+        result = await image_gen.generate_into_library(
+            prompt=request.prompt,
+            aspect=request.aspect_ratio,
+            seed=seed,
+            provider=provider,
+        )
+        row = await media_store.create_asset(
+            kind="image",
+            filename=result.filename,
+            thumb_filename=result.thumb_filename,
+            origin="generated",
+            meta_json=json.dumps(result.meta, ensure_ascii=False),
+            width=result.width,
+            height=result.height,
+            prompt=request.prompt,
+            seed=result.seed,
+            aspect_ratio=result.aspect_ratio,
+        )
+        assets.append(_asset_from_row(row))
+
+    logger.info(
+        "Library generate: provider=%s prompt=%r count=%d aspect=%s",
+        provider.name, request.prompt[:60], request.count, request.aspect_ratio,
+    )
+    return MediaAssetsResponse(assets=assets, count=len(assets))
+
+
+@router.get(
+    "/media",
+    summary="List media library assets (newest first)",
+    response_model=MediaAssetsResponse,
+)
+async def list_media(
+    kind: str | None = Query(default=None, description="image | clip"),
+    origin: str | None = Query(default=None, description="upload | imported | generated"),
+    q: str | None = Query(default=None, description="Substring match against the prompt"),
+) -> MediaAssetsResponse:
+    if kind is not None and kind not in ("image", "clip"):
+        raise InvalidParameterError(f"Invalid kind: {kind}. Valid: image, clip")
+    if origin is not None and origin not in ("upload", "imported", "generated"):
+        raise InvalidParameterError(
+            f"Invalid origin: {origin}. Valid: upload, imported, generated"
+        )
+    rows = await media_store.list_assets(kind=kind, origin=origin, query=q)
+    return MediaAssetsResponse(
+        assets=[_asset_from_row(r) for r in rows], count=len(rows),
+    )
+
+
+@router.delete("/media/{asset_id}", summary="Delete a media asset (row + files)")
+async def delete_media(asset_id: str) -> dict[str, str]:
+    row = await media_store.get_asset(asset_id)
+    if not row:
+        raise SampleNotFound(f"Media asset not found: {asset_id}")
+
+    # Best-effort delete of the PNG, its thumbnail and the sidecar; the row
+    # is authoritative. Every unlink is guarded by the allowed-roots check.
+    targets: list[Path] = [STUDIO_MEDIA_DIR / row["filename"]]
+    sidecar = STUDIO_MEDIA_DIR / (Path(row["filename"]).stem + ".json")
+    targets.append(sidecar)
+    if row.get("thumb_filename"):
+        targets.append(STUDIO_MEDIA_THUMBS_DIR / row["thumb_filename"])
+    for target in targets:
+        if target.exists() and _is_within_allowed_roots(target):
+            try:
+                target.unlink()
+            except OSError as exc:  # noqa: PERF203
+                logger.warning("Could not delete media file %s: %s", target, exc)
+
+    await media_store.delete_asset(asset_id)
+    return {"status": "deleted", "id": asset_id}
+
+
+@router.get("/media/file/{asset_id}", summary="Serve a media asset by id")
+async def get_media_file(
+    asset_id: str,
+    thumb: bool = Query(default=False, description="Serve the thumbnail instead"),
+) -> FileResponse:
+    """Serve an asset's binary BY ID — the filename comes from the row,
+    never from the request, so there is no path-traversal surface."""
+    row = await media_store.get_asset(asset_id)
+    if not row:
+        raise SampleNotFound(f"Media asset not found: {asset_id}")
+
+    if thumb:
+        if not row.get("thumb_filename"):
+            raise SampleNotFound("Asset has no thumbnail")
+        target = STUDIO_MEDIA_THUMBS_DIR / row["thumb_filename"]
+    else:
+        target = STUDIO_MEDIA_DIR / row["filename"]
+
+    resolved = target.resolve()
+    if not _is_within_allowed_roots(resolved) or not resolved.is_file():
+        raise SampleNotFound("Media file not found")
+
+    ext = resolved.suffix.lstrip(".").lower()
+    media_type = "image/png" if ext == "png" else f"image/{ext or 'png'}"
+    return FileResponse(str(resolved), media_type=media_type)
 
 
 @router.post("/render-video", summary="Render an MP4 from audio + cover or slideshow")

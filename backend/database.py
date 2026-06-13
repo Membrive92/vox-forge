@@ -21,7 +21,7 @@ DB_PATH: Path = DATA_DIR / "voxforge.db"
 
 # Bump when the schema changes; stamped into ``PRAGMA user_version`` after
 # migrations run so future versions can branch on it.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Single source of truth for every column added *after* the initial schema.
 # ``CREATE TABLE IF NOT EXISTS`` is a no-op on a pre-existing table, so any
@@ -134,11 +134,37 @@ CREATE TABLE IF NOT EXISTS studio_renders (
     created_at    TEXT NOT NULL
 );
 
+-- Media library (T2I-1 / UX-03 phases M1-M2): source images and clips the
+-- montage timeline draws from. ``kind`` is 'image' | 'clip'; ``origin`` is
+-- 'upload' | 'imported' | 'generated'. ``filename`` / ``thumb_filename`` are
+-- relative to ``data/studio/media/`` so the row never stores an absolute
+-- path and serving stays strictly by id. ``prompt`` / ``seed`` /
+-- ``aspect_ratio`` are denormalised out of ``meta_json`` for fast
+-- search/reuse; ``duration_s`` is NULL for images. No FK constraint — the
+-- library is independent of projects/chapters.
+CREATE TABLE IF NOT EXISTS media_assets (
+    id             TEXT PRIMARY KEY,
+    kind           TEXT NOT NULL,         -- "image" | "clip"
+    filename       TEXT NOT NULL,
+    thumb_filename TEXT,
+    origin         TEXT NOT NULL,         -- "upload" | "imported" | "generated"
+    source_path    TEXT,
+    meta_json      TEXT,
+    width          INTEGER,
+    height         INTEGER,
+    duration_s     REAL,
+    prompt         TEXT,
+    seed           INTEGER,
+    aspect_ratio   TEXT,
+    created_at     TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_chapters_project ON chapters(project_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_generations_chapter ON generations(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_takes_generation ON takes(generation_id, chunk_index);
 CREATE INDEX IF NOT EXISTS idx_studio_renders_chapter ON studio_renders(chapter_id);
 CREATE INDEX IF NOT EXISTS idx_studio_renders_created ON studio_renders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_media_assets_created ON media_assets(created_at DESC);
 """
 
 

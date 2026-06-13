@@ -251,15 +251,16 @@ def test_regenerating_a_chunk_clears_its_qc_verdict(client, monkeypatch) -> None
     assert after["qc_flagged"] is False
 
 
-# ── Schema migration (v3) ────────────────────────────────────────────
+# ── Schema migration (takes QC columns; user_version stamp) ──────────
 
 
-def test_takes_table_carries_qc_columns_and_schema_v3(client) -> None:
+def test_takes_table_carries_qc_columns_and_schema_stamped(client) -> None:
     import asyncio
 
     from backend.database import SCHEMA_VERSION, get_db
 
-    assert SCHEMA_VERSION == 3
+    # The takes QC columns arrived in v3; the version only moves forward.
+    assert SCHEMA_VERSION >= 3
 
     async def inspect() -> tuple[int, set[str]]:
         async with get_db() as db:
@@ -274,5 +275,5 @@ def test_takes_table_carries_qc_columns_and_schema_v3(client) -> None:
         version, columns = loop.run_until_complete(inspect())
     finally:
         loop.close()
-    assert version == 3
+    assert version == SCHEMA_VERSION
     assert {"qc_score", "qc_transcript"} <= columns
