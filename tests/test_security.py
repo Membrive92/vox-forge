@@ -111,7 +111,11 @@ def test_escape_subtitles_path_escapes_drive_colon() -> None:
     from backend.services.video_renderer import _escape_subtitles_path
 
     out = _escape_subtitles_path(Path(r"C:\data\studio\subs\x.srt"))
-    assert out == r"C\:/data/studio/subs/x.srt"
+    # Doubled backslash so the drive colon survives BOTH ffmpeg parse levels
+    # (filtergraph parser -> subtitles filter option parser). A single
+    # ``\:`` is reduced to a bare ``:`` by the graph level and breaks the
+    # filter. See ``_escape_subtitles_path``.
+    assert out == r"C\\:/data/studio/subs/x.srt"
 
 
 def test_progress_snapshot_is_isolated_from_mutation() -> None:

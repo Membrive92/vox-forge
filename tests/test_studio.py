@@ -751,8 +751,9 @@ def test_build_ffmpeg_argv_with_burn_subs(client) -> None:
     )
     joined = " ".join(argv)
     # Backslashes become forward slashes AND the drive-letter colon is
-    # escaped so it can't terminate the subtitles filter option.
-    assert r"C\:/data/studio/subs/x.srt" in joined
+    # double-escaped (``C\\:``) so it survives both ffmpeg parse levels and
+    # can't terminate the subtitles filter option.
+    assert r"C\\:/data/studio/subs/x.srt" in joined
     assert "subtitles=" in joined
 
 
@@ -824,9 +825,9 @@ def test_run_command_passes_pipes_as_keyword_args(client, monkeypatch, tmp_path)
 
 
 async def test_run_command_failure_raises_with_stderr_excerpt(client, monkeypatch, tmp_path) -> None:
-    """``returncode != 0`` must surface as SynthesisError carrying the exit
+    """``returncode != 0`` must surface as VideoRenderError carrying the exit
     code and the TAIL of stderr (ffmpeg prints the actual error last)."""
-    from backend.exceptions import SynthesisError
+    from backend.exceptions import VideoRenderError
     from backend.services import video_renderer as vr
 
     class _Failed:
@@ -837,7 +838,7 @@ async def test_run_command_failure_raises_with_stderr_excerpt(client, monkeypatc
 
     monkeypatch.setattr(vr.subprocess, "run", lambda *a, **k: _Failed())
 
-    with pytest.raises(SynthesisError) as exc:
+    with pytest.raises(VideoRenderError) as exc:
         await vr.VideoRenderer()._run_command(
             ["ffmpeg", "-i", "in.wav", "out.mp4"], tmp_path / "out.mp4",
         )
@@ -849,19 +850,19 @@ async def test_run_command_failure_raises_with_stderr_excerpt(client, monkeypatc
 
 
 async def test_run_command_raises_when_ffmpeg_not_on_path(client, monkeypatch, tmp_path) -> None:
-    from backend.exceptions import SynthesisError
+    from backend.exceptions import VideoRenderError
     from backend.services import video_renderer as vr
 
     monkeypatch.setattr(vr.shutil, "which", lambda _exe: None)
 
-    with pytest.raises(SynthesisError, match="ffmpeg not found"):
+    with pytest.raises(VideoRenderError, match="ffmpeg not found"):
         await vr.VideoRenderer()._run_command(["ffmpeg"], tmp_path / "out.mp4")
 
 
 async def test_render_raises_when_no_output_file_produced(client, monkeypatch) -> None:
     """ffmpeg can exit 0 without writing the file (e.g. dry/aborted runs):
     render() must fail loudly instead of returning a phantom result."""
-    from backend.exceptions import SynthesisError
+    from backend.exceptions import VideoRenderError
     from backend.schemas import VideoOptions
     from backend.services.video_renderer import VideoRenderer
 
@@ -873,7 +874,7 @@ async def test_render_raises_when_no_output_file_produced(client, monkeypatch) -
 
     monkeypatch.setattr(VideoRenderer, "_run_command", fake_run)
 
-    with pytest.raises(SynthesisError, match="no output file"):
+    with pytest.raises(VideoRenderError, match="no output file"):
         await VideoRenderer().render(
             audio_path=src,
             cover_path=cover,

@@ -17,7 +17,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..exceptions import InvalidSampleError, SynthesisError
+from ..exceptions import InvalidSampleError, VideoRenderError
 from ..paths import STUDIO_VIDEOS_DIR
 from ..schemas import VideoImage, VideoOptions
 
@@ -75,14 +75,20 @@ def _escape_drawtext(text: str) -> str:
 
 
 def _escape_subtitles_path(path: Path) -> str:
-    """Escape a filesystem path for ffmpeg's ``subtitles`` filter.
+    r"""Escape a filesystem path for ffmpeg's ``subtitles`` filter.
 
-    Forward slashes (the filter chokes on backslashes), then escape the
-    colon and quote so a Windows drive letter (``C:``) or a quote in the
-    path can't terminate the filter option / inject extra options.
+    ``-filter_complex`` is parsed in TWO levels: the filtergraph parser
+    first, then the subtitles filter's own option parser. For a Windows
+    drive colon (``C:``) to reach the filter as a literal, the backslash
+    escape must itself survive the graph level — hence ``\\:``, which the
+    graph parser reduces to ``\:`` and the filter then reads as a literal
+    ``:``. A single ``\:`` loses its backslash at the graph level, so the
+    filter splits the path on the drive colon and mis-reads the tail as the
+    ``original_size`` option (``Invalid argument``). Forward slashes
+    throughout (the filter treats backslashes as escapes).
     """
     s = str(path).replace("\\", "/")
-    return s.replace(":", r"\:").replace("'", r"\'")
+    return s.replace(":", r"\\:").replace("'", r"\'")
 
 
 def _build_filter_complex(
@@ -458,7 +464,7 @@ class VideoRenderer:
         await self._run_command(argv, output_path)
 
         if not output_path.exists():
-            raise SynthesisError("Renderer completed but no output file was produced")
+            raise VideoRenderError("Renderer completed but no output file was produced")
 
         duration_s = _measure_audio_duration_s(audio_path)
 
@@ -476,7 +482,7 @@ class VideoRenderer:
         Windows platform limitations with subprocess.PIPE.
         """
         if not shutil.which(argv[0]):
-            raise SynthesisError(
+            raise VideoRenderError(
                 "ffmpeg not found on PATH. Install it or add it to PATH.",
             )
 
@@ -497,6 +503,6 @@ class VideoRenderer:
         )
         if result.returncode != 0:
             tail = result.stderr.decode(errors="replace")[-2000:]
-            raise SynthesisError(
+            raise VideoRenderError(
                 f"ffmpeg exited {result.returncode}: {tail.strip()}",
             )

@@ -64,6 +64,17 @@ class SynthesisError(DomainError):
     code = "synthesis_failed"
 
 
+class VideoRenderError(DomainError):
+    """The ffmpeg video render (cover/slideshow + optional subtitles) failed.
+
+    Distinct from ``SynthesisError`` so the toast reads "Video render
+    failed", not "Audio synthesis failed" — the renderer never touches TTS.
+    """
+
+    status_code = 500
+    code = "video_render_failed"
+
+
 # Image generation (PROD-02). These three carry per-instance actionable
 # messages (which ComfyUI URL to start, which workflow file to export and
 # how) — deliberately NOT in ``_USER_FRIENDLY_MESSAGES`` so the handler's
@@ -100,6 +111,7 @@ _USER_FRIENDLY_MESSAGES: dict[str, str] = {
     "path_not_allowed": "That file path is outside the folders VoxForge is allowed to use.",
     "invalid_parameter": "One of the request options has an invalid value. Adjust it and try again.",
     "synthesis_failed": "Audio synthesis failed. Check the logs tab for details.",
+    "video_render_failed": "Video render failed. Check the logs tab for details.",
 }
 
 
