@@ -19,6 +19,19 @@ from typing import Iterator
 import pytest
 
 # ---------------------------------------------------------------------------
+# Data-loss guard. ``backend`` reads VOXFORGE_BASE_DIR at IMPORT time
+# (pydantic-settings), so a stray module-level ``import backend`` in any
+# test file would bind ``paths.DATA_DIR`` to the REAL ``data/`` dir — and
+# the isolation fixtures (``_reset_profiles``) would then clobber real
+# profiles/projects. Setting it HERE (conftest is imported before pytest
+# collects any test module) makes isolation independent of import order.
+# ---------------------------------------------------------------------------
+import tempfile as _tempfile
+
+os.environ.setdefault("VOXFORGE_BASE_DIR", _tempfile.mkdtemp(prefix="voxforge-test-"))
+os.environ.setdefault("VOXFORGE_DATA_SUBDIR", "data")
+
+# ---------------------------------------------------------------------------
 # Native dependency stubs. Must be installed BEFORE importing ``backend``.
 # ---------------------------------------------------------------------------
 
@@ -256,6 +269,12 @@ def _install_stubs() -> None:
         fw = types.ModuleType("faster_whisper")
         fw.WhisperModel = _FakeWhisperModel  # type: ignore[attr-defined]
         sys.modules["faster_whisper"] = fw
+
+
+# Install at import time too — before pytest collects any test module — so a
+# module-level ``import backend`` can't bind the real pydub/torch first. The
+# ``_session_env`` fixture re-runs this (idempotent via setdefault).
+_install_stubs()
 
 
 # ---------------------------------------------------------------------------
