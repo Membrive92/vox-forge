@@ -406,7 +406,7 @@ class CoverUploadResponse(BaseModel):
 class GenerateImageRequest(BaseModel):
     """Generate a scene image from a text prompt."""
 
-    prompt: str = Field(..., min_length=1, max_length=500)
+    prompt: str = Field(..., min_length=1, max_length=2000)
     aspect_ratio: str = Field(
         default="16:9",
         description="16:9 | 9:16 | 1:1 | 4:3",
@@ -451,7 +451,7 @@ class MediaGenerateRequest(BaseModel):
     becomes its own ``media_assets`` row.
     """
 
-    prompt: str = Field(..., min_length=1, max_length=500)
+    prompt: str = Field(..., min_length=1, max_length=2000)
     aspect_ratio: str = Field(
         default="16:9",
         description="16:9 | 9:16 | 1:1 | 4:3",

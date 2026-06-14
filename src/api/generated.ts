@@ -293,9 +293,11 @@ export interface paths {
          * Convert voice tone of an audio file
          * @description Convert the voice tone of an uploaded audio file.
          *
-         *     Provide either a profile_id (uses the profile's voice sample as
-         *     target) or a target_sample file directly. The source audio's
-         *     speech content and prosody are preserved; only the timbre changes.
+         *     Provide the target voice in one of three ways: a ``profile_id`` (uses
+         *     the profile's voice sample), a ``catalog_voice_id`` (synthesizes and
+         *     caches a tone-color reference from a system Edge-TTS voice), or a
+         *     ``target_sample`` file directly. The source audio's speech content
+         *     and prosody are preserved; only the timbre changes.
          */
         post: operations["convert_voice_api_convert_post"];
         delete?: never;
@@ -748,6 +750,61 @@ export interface paths {
          *     preserve quality.
          */
         post: operations["upload_chapter_audio_api_chapters__chapter_id__upload_audio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chapters/{chapter_id}/apply-voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-voice a chapter take with a target timbre (OpenVoice)
+         * @description Convert a chapter take's timbre to a target voice, keeping the
+         *     original narration's prosody (OpenVoice audio-to-audio).
+         *
+         *     Source = ``generation_id`` if given, else the chapter's active take
+         *     (falling back to the latest done one). Target = a catalog/system voice
+         *     (``catalog_voice_id``, a tone-color reference is synthesized + cached)
+         *     or a profile's voice sample (``profile_id``). The converted audio
+         *     registers as a new ``engine="converted"`` generation and becomes the
+         *     chapter's active take, so export / video / QC pick it up like any other.
+         */
+        post: operations["apply_voice_to_chapter_api_chapters__chapter_id__apply_voice_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chapters/{chapter_id}/transcribe-generation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Transcribe a chapter take and fill the chapter text
+         * @description Run faster-whisper over a chapter take and write the transcript to
+         *     ``chapters.text`` � so a recorded/uploaded narration becomes a normal
+         *     chapter with text (for QC, aligned subtitles and re-synthesis).
+         *
+         *     Source = ``generation_id`` if given, else the chapter's active take
+         *     (falling back to the latest done one). Overwrites the existing text.
+         *     Holds the shared GPU semaphore during transcription, so it serializes
+         *     with TTS/OpenVoice inference on CUDA.
+         */
+        post: operations["transcribe_chapter_generation_api_chapters__chapter_id__transcribe_generation_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1545,6 +1602,49 @@ export interface components {
             /** Tags */
             tags: string[];
         };
+        /**
+         * ApplyVoiceRequest
+         * @description Re-voice a chapter take with a target timbre (OpenVoice).
+         *
+         *     The source take's prosody/intonation is preserved; only the timbre
+         *     changes � to a catalog (system) voice or a profile's voice sample.
+         *     The source defaults to the chapter's active (else latest done) take.
+         */
+        ApplyVoiceRequest: {
+            /** Catalog Voice Id */
+            catalog_voice_id?: string | null;
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Generation Id */
+            generation_id?: string | null;
+            /**
+             * Tau
+             * @default 0.3
+             */
+            tau: number;
+            /**
+             * Denoise Source
+             * @default false
+             */
+            denoise_source: boolean;
+        };
+        /** ApplyVoiceResponse */
+        ApplyVoiceResponse: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Generation Id */
+            generation_id: string;
+            /** Source Generation Id */
+            source_generation_id: string;
+            /** Engine */
+            engine: string;
+            /** Duration */
+            duration: number;
+            /** File Path */
+            file_path: string;
+            /** Output Format */
+            output_format: string;
+        };
         /** Body_analyze_sample_api_analyze_sample_post */
         Body_analyze_sample_api_analyze_sample_post: {
             /**
@@ -1562,6 +1662,8 @@ export interface components {
             audio: string;
             /** Profile Id */
             profile_id?: string | null;
+            /** Catalog Voice Id */
+            catalog_voice_id?: string | null;
             /** Target Sample */
             target_sample?: string | null;
             /**
@@ -1584,6 +1686,16 @@ export interface components {
              * @default 0
              */
             bass_boost_db: number;
+            /**
+             * Tau
+             * @default 0.3
+             */
+            tau: number;
+            /**
+             * Denoise Source
+             * @default false
+             */
+            denoise_source: boolean;
         };
         /** Body_create_profile_api_profiles_post */
         Body_create_profile_api_profiles_post: {
@@ -2945,6 +3057,31 @@ export interface components {
              * @description ISO code (es, en, ...). None -> auto-detect.
              */
             language?: string | null;
+        };
+        /**
+         * TranscribeGenerationRequest
+         * @description Transcribe a chapter take to fill the chapter text.
+         *
+         *     Source defaults to the chapter's active (else latest done) take.
+         */
+        TranscribeGenerationRequest: {
+            /** Generation Id */
+            generation_id?: string | null;
+            /** Language */
+            language?: string | null;
+        };
+        /** TranscribeGenerationResponse */
+        TranscribeGenerationResponse: {
+            /** Chapter Id */
+            chapter_id: string;
+            /** Generation Id */
+            generation_id: string;
+            /** Text */
+            text: string;
+            /** Word Count */
+            word_count: number;
+            /** Language */
+            language: string;
         };
         /**
          * TranscribeRequest
@@ -4438,6 +4575,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UploadedChapterGenerationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_voice_to_chapter_api_chapters__chapter_id__apply_voice_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyVoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyVoiceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcribe_chapter_generation_api_chapters__chapter_id__transcribe_generation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chapter_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranscribeGenerationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscribeGenerationResponse"];
                 };
             };
             /** @description Validation Error */

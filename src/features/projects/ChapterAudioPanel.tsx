@@ -1,15 +1,41 @@
 import { useRef, useState } from "react";
 
 import type { Generation } from "@/api/projects";
-import { uploadChapterAudio } from "@/api/chapterSynth";
+import {
+  applyChapterVoice,
+  transcribeChapterGeneration,
+  uploadChapterAudio,
+} from "@/api/chapterSynth";
 import { getGenerationAudioUrl } from "@/api/studio";
 import { Button } from "@/components/Button";
 import * as Icons from "@/components/icons";
+import { ALL_VOICES } from "@/constants/voices";
+import { logger } from "@/logging/logger";
+import { downloadBlob } from "@/utils/download";
 import type { Translations } from "@/i18n";
+import type { Profile } from "@/types/domain";
 import { colors, fonts, radii, space, typography } from "@/theme/tokens";
 
 import { ChapterRecorder } from "./ChapterRecorder";
 import { relativeTime } from "./workbenchHelpers";
+
+/** Fetch a generation's audio and save it. The audio endpoint is a
+ * different origin (API :8000) than the app, so the anchor ``download``
+ * attribute is ignored — go through a blob. */
+async function downloadTake(gen: Generation): Promise<void> {
+  if (!gen.file_path) return;
+  try {
+    const res = await fetch(getGenerationAudioUrl(gen.file_path));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const ext = gen.file_path.split(".").pop() || "mp3";
+    downloadBlob(await res.blob(), `take_${gen.id}.${ext}`);
+  } catch (e) {
+    logger.error("Chapter take: download failed", {
+      genId: gen.id,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
 
 // ── ChapterAudioPanel ───────────────────────────────────────────────
 //
@@ -19,6 +45,8 @@ import { relativeTime } from "./workbenchHelpers";
 interface ChapterAudioPanelProps {
   t: Translations;
   chapterId: string;
+  /** Saved voice profiles — those with a sample can be re-voice targets. */
+  profiles: readonly Profile[];
   /** Active generation per chapter metadata (falling back to newest done). */
   activeGen: Generation | undefined;
   generations: readonly Generation[];
@@ -27,21 +55,31 @@ interface ChapterAudioPanelProps {
   onSetActiveGeneration: (genId: string | null) => Promise<void>;
   /** Re-fetch generations/renders after an upload or recording lands. */
   onReloadStatus: () => Promise<void>;
+  /** Push a fresh transcript into the chapter's text editor. */
+  onTranscribed: (text: string) => void;
 }
 
 export function ChapterAudioPanel({
   t,
   chapterId,
+  profiles,
   activeGen,
   generations,
   onToast,
   onOpenStudioWithSource,
   onSetActiveGeneration,
   onReloadStatus,
+  onTranscribed,
 }: ChapterAudioPanelProps) {
+  // Only profiles with a stored sample can be an OpenVoice target.
+  const profilesWithSample = profiles.filter((p) => p.samples.length > 0);
   const [isUploading, setIsUploading] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [isSavingRecording, setIsSavingRecording] = useState(false);
+  const [applyVoiceId, setApplyVoiceId] = useState("");
+  const [applyDenoise, setApplyDenoise] = useState(false);
+  const [isApplyingVoice, setIsApplyingVoice] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const handleUploadAudio = async (file: File): Promise<void> => {
@@ -68,6 +106,46 @@ export function ChapterAudioPanel({
       onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
     } finally {
       setIsSavingRecording(false);
+    }
+  };
+
+  // Re-voice the active take with a catalog voice's timbre (OpenVoice):
+  // keeps the narration's prosody, registers a new active take.
+  const handleApplyVoice = async (): Promise<void> => {
+    if (!applyVoiceId) return;
+    // applyVoiceId is "p:<profileId>" (saved profile) or "c:<voiceId>" (catalog).
+    const isProfile = applyVoiceId.startsWith("p:");
+    const id = applyVoiceId.slice(2);
+    setIsApplyingVoice(true);
+    try {
+      const result = await applyChapterVoice(chapterId, {
+        ...(isProfile ? { profileId: id } : { catalogVoiceId: id }),
+        denoiseSource: applyDenoise,
+      });
+      onToast(t.chapterApplyVoiceDone);
+      // The new take is already active server-side, but the player reads
+      // ``chapter.active_generation_id`` from the prop — push it up so the
+      // chapter refreshes and the player switches to the re-voiced take.
+      await onSetActiveGeneration(result.generation_id);
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    } finally {
+      setIsApplyingVoice(false);
+    }
+  };
+
+  // Transcribe the active take with faster-whisper and fill the chapter
+  // text, so a recorded/uploaded narration becomes a normal chapter.
+  const handleTranscribe = async (): Promise<void> => {
+    setIsTranscribing(true);
+    try {
+      const result = await transcribeChapterGeneration(chapterId);
+      onTranscribed(result.text);
+      onToast(t.chapterTranscribeDone.replace("{words}", String(result.word_count)));
+    } catch (e) {
+      onToast(`Error: ${e instanceof Error ? e.message : t.unknownError}`);
+    } finally {
+      setIsTranscribing(false);
     }
   };
 
@@ -129,8 +207,18 @@ export function ChapterAudioPanel({
                   ? t.chapterTakeEngineUpload
                   : activeGen.engine === "recording" || activeGen.engine === "record"
                     ? t.chapterTakeEngineRecord
-                    : t.chapterTakeEngineTts}
+                    : activeGen.engine === "converted"
+                      ? t.chapterTakeEngineConverted
+                      : t.chapterTakeEngineTts}
               </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Icons.Download />}
+                onClick={() => void downloadTake(activeGen)}
+              >
+                {t.chapterDownloadTake}
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -138,6 +226,15 @@ export function ChapterAudioPanel({
                 onClick={() => onOpenStudioWithSource(activeGen.id)}
               >
                 {t.chapterEditInStudio}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                loading={isTranscribing}
+                title={t.chapterTranscribeHint}
+                onClick={() => void handleTranscribe()}
+              >
+                {t.chapterTranscribe}
               </Button>
             </div>
           </div>
@@ -151,6 +248,95 @@ export function ChapterAudioPanel({
               {t.chapterUploadTakeNote}
             </p>
           )}
+
+          {/* Re-voice this take: apply a catalog voice's timbre, keep prosody */}
+          <div
+            style={{
+              borderTop: `1px solid ${colors.borderSubtle}`,
+              paddingTop: space[2],
+              display: "flex",
+              flexDirection: "column",
+              gap: space[1],
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: space[2], flexWrap: "wrap" }}>
+              <span
+                style={{
+                  fontSize: typography.size.xs,
+                  fontWeight: 600,
+                  color: colors.textMuted,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Icons.Mic /> {t.chapterApplyVoiceLabel}
+              </span>
+              <select
+                value={applyVoiceId}
+                onChange={(e) => setApplyVoiceId(e.target.value)}
+                aria-label={t.chapterApplyVoiceLabel}
+                style={{
+                  padding: "5px 9px",
+                  borderRadius: radii.sm,
+                  background: colors.surfaceAlt,
+                  border: `1px solid ${colors.border}`,
+                  color: colors.text,
+                  fontSize: typography.size.xs,
+                  fontFamily: fonts.sans,
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">{t.chapterApplyVoicePick}</option>
+                {profilesWithSample.length > 0 && (
+                  <optgroup label={t.tabProfiles}>
+                    {profilesWithSample.map((p) => (
+                      <option key={p.id} value={`p:${p.id}`}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label={t.convertTargetCatalog}>
+                  {ALL_VOICES.map((v) => (
+                    <option key={v.id} value={`c:${v.id}`}>
+                      {v.name} · {v.accent}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={isApplyingVoice}
+                disabled={!applyVoiceId}
+                onClick={() => void handleApplyVoice()}
+              >
+                {t.chapterApplyVoiceButton}
+              </Button>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  cursor: "pointer",
+                  fontSize: typography.size.xs,
+                  color: colors.textDim,
+                }}
+                title={t.chapterApplyVoiceDenoiseHint}
+              >
+                <input
+                  type="checkbox"
+                  checked={applyDenoise}
+                  onChange={(e) => setApplyDenoise(e.target.checked)}
+                />
+                {t.chapterApplyVoiceDenoise}
+              </label>
+            </div>
+            <p style={{ margin: 0, fontSize: typography.size.xs, color: colors.textDim }}>
+              {t.chapterApplyVoiceHint}
+            </p>
+          </div>
         </div>
       )}
 
@@ -230,6 +416,7 @@ function TakeSelector({ t, generations, activeId, onChange }: TakeSelectorProps)
   const engineLabel = (engine: string): string => {
     if (engine === "upload") return t.chapterTakeEngineUpload;
     if (engine === "recording" || engine === "record") return t.chapterTakeEngineRecord;
+    if (engine === "converted") return t.chapterTakeEngineConverted;
     return t.chapterTakeEngineTts;
   };
 

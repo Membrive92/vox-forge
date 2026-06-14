@@ -676,7 +676,7 @@
           "conversion"
         ],
         "summary": "Convert voice tone of an audio file",
-        "description": "Convert the voice tone of an uploaded audio file.\n\nProvide either a profile_id (uses the profile's voice sample as\ntarget) or a target_sample file directly. The source audio's\nspeech content and prosody are preserved; only the timbre changes.",
+        "description": "Convert the voice tone of an uploaded audio file.\n\nProvide the target voice in one of three ways: a ``profile_id`` (uses\nthe profile's voice sample), a ``catalog_voice_id`` (synthesizes and\ncaches a tone-color reference from a system Edge-TTS voice), or a\n``target_sample`` file directly. The source audio's speech content\nand prosody are preserved; only the timbre changes.",
         "operationId": "convert_voice_api_convert_post",
         "requestBody": {
           "content": {
@@ -1749,6 +1749,112 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UploadedChapterGenerationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chapters/{chapter_id}/apply-voice": {
+      "post": {
+        "tags": [
+          "chapter-synth"
+        ],
+        "summary": "Re-voice a chapter take with a target timbre (OpenVoice)",
+        "description": "Convert a chapter take's timbre to a target voice, keeping the\noriginal narration's prosody (OpenVoice audio-to-audio).\n\nSource = ``generation_id`` if given, else the chapter's active take\n(falling back to the latest done one). Target = a catalog/system voice\n(``catalog_voice_id``, a tone-color reference is synthesized + cached)\nor a profile's voice sample (``profile_id``). The converted audio\nregisters as a new ``engine=\"converted\"`` generation and becomes the\nchapter's active take, so export / video / QC pick it up like any other.",
+        "operationId": "apply_voice_to_chapter_api_chapters__chapter_id__apply_voice_post",
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chapter Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyVoiceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyVoiceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chapters/{chapter_id}/transcribe-generation": {
+      "post": {
+        "tags": [
+          "chapter-synth"
+        ],
+        "summary": "Transcribe a chapter take and fill the chapter text",
+        "description": "Run faster-whisper over a chapter take and write the transcript to\n``chapters.text`` — so a recorded/uploaded narration becomes a normal\nchapter with text (for QC, aligned subtitles and re-synthesis).\n\nSource = ``generation_id`` if given, else the chapter's active take\n(falling back to the latest done one). Overwrites the existing text.\nHolds the shared GPU semaphore during transcription, so it serializes\nwith TTS/OpenVoice inference on CUDA.",
+        "operationId": "transcribe_chapter_generation_api_chapters__chapter_id__transcribe_generation_post",
+        "parameters": [
+          {
+            "name": "chapter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Chapter Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranscribeGenerationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscribeGenerationResponse"
                 }
               }
             }
@@ -3635,6 +3741,99 @@
         ],
         "title": "AmbienceTrackResponse"
       },
+      "ApplyVoiceRequest": {
+        "properties": {
+          "catalog_voice_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Voice Id"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Id"
+          },
+          "tau": {
+            "type": "number",
+            "title": "Tau",
+            "default": 0.3
+          },
+          "denoise_source": {
+            "type": "boolean",
+            "title": "Denoise Source",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ApplyVoiceRequest",
+        "description": "Re-voice a chapter take with a target timbre (OpenVoice).\n\nThe source take's prosody/intonation is preserved; only the timbre\nchanges — to a catalog (system) voice or a profile's voice sample.\nThe source defaults to the chapter's active (else latest done) take."
+      },
+      "ApplyVoiceResponse": {
+        "properties": {
+          "chapter_id": {
+            "type": "string",
+            "title": "Chapter Id"
+          },
+          "generation_id": {
+            "type": "string",
+            "title": "Generation Id"
+          },
+          "source_generation_id": {
+            "type": "string",
+            "title": "Source Generation Id"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "duration": {
+            "type": "number",
+            "title": "Duration"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chapter_id",
+          "generation_id",
+          "source_generation_id",
+          "engine",
+          "duration",
+          "file_path",
+          "output_format"
+        ],
+        "title": "ApplyVoiceResponse"
+      },
       "Body_analyze_sample_api_analyze_sample_post": {
         "properties": {
           "audio": {
@@ -3667,6 +3866,17 @@
             ],
             "title": "Profile Id"
           },
+          "catalog_voice_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Voice Id"
+          },
           "target_sample": {
             "anyOf": [
               {
@@ -3698,6 +3908,16 @@
             "type": "number",
             "title": "Bass Boost Db",
             "default": 0.0
+          },
+          "tau": {
+            "type": "number",
+            "title": "Tau",
+            "default": 0.3
+          },
+          "denoise_source": {
+            "type": "boolean",
+            "title": "Denoise Source",
+            "default": false
           }
         },
         "type": "object",
@@ -4861,7 +5081,7 @@
         "properties": {
           "prompt": {
             "type": "string",
-            "maxLength": 500,
+            "maxLength": 2000,
             "minLength": 1,
             "title": "Prompt"
           },
@@ -5530,7 +5750,7 @@
         "properties": {
           "prompt": {
             "type": "string",
-            "maxLength": 500,
+            "maxLength": 2000,
             "minLength": 1,
             "title": "Prompt"
           },
@@ -6972,6 +7192,68 @@
         ],
         "title": "TranscribeAlignedRequest",
         "description": "Align a known chapter text to a Studio audio file (S2).\n\nExactly one text source is required: either ``source_text`` inline or\n``chapter_id`` (the backend reads ``chapters.text``). The result is an\nSRT carrying the SOURCE words (correct proper/fantasy names) with the\naudio's word-level timings."
+      },
+      "TranscribeGenerationRequest": {
+        "properties": {
+          "generation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Id"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "title": "TranscribeGenerationRequest",
+        "description": "Transcribe a chapter take to fill the chapter text.\n\nSource defaults to the chapter's active (else latest done) take."
+      },
+      "TranscribeGenerationResponse": {
+        "properties": {
+          "chapter_id": {
+            "type": "string",
+            "title": "Chapter Id"
+          },
+          "generation_id": {
+            "type": "string",
+            "title": "Generation Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "word_count": {
+            "type": "integer",
+            "title": "Word Count"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "chapter_id",
+          "generation_id",
+          "text",
+          "word_count",
+          "language"
+        ],
+        "title": "TranscribeGenerationResponse"
       },
       "TranscribeRequest": {
         "properties": {

@@ -13,6 +13,7 @@ from ..catalogs import AUDIO_FORMATS
 from ..dependencies import get_convert_engine, get_profile_manager
 from ..exceptions import InvalidSampleError, ProfileNotFound, UnsupportedFormatError
 from ..paths import TEMP_DIR, VOICES_DIR
+from ..services.catalog_reference import get_or_create_catalog_reference
 from ..services.convert_engine import ConvertEngine
 from ..services.profile_manager import ProfileManager
 from ..upload_utils import read_upload_safely, validate_audio_upload
@@ -26,19 +27,24 @@ async def convert_voice(
     background_tasks: BackgroundTasks,
     audio: UploadFile = File(...),
     profile_id: Optional[str] = Form(default=None),
+    catalog_voice_id: Optional[str] = Form(default=None),
     target_sample: Optional[UploadFile] = File(default=None),
     output_format: str = Form(default="mp3"),
     pitch_shift: float = Form(default=0.0),
     formant_shift: float = Form(default=0.0),
     bass_boost_db: float = Form(default=0.0),
+    tau: float = Form(default=0.3),
+    denoise_source: bool = Form(default=False),
     engine: ConvertEngine = Depends(get_convert_engine),
     profiles: ProfileManager = Depends(get_profile_manager),
 ) -> FileResponse:
     """Convert the voice tone of an uploaded audio file.
 
-    Provide either a profile_id (uses the profile's voice sample as
-    target) or a target_sample file directly. The source audio's
-    speech content and prosody are preserved; only the timbre changes.
+    Provide the target voice in one of three ways: a ``profile_id`` (uses
+    the profile's voice sample), a ``catalog_voice_id`` (synthesizes and
+    caches a tone-color reference from a system Edge-TTS voice), or a
+    ``target_sample`` file directly. The source audio's speech content
+    and prosody are preserved; only the timbre changes.
     """
     if output_format not in AUDIO_FORMATS:
         raise UnsupportedFormatError(
@@ -71,6 +77,16 @@ async def convert_voice(
                 target_path = candidate
                 break
 
+    if target_path is None and catalog_voice_id:
+        # A system voice has no stored sample: synthesize (once, cached) a
+        # tone-color reference from it. The cached file lives outside
+        # TEMP_DIR, so the cleanup below never deletes it.
+        try:
+            target_path = await get_or_create_catalog_reference(catalog_voice_id)
+        except Exception:
+            source_path.unlink(missing_ok=True)
+            raise
+
     if target_path is None and target_sample is not None:
         validate_audio_upload(target_sample)
         target_ext = Path(target_sample.filename or "").suffix or ".wav"
@@ -94,6 +110,8 @@ async def convert_voice(
             pitch_shift=max(-12.0, min(12.0, pitch_shift)),
             formant_shift=max(-6.0, min(6.0, formant_shift)),
             bass_boost_db=max(-6.0, min(12.0, bass_boost_db)),
+            tau=max(0.1, min(0.7, tau)),
+            denoise_source=denoise_source,
         )
 
         try:

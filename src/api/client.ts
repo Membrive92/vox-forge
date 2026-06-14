@@ -42,11 +42,30 @@ async function parseErrorBody(res: Response): Promise<ApiErrorBody> {
   }
 }
 
+/** Coerce ``detail`` into a readable string. FastAPI's request-validation
+ * errors (422) put an ARRAY of ``{loc, msg, ...}`` here, not a string —
+ * stringifying that array naively yields "[object Object]". */
+function detailToMessage(detail: ApiErrorBody["detail"]): string | undefined {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((d) => {
+        if (typeof d === "string") return d;
+        const field = Array.isArray(d?.loc) ? d.loc[d.loc.length - 1] : undefined;
+        return field ? `${field}: ${d?.msg ?? ""}` : (d?.msg ?? "");
+      })
+      .filter(Boolean);
+    if (parts.length > 0) return parts.join("; ");
+  }
+  return undefined;
+}
+
 async function ensureOk(res: Response, requestId: string): Promise<void> {
   if (res.ok) return;
   const body = await parseErrorBody(res);
   const serverId = res.headers.get("X-Request-ID") ?? requestId;
-  throw new ApiError(res.status, body.detail || `HTTP ${res.status}`, body.code, serverId);
+  const message = detailToMessage(body.detail) ?? `HTTP ${res.status}`;
+  throw new ApiError(res.status, message, body.code, serverId);
 }
 
 interface RequestOptions {

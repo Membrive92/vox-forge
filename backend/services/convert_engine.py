@@ -105,18 +105,24 @@ class ConvertEngine:
         return se
 
     @staticmethod
-    def _prepare_source(source_path: Path) -> Path:
+    def _prepare_source(source_path: Path, denoise: bool = False) -> Path:
         """Normalize source audio to 22050 Hz mono WAV, peak at -1 dBFS.
 
         OpenVoice V2's native sample rate is 22050 Hz. Pre-resampling and
         peak-normalizing avoids librosa surprises inside convert() and
-        fixes the low-volume output problem.
+        fixes the low-volume output problem. When ``denoise`` is set, a
+        spectral-gating noise reduction runs first — a cleaner source means
+        fewer artifacts (less "metallic") in the converted output.
         """
         import librosa
         import numpy as np
         import soundfile as sf
 
         y, _ = librosa.load(str(source_path), sr=22050, mono=True)
+        if denoise and y.size:
+            import noisereduce as nr
+
+            y = nr.reduce_noise(y=y, sr=22050, prop_decrease=0.6, stationary=False)
         peak = float(np.max(np.abs(y))) if y.size else 0.0
         if peak > 0:
             y = (y / peak) * 0.98
@@ -153,6 +159,8 @@ class ConvertEngine:
         pitch_shift: float = 0.0,
         formant_shift: float = 0.0,
         bass_boost_db: float = 0.0,
+        tau: float = 0.3,
+        denoise_source: bool = False,
     ) -> Path:
         """Convert source audio to match target voice.
 
@@ -165,6 +173,11 @@ class ConvertEngine:
             formant_shift: Formant resonance shift after conversion
                 (-6 to +6). Negative = deeper, more chest resonance.
             bass_boost_db: Low-frequency shelf boost in dB (-6 to +12).
+            tau: OpenVoice flow temperature (0.1-0.7). Lower = more stable
+                and closer to the source; higher = more expressive but can
+                add artifacts. Stock default is 0.3.
+            denoise_source: Spectral-gating noise reduction on the source
+                before conversion — cleaner input, fewer artifacts.
 
         Returns:
             Path to the converted audio file.
@@ -179,8 +192,10 @@ class ConvertEngine:
 
         try:
             # Pre-process source: resample to 22050Hz mono and peak-normalize
-            logger.info("Preparing source audio: %s", source_path.name)
-            prepped_source = await asyncio.to_thread(self._prepare_source, source_path)
+            logger.info("Preparing source audio: %s (denoise=%s)", source_path.name, denoise_source)
+            prepped_source = await asyncio.to_thread(
+                self._prepare_source, source_path, denoise_source
+            )
 
             async with gpu_semaphore:
                 logger.info("Extracting target voice embedding from %s", target_sample_path.name)
@@ -203,6 +218,7 @@ class ConvertEngine:
                         src_se=source_se,
                         tgt_se=target_se,
                         output_path=str(temp_wav),
+                        tau=tau,
                         message="",  # ignored when enable_watermark=False
                     ),
                     timeout=_CONVERT_TIMEOUT_SECONDS,

@@ -19,7 +19,16 @@ export type MediaAssetDTO = Schema["MediaAsset"];
 export type MediaAssetsResponseDTO = Schema["MediaAssetsResponse"];
 export type MediaGenerateRequestDTO = Schema["MediaGenerateRequest"];
 
+/** Shape of an error response. ``detail`` is a string for our domain
+ * errors and for bare HTTPExceptions, but FastAPI's request-validation
+ * errors (422) make it an array of ``{loc, msg, type}`` entries. */
+export interface ValidationDetail {
+  loc?: (string | number)[];
+  msg?: string;
+  type?: string;
+}
+
 export interface ApiErrorBody {
-  detail: string;
+  detail: string | ValidationDetail[];
   code?: string;
 }

@@ -103,6 +103,74 @@ export function masterChapter(
   );
 }
 
+export interface ApplyVoiceBody {
+  catalogVoiceId?: string;
+  profileId?: string;
+  generationId?: string;
+  /** OpenVoice flow temperature (0.1-0.7). Lower = stabler/cleaner. */
+  tau?: number;
+  /** Denoise the source narration before conversion. */
+  denoiseSource?: boolean;
+}
+
+export interface ApplyVoiceResult {
+  chapter_id: string;
+  generation_id: string;
+  source_generation_id: string;
+  engine: string;
+  duration: number;
+  file_path: string;
+  output_format: string;
+}
+
+/** Re-voice a chapter take with a target timbre (OpenVoice): keeps the
+ * narration's prosody, swaps the timbre to a catalog (system) voice or a
+ * profile sample. The converted audio becomes the chapter's active take. */
+export function applyChapterVoice(
+  chapterId: string,
+  body: ApplyVoiceBody,
+  signal?: AbortSignal,
+): Promise<ApplyVoiceResult> {
+  return postJson<ApplyVoiceResult, Record<string, string | number | boolean>>(
+    `/chapters/${chapterId}/apply-voice`,
+    {
+      ...(body.catalogVoiceId ? { catalog_voice_id: body.catalogVoiceId } : {}),
+      ...(body.profileId ? { profile_id: body.profileId } : {}),
+      ...(body.generationId ? { generation_id: body.generationId } : {}),
+      ...(body.tau !== undefined ? { tau: body.tau } : {}),
+      ...(body.denoiseSource ? { denoise_source: true } : {}),
+    },
+    signal,
+  );
+}
+
+export interface TranscribeGenerationResult {
+  chapter_id: string;
+  generation_id: string;
+  text: string;
+  word_count: number;
+  language: string;
+}
+
+/** Transcribe a chapter take with faster-whisper and fill the chapter
+ * text — so a recorded/uploaded narration becomes a normal chapter (with
+ * text for QC, aligned subtitles and re-synthesis). Overwrites the text. */
+export function transcribeChapterGeneration(
+  chapterId: string,
+  generationId?: string,
+  language?: string,
+  signal?: AbortSignal,
+): Promise<TranscribeGenerationResult> {
+  return postJson<TranscribeGenerationResult, Record<string, string>>(
+    `/chapters/${chapterId}/transcribe-generation`,
+    {
+      ...(generationId ? { generation_id: generationId } : {}),
+      ...(language ? { language } : {}),
+    },
+    signal,
+  );
+}
+
 export interface ChunkQCInfo {
   index: number;
   qc_score: number | null;

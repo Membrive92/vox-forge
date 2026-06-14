@@ -9,6 +9,10 @@ from .config import settings
 DATA_DIR: Path = settings.base_dir / settings.data_subdir
 VOICES_DIR: Path = DATA_DIR / "voices"
 REFERENCE_VOICES_DIR: Path = VOICES_DIR / "reference"
+# Cached tone-color reference clips synthesized from catalog (Edge-TTS)
+# voices, so OpenVoice conversion can target a system voice (which has no
+# stored audio sample). One clip per voice_id, generated on first use.
+CATALOG_REFS_DIR: Path = VOICES_DIR / "catalog_refs"
 PROFILES_DIR: Path = DATA_DIR / "profiles"
 OUTPUT_DIR: Path = DATA_DIR / "output"
 TEMP_DIR: Path = DATA_DIR / "temp"
@@ -30,9 +34,9 @@ PROFILES_FILE: Path = PROFILES_DIR / "profiles.json"
 def ensure_dirs() -> None:
     """Create data directories if they don't exist."""
     for d in (
-        VOICES_DIR, REFERENCE_VOICES_DIR, PROFILES_DIR, OUTPUT_DIR, TEMP_DIR,
-        AMBIENCE_DIR, STUDIO_DIR, STUDIO_SUBS_DIR, STUDIO_VIDEOS_DIR, STUDIO_COVERS_DIR,
-        STUDIO_MEDIA_DIR, STUDIO_MEDIA_THUMBS_DIR,
+        VOICES_DIR, REFERENCE_VOICES_DIR, CATALOG_REFS_DIR, PROFILES_DIR, OUTPUT_DIR,
+        TEMP_DIR, AMBIENCE_DIR, STUDIO_DIR, STUDIO_SUBS_DIR, STUDIO_VIDEOS_DIR,
+        STUDIO_COVERS_DIR, STUDIO_MEDIA_DIR, STUDIO_MEDIA_THUMBS_DIR,
     ):
         d.mkdir(parents=True, exist_ok=True)
 

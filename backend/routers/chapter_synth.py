@@ -25,17 +25,26 @@ from ..audio_meta import duration_seconds
 from ..cancellation import create_cancellation_token
 from ..catalogs import AUDIO_FORMATS
 from ..config import settings
-from ..dependencies import get_tts_engine
+from ..dependencies import (
+    get_convert_engine,
+    get_profile_manager,
+    get_transcriber,
+    get_tts_engine,
+)
 from ..exceptions import UnsupportedFormatError
-from ..paths import OUTPUT_DIR, TEMP_DIR
+from ..paths import OUTPUT_DIR, TEMP_DIR, VOICES_DIR
 from ..schemas import SynthesisRequest
 from ..services import export_source as export_source_service
 from ..services import job_store
 from ..services import mastering
 from ..services import project_manager as pm
 from ..services import qc as qc_service
+from ..services.catalog_reference import get_or_create_catalog_reference
+from ..services.convert_engine import ConvertEngine
 from ..services.metadata import AudioMetadata, embed_metadata
+from ..services.profile_manager import ProfileManager
 from ..services.progress import registry as progress_registry
+from ..services.transcriber import Transcriber
 from ..services.tts_engine import TTSEngine, chunk_texts_for_engine
 from ..upload_utils import (
     ALLOWED_AUDIO_EXTS,
@@ -120,6 +129,50 @@ class MasterChapterResponse(BaseModel):
     output_path: str
     duration_s: float
     operations: list[str]
+
+
+class ApplyVoiceRequest(BaseModel):
+    """Re-voice a chapter take with a target timbre (OpenVoice).
+
+    The source take's prosody/intonation is preserved; only the timbre
+    changes — to a catalog (system) voice or a profile's voice sample.
+    The source defaults to the chapter's active (else latest done) take.
+    """
+
+    catalog_voice_id: str | None = None
+    profile_id: str | None = None
+    generation_id: str | None = None
+    # OpenVoice quality knobs (see ConvertEngine.convert).
+    tau: float = 0.3
+    denoise_source: bool = False
+
+
+class ApplyVoiceResponse(BaseModel):
+    chapter_id: str
+    generation_id: str
+    source_generation_id: str
+    engine: str
+    duration: float
+    file_path: str
+    output_format: str
+
+
+class TranscribeGenerationRequest(BaseModel):
+    """Transcribe a chapter take to fill the chapter text.
+
+    Source defaults to the chapter's active (else latest done) take.
+    """
+
+    generation_id: str | None = None
+    language: str | None = None
+
+
+class TranscribeGenerationResponse(BaseModel):
+    chapter_id: str
+    generation_id: str
+    text: str
+    word_count: int
+    language: str
 
 
 @router.post("/{chapter_id}/synthesize", summary="Synthesize a chapter with per-chunk tracking")
@@ -638,3 +691,183 @@ async def upload_chapter_audio(
         "file_path": str(filepath.resolve()),
         "output_format": ext.lstrip("."),
     }
+
+
+async def _resolve_source_take(
+    chapter: dict, generation_id: str | None
+) -> dict | None:
+    """The ORIGINAL take to operate on (re-voice / transcribe).
+
+    An explicit ``generation_id`` wins. Otherwise prefer the newest done
+    take that is NOT itself a conversion — re-voicing must always start
+    from the recording/upload/synth, never a prior ``converted`` take.
+    Without this, repeated "apply voice" chains conversions: each pass
+    re-voices the previous output and the OpenVoice artifacts compound
+    until the narration is destroyed. Falls back to the active / latest
+    done take only if every take is already a conversion.
+    """
+    if generation_id:
+        return await pm.get_generation(generation_id)
+
+    gens = await pm.list_generations(chapter["id"])  # newest first
+    done = [g for g in gens if g.get("status") == "done" and g.get("file_path")]
+    for g in done:
+        if g.get("engine") != "converted":
+            return g
+
+    active_id = chapter.get("active_generation_id")
+    if active_id:
+        for g in done:
+            if g["id"] == active_id:
+                return g
+    return done[0] if done else None
+
+
+@router.post(
+    "/{chapter_id}/apply-voice",
+    summary="Re-voice a chapter take with a target timbre (OpenVoice)",
+    response_model=ApplyVoiceResponse,
+)
+async def apply_voice_to_chapter(
+    chapter_id: str,
+    request: ApplyVoiceRequest,
+    convert: ConvertEngine = Depends(get_convert_engine),
+    profiles: ProfileManager = Depends(get_profile_manager),
+) -> ApplyVoiceResponse:
+    """Convert a chapter take's timbre to a target voice, keeping the
+    original narration's prosody (OpenVoice audio-to-audio).
+
+    Source = ``generation_id`` if given, else the chapter's active take
+    (falling back to the latest done one). Target = a catalog/system voice
+    (``catalog_voice_id``, a tone-color reference is synthesized + cached)
+    or a profile's voice sample (``profile_id``). The converted audio
+    registers as a new ``engine="converted"`` generation and becomes the
+    chapter's active take, so export / video / QC pick it up like any other.
+    """
+    chapter = await pm.get_chapter(chapter_id)
+    if chapter is None:
+        raise HTTPException(404, "Chapter not found")
+
+    # Resolve the SOURCE take audio.
+    src_gen = await _resolve_source_take(chapter, request.generation_id)
+    if src_gen is None or not src_gen.get("file_path"):
+        raise HTTPException(400, "No completed take to re-voice")
+    source_path = Path(src_gen["file_path"])
+    if not source_path.exists():
+        raise HTTPException(400, "Take audio file not found on disk")
+
+    # Resolve the TARGET tone-color reference: catalog voice or profile.
+    target_path: Path | None = None
+    if request.catalog_voice_id:
+        target_path = await get_or_create_catalog_reference(request.catalog_voice_id)
+    elif request.profile_id:
+        profile = profiles.get(request.profile_id)
+        if profile is None:
+            raise HTTPException(404, f"Profile not found: {request.profile_id}")
+        for sample in profile.samples:
+            candidate = VOICES_DIR / sample
+            if candidate.exists():
+                target_path = candidate
+                break
+    if target_path is None:
+        raise HTTPException(
+            400, "Provide catalog_voice_id or a profile_id with a voice sample"
+        )
+
+    project = await pm.get_project(chapter["project_id"])
+    fmt = project["output_format"] if project else "mp3"
+    if fmt not in AUDIO_FORMATS:
+        fmt = "mp3"
+
+    output_path = await convert.convert(
+        source_path=source_path,
+        target_sample_path=target_path,
+        output_format=fmt,
+        tau=max(0.1, min(0.7, request.tau)),
+        denoise_source=request.denoise_source,
+    )
+    duration = await asyncio.to_thread(duration_seconds, output_path)
+
+    gen = await pm.create_generation(
+        chapter_id=chapter_id,
+        voice_id=request.catalog_voice_id or request.profile_id or "converted",
+        profile_id=request.profile_id,
+        output_format=fmt,
+        engine="converted",
+        chunks_total=0,
+    )
+    gen_id = gen["id"]
+    await pm.update_generation(
+        gen_id,
+        status="done",
+        duration=duration,
+        file_path=str(output_path.resolve()),
+        chunks_done=0,
+    )
+    await pm.update_chapter(chapter_id, active_generation_id=gen_id)
+
+    logger.info(
+        "Chapter re-voiced: chapter=%s source=%s -> %s (target=%s)",
+        chapter_id, source_path.name, output_path.name,
+        request.catalog_voice_id or request.profile_id,
+    )
+    return ApplyVoiceResponse(
+        chapter_id=chapter_id,
+        generation_id=gen_id,
+        source_generation_id=src_gen["id"],
+        engine="converted",
+        duration=duration,
+        file_path=str(output_path.resolve()),
+        output_format=fmt,
+    )
+
+
+@router.post(
+    "/{chapter_id}/transcribe-generation",
+    summary="Transcribe a chapter take and fill the chapter text",
+    response_model=TranscribeGenerationResponse,
+)
+async def transcribe_chapter_generation(
+    chapter_id: str,
+    request: TranscribeGenerationRequest,
+    transcriber: Transcriber = Depends(get_transcriber),
+) -> TranscribeGenerationResponse:
+    """Run faster-whisper over a chapter take and write the transcript to
+    ``chapters.text`` — so a recorded/uploaded narration becomes a normal
+    chapter with text (for QC, aligned subtitles and re-synthesis).
+
+    Source = ``generation_id`` if given, else the chapter's active take
+    (falling back to the latest done one). Overwrites the existing text.
+    Holds the shared GPU semaphore during transcription, so it serializes
+    with TTS/OpenVoice inference on CUDA.
+    """
+    chapter = await pm.get_chapter(chapter_id)
+    if chapter is None:
+        raise HTTPException(404, "Chapter not found")
+
+    src_gen = await _resolve_source_take(chapter, request.generation_id)
+    if src_gen is None or not src_gen.get("file_path"):
+        raise HTTPException(400, "No completed take to transcribe")
+    source = Path(src_gen["file_path"])
+    if not source.exists():
+        raise HTTPException(400, "Take audio file not found on disk")
+
+    project = await pm.get_project(chapter["project_id"])
+    language = request.language or (project["language"] if project else None)
+
+    result = await transcriber.transcribe_async(source, language=language)
+    text = " ".join(s.text.strip() for s in result.segments if s.text.strip()).strip()
+
+    await pm.update_chapter(chapter_id, text=text)
+
+    logger.info(
+        "Chapter transcribed: chapter=%s take=%s -> %d words (%s)",
+        chapter_id, source.name, result.word_count, result.engine,
+    )
+    return TranscribeGenerationResponse(
+        chapter_id=chapter_id,
+        generation_id=src_gen["id"],
+        text=text,
+        word_count=result.word_count,
+        language=result.language,
+    )

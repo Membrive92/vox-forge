@@ -1,18 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { isAbortError } from "@/api/client";
 import { convertVoice } from "@/api/conversion";
+import { AudioRecorder } from "@/components/AudioRecorder";
 import { Button } from "@/components/Button";
 import { HiddenAudio } from "@/components/HiddenAudio";
 import { Slider } from "@/components/Slider";
+import { VOICES } from "@/constants/voices";
 import { logger } from "@/logging/logger";
 import * as Icons from "@/components/icons";
 import { useJobMirror } from "@/hooks/jobsContext";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
-import { downloadUrl } from "@/utils/download";
+import { downloadBlob, downloadUrl } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
-import type { Profile } from "@/types/domain";
+import type { Language, Profile, Voice } from "@/types/domain";
 
 interface ConvertTabProps {
   t: Translations;
@@ -22,14 +24,17 @@ interface ConvertTabProps {
 
 export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
   const [sourceFile, setSourceFile] = useState<File | null>(null);
-  const [targetMode, setTargetMode] = useState<"profile" | "file">("profile");
+  const [targetMode, setTargetMode] = useState<"catalog" | "profile" | "file">("catalog");
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [selectedCatalogVoiceId, setSelectedCatalogVoiceId] = useState<string | null>(null);
   const [targetFile, setTargetFile] = useState<File | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [format, setFormat] = useState("mp3");
   const [pitchShift, setPitchShift] = useState(0);
   const [formantShift, setFormantShift] = useState(0);
   const [bassBoost, setBassBoost] = useState(0);
+  const [tau, setTau] = useState(0.3);
+  const [denoiseSource, setDenoiseSource] = useState(false);
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const targetInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -53,7 +58,11 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
   const canConvert =
     sourceFile !== null &&
     !isConverting &&
-    (targetMode === "profile" ? selectedProfileId !== null : targetFile !== null);
+    (targetMode === "profile"
+      ? selectedProfileId !== null
+      : targetMode === "catalog"
+        ? selectedCatalogVoiceId !== null
+        : targetFile !== null);
 
   const handleConvert = async (): Promise<void> => {
     if (!sourceFile || !canConvert) return;
@@ -66,11 +75,14 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
         sourceFile,
         {
           profileId: targetMode === "profile" ? (selectedProfileId ?? undefined) : undefined,
+          catalogVoiceId: targetMode === "catalog" ? (selectedCatalogVoiceId ?? undefined) : undefined,
           targetSample: targetMode === "file" ? (targetFile ?? undefined) : undefined,
           outputFormat: format,
           pitchShift,
           formantShift,
           bassBoostDb: bassBoost,
+          tau,
+          denoiseSource,
         },
         controller.signal,
       );
@@ -149,6 +161,44 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
             <Icons.Upload />
             {sourceFile ? sourceFile.name : t.sourceAudio}
           </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "12px 0" }}>
+            <span style={{ flex: 1, height: 1, background: colors.borderFaint }} />
+            <span style={{ fontSize: typography.size.xs, color: colors.textFaint, fontFamily: fonts.sans }}>
+              {t.convertOrRecord}
+            </span>
+            <span style={{ flex: 1, height: 1, background: colors.borderFaint }} />
+          </div>
+          <AudioRecorder
+            onRecorded={setSourceFile}
+            labelRecord={t.recordVoice}
+            labelStop={t.stopRecording}
+            labelRecording={t.recording}
+          />
+          {sourceFile && (
+            <button
+              onClick={() => downloadBlob(sourceFile, sourceFile.name)}
+              style={{
+                marginTop: 10,
+                width: "100%",
+                padding: "8px 0",
+                borderRadius: radii.md,
+                background: "transparent",
+                border: `1px solid ${colors.borderFaint}`,
+                color: colors.textDim,
+                cursor: "pointer",
+                fontSize: typography.size.xs,
+                fontWeight: 600,
+                fontFamily: fonts.sans,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              <Icons.Download /> {t.convertDownloadSource}
+            </button>
+          )}
         </div>
 
         {/* Player (after conversion) */}
@@ -266,41 +316,79 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
 
         {/* Mode toggle */}
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => setTargetMode("profile")}
-            style={{
-              flex: 1,
-              padding: "8px 0",
-              borderRadius: radii.sm,
-              fontSize: typography.size.sm,
-              fontWeight: 600,
-              background: targetMode === "profile" ? colors.primary : colors.surfaceAlt,
-              color: targetMode === "profile" ? "#fff" : colors.textDim,
-              border: "none",
-              cursor: "pointer",
-              fontFamily: fonts.sans,
-            }}
-          >
-            {t.tabProfiles}
-          </button>
-          <button
-            onClick={() => setTargetMode("file")}
-            style={{
-              flex: 1,
-              padding: "8px 0",
-              borderRadius: radii.sm,
-              fontSize: typography.size.sm,
-              fontWeight: 600,
-              background: targetMode === "file" ? colors.primary : colors.surfaceAlt,
-              color: targetMode === "file" ? "#fff" : colors.textDim,
-              border: "none",
-              cursor: "pointer",
-              fontFamily: fonts.sans,
-            }}
-          >
-            {t.useTargetFile}
-          </button>
+          {([
+            ["catalog", t.convertTargetCatalog],
+            ["profile", t.tabProfiles],
+            ["file", t.convertTargetFile],
+          ] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              onClick={() => setTargetMode(mode)}
+              style={{
+                flex: 1,
+                padding: "8px 0",
+                borderRadius: radii.sm,
+                fontSize: typography.size.sm,
+                fontWeight: 600,
+                background: targetMode === mode ? colors.primary : colors.surfaceAlt,
+                color: targetMode === mode ? "#fff" : colors.textDim,
+                border: "none",
+                cursor: "pointer",
+                fontFamily: fonts.sans,
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+
+        {/* Catalog voices (system / Edge-TTS) — synthesized tone-color target */}
+        {targetMode === "catalog" && (
+          <div>
+            <p style={{ margin: "0 0 8px", fontSize: typography.size.xs, color: colors.textDim, fontFamily: fonts.sans }}>
+              {t.convertCatalogHint}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
+              {(Object.entries(VOICES) as [Language, readonly Voice[]][]).map(([lang, voices]) => (
+                <Fragment key={lang}>
+                  <div style={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: "1px",
+                    color: colors.textFaint, textTransform: "uppercase",
+                    padding: "4px 2px 0", fontFamily: fonts.mono,
+                  }}>
+                    {lang}
+                  </div>
+                  {voices.map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setSelectedCatalogVoiceId(v.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 14px",
+                        borderRadius: radii.md,
+                        background: selectedCatalogVoiceId === v.id ? colors.primarySoft : colors.surfaceSubtle,
+                        border: selectedCatalogVoiceId === v.id
+                          ? `1px solid ${colors.primaryBorder}`
+                          : `1px solid ${colors.borderFaint}`,
+                        cursor: "pointer",
+                        color: colors.text,
+                        fontFamily: fonts.sans,
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <span style={{ fontSize: typography.size.sm, fontWeight: 500 }}>
+                        {v.name} · {v.accent}
+                      </span>
+                      {selectedCatalogVoiceId === v.id && <Icons.Check />}
+                    </button>
+                  ))}
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Profile list */}
         {targetMode === "profile" && (
@@ -417,6 +505,35 @@ export function ConvertTab({ t, profiles, onToast }: ConvertTabProps) {
             unit="dB"
             info={t.infoConvertBass}
           />
+          <Slider
+            label={t.convertTau}
+            value={tau}
+            onChange={setTau}
+            min={0.1}
+            max={0.7}
+            step={0.05}
+            info={t.infoConvertTau}
+          />
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 12,
+              cursor: "pointer",
+              fontSize: typography.size.sm,
+              color: colors.textDim,
+              fontFamily: fonts.sans,
+            }}
+            title={t.infoConvertDenoise}
+          >
+            <input
+              type="checkbox"
+              checked={denoiseSource}
+              onChange={(e) => setDenoiseSource(e.target.checked)}
+            />
+            {t.convertDenoise}
+          </label>
         </div>
 
         {/* Format selector */}

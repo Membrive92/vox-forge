@@ -523,12 +523,14 @@ export function ChapterCard({ t, chapter, project, profiles, onUpdate, onDelete,
           <ChapterAudioPanel
             t={t}
             chapterId={chapter.id}
+            profiles={profiles}
             activeGen={activeGen}
             generations={generations}
             onToast={onToast}
             onOpenStudioWithSource={onOpenStudioWithSource}
             onSetActiveGeneration={handleSetActiveGeneration}
             onReloadStatus={loadStatus}
+            onTranscribed={setText}
           />
 
           {activePanel === "preview" && (

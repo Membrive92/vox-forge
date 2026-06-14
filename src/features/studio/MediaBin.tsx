@@ -1,12 +1,42 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { mediaFileUrl, type MediaAsset } from "@/api/studio";
 import { Button } from "@/components/Button";
 import { useConfirm } from "@/components/ConfirmProvider";
 import { IconButton } from "@/components/IconButton";
 import * as Icons from "@/components/icons";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { logger } from "@/logging/logger";
+import { downloadBlob } from "@/utils/download";
 import type { Translations } from "@/i18n";
 import { colors, fonts, radii, typography } from "@/theme/tokens";
+
+/** Filename for a downloaded asset: prompt-derived, else the seed/id. */
+function downloadName(asset: MediaAsset): string {
+  const base = (asset.prompt ?? "")
+    .trim()
+    .slice(0, 50)
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "_");
+  return `${base || `voxforge_${asset.seed ?? asset.id}`}.png`;
+}
+
+/** Fetch the full-res image as a blob and save it. The media endpoint is a
+ * different origin (API :8000) than the app (:3000), so the anchor
+ * ``download`` attribute is ignored — go through a blob. */
+async function downloadAsset(asset: MediaAsset): Promise<void> {
+  try {
+    const res = await fetch(mediaFileUrl(asset.id, false));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    downloadBlob(await res.blob(), downloadName(asset));
+  } catch (e) {
+    logger.error("Media bin: download failed", {
+      assetId: asset.id,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
 
 interface Props {
   t: Translations;
@@ -35,6 +65,19 @@ function originLabel(t: Translations, origin: MediaAsset["origin"]): string {
 export function MediaBin({ t, assets, loading, onRefresh, onDelete, onUseAsCover }: Props) {
   const confirm = useConfirm();
   const [search, setSearch] = useState("");
+  const [lightbox, setLightbox] = useState<MediaAsset | null>(null);
+  const lightboxRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(lightboxRef, lightbox !== null);
+
+  // Close the lightbox on Escape.
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") setLightbox(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox]);
 
   const submitSearch = (): void => onRefresh(search.trim() || undefined);
 
@@ -115,12 +158,27 @@ export function MediaBin({ t, assets, loading, onRefresh, onDelete, onUseAsCover
               }}
             >
               <div style={{ position: "relative", aspectRatio: "16 / 9", background: "#000" }}>
-                <img
-                  src={mediaFileUrl(asset.id, true)}
-                  alt={asset.prompt ?? asset.filename}
-                  loading="lazy"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                />
+                <button
+                  type="button"
+                  onClick={() => setLightbox(asset)}
+                  aria-label={t.studioMediaBinEnlarge}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
+                    padding: 0,
+                    border: "none",
+                    background: "none",
+                    cursor: "zoom-in",
+                  }}
+                >
+                  <img
+                    src={mediaFileUrl(asset.id, true)}
+                    alt={asset.prompt ?? asset.filename}
+                    loading="lazy"
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                </button>
                 <span
                   style={{
                     position: "absolute",
@@ -139,7 +197,15 @@ export function MediaBin({ t, assets, loading, onRefresh, onDelete, onUseAsCover
                 >
                   {originLabel(t, asset.origin)}
                 </span>
-                <span style={{ position: "absolute", top: 4, right: 4 }}>
+                <span style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 4 }}>
+                  <IconButton
+                    aria-label={t.studioMediaBinDownload}
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void downloadAsset(asset)}
+                  >
+                    <Icons.Download />
+                  </IconButton>
                   <IconButton
                     aria-label={t.studioMediaBinDelete}
                     variant="danger"
@@ -196,6 +262,70 @@ export function MediaBin({ t, assets, loading, onRefresh, onDelete, onUseAsCover
           ))}
         </div>
       )}
+
+      {lightbox ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={lightbox.prompt ?? lightbox.filename}
+          ref={lightboxRef}
+          tabIndex={-1}
+          onClick={() => setLightbox(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 200,
+            background: "rgba(0,0,0,0.82)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "min(1100px, 92vw)",
+              maxHeight: "92vh",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <img
+              src={mediaFileUrl(lightbox.id, false)}
+              alt={lightbox.prompt ?? lightbox.filename}
+              style={{
+                maxWidth: "100%",
+                maxHeight: "78vh",
+                objectFit: "contain",
+                borderRadius: radii.md,
+                background: "#000",
+              }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <p
+                style={{
+                  margin: 0,
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: typography.size.sm,
+                  color: "#fff",
+                  fontFamily: fonts.sans,
+                }}
+              >
+                {lightbox.prompt ?? lightbox.filename}
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => void downloadAsset(lightbox)}>
+                {t.studioMediaBinDownload}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setLightbox(null)}>
+                {t.studioMediaBinClose}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
