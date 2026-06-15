@@ -78,13 +78,25 @@ La config **persiste** tras reiniciar.
 
 | Problema | Palanca |
 |---|---|
-| **Acento** se va a latino (seseo) | activar `castilian_anchor`; si aún se escapa, bajar `VOXFORGE_XTTS_TEMPERATURE` (menos deriva) |
+| **Acento** se va a latino (seseo) | activar `castilian_anchor`; si aún se escapa, **muestreo apretado** (ver abajo) |
 | **Ritmo** demasiado rápido | usar una **referencia de ancla más pausada**, o bajar la **velocidad** del capítulo |
 | **Robótico / no se parece** | el **sample** manda: usa voz humana real, limpia, ≥20 s. (Las voces de catálogo son sintéticas → más robóticas) |
 | Palabras mal (nombres, latín) | corrige el **texto** — XTTS lee literal lo que pongas |
+| **Seseo residual** en alguna ce/zeta | **Regen** solo en ese chunk del mapa (es sesgo del modelo; el muestreo lo reduce pero no lo elimina al 100%) |
 
-Los parámetros del muestreo XTTS se tocan por **variables de entorno** sin tocar
-código: `VOXFORGE_XTTS_TEMPERATURE`, `VOXFORGE_XTTS_TOP_P`, etc.
+### Muestreo XTTS apretado (la config que quedó)
+
+Para minimizar la deriva de acento se baja la aleatoriedad del muestreo por
+**variables de entorno** (sin tocar código). Los valores que funcionaron:
+
+```
+VOXFORGE_XTTS_TEMPERATURE = 0.5   (por defecto 0.70)
+VOXFORGE_XTTS_TOP_P       = 0.7   (por defecto 0.85)
+VOXFORGE_XTTS_TOP_K       = 40    (por defecto 50)
+```
+
+Ya quedan **fijadas en `instructions/levantar-app.ps1`**, así que al arrancar con
+ese script el backend las coge solo. Más bajo aún tiende a sonar monótono.
 
 ---
 
@@ -103,7 +115,20 @@ código: `VOXFORGE_XTTS_TEMPERATURE`, `VOXFORGE_XTTS_TOP_P`, etc.
 
 ---
 
-## 7. Ficheros y rutas clave
+## 7. Formato de salida (que la descarga se oiga en cualquier reproductor)
+
+XTTS y Edge generan a **24 kHz**, una tasa MPEG-2 que **algunos reproductores de
+escritorio rechazan** (el audio se cortaba a los pocos segundos al reproducir el
+mp3 descargado). El pipeline **re-codifica siempre** la salida mp3 a **44.1 kHz
+CBR 192 kbps** (`AUDIO_FORMATS["mp3"]` en `backend/catalogs.py`), así cualquier
+reproductor calcula la duración y hace seek sin depender de una cabecera Xing/VBR.
+
+> Si tienes un capítulo sintetizado **antes** de este arreglo, vuelve a
+> **sintetizarlo** para que salga a 44.1 kHz.
+
+---
+
+## 8. Ficheros y rutas clave
 
 - Perfiles: `data/profiles/profiles.json` (flag `castilian_anchor` por perfil).
 - Referencia del ancla: `data/voices/reference/aa_castellano_edge.mp3`.
@@ -111,3 +136,6 @@ código: `VOXFORGE_XTTS_TEMPERATURE`, `VOXFORGE_XTTS_TOP_P`, etc.
 - Motor de clonado XTTS: `backend/services/clone_engine.py`.
 - Ancla castellana: `backend/services/castilian_warmup.py`
   (`get_reference_voice`, `build_anchored_speaker_wav`).
+- Formato de salida: `AUDIO_FORMATS` en `backend/catalogs.py`; re-codificado en
+  `backend/services/tts_engine.py`.
+- Muestreo XTTS: variables de entorno fijadas en `instructions/levantar-app.ps1`.

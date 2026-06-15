@@ -33,10 +33,13 @@ if (-not (Test-Path (Join-Path $RepoRoot "node_modules"))) {
 }
 
 # --- Backend (FastAPI + uvicorn, recarga en caliente) ------------------
+# Muestreo XTTS apretado: reduce la deriva de acento (seseo) en la voz
+# clonada con acento de España. Ver instructions/configuracion-voz.md (§5).
+$XttsEnv = "`$env:VOXFORGE_XTTS_TEMPERATURE='0.5'; `$env:VOXFORGE_XTTS_TOP_P='0.7'; `$env:VOXFORGE_XTTS_TOP_K='40'; "
 Write-Host "Lanzando backend  -> http://127.0.0.1:8000" -ForegroundColor Green
 Start-Process powershell -ArgumentList @(
     "-NoExit", "-Command",
-    "Set-Location '$RepoRoot'; python -m uvicorn backend:app --reload --port 8000"
+    "Set-Location '$RepoRoot'; $XttsEnv python -m uvicorn backend:app --reload --port 8000"
 )
 
 # --- Frontend (Vite) ---------------------------------------------------
