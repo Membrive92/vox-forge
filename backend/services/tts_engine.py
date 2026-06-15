@@ -371,33 +371,32 @@ class TTSEngine:
                 if job_id:
                     progress_registry.update(job_id, chunks_done=i + 1)
 
-            # Single chunk + MP3: skip pydub entirely (no ffmpeg needed)
-            if len(temp_files) == 1 and request.output_format == "mp3":
-                temp_files[0].replace(output_path)
+            # Always re-encode through pydub/ffmpeg so the output gets the
+            # AUDIO_FORMATS settings (44.1 kHz mp3). The raw Edge chunks are
+            # 24 kHz (MPEG-2), a rate some desktop players reject — copying a
+            # single chunk verbatim would ship that non-standard file.
+            if len(temp_files) == 1:
+                combined = AudioSegment.from_mp3(str(temp_files[0]))
             else:
-                # Multiple chunks or format conversion: requires ffmpeg
-                if len(temp_files) == 1:
-                    combined = AudioSegment.from_mp3(str(temp_files[0]))
-                else:
-                    combined = AudioSegment.empty()
-                    # Audiobook-cadence gap between Edge chunks (P1a),
-                    # scaled by the request's pacing lever (P2). 1.0 = no-op.
-                    pause = AudioSegment.silent(
-                        duration=round(EDGE_PAUSE_MS * request.pause_scale)
-                    )
-                    for j, tf in enumerate(temp_files):
-                        segment = AudioSegment.from_mp3(str(tf))
-                        if j > 0:
-                            combined += pause
-                        combined += segment
-
-                fmt_cfg = AUDIO_FORMATS[request.output_format]
-                combined.export(
-                    str(output_path),
-                    format=fmt_cfg["format"],
-                    codec=fmt_cfg["codec"],
-                    parameters=fmt_cfg["parameters"],
+                combined = AudioSegment.empty()
+                # Audiobook-cadence gap between Edge chunks (P1a),
+                # scaled by the request's pacing lever (P2). 1.0 = no-op.
+                pause = AudioSegment.silent(
+                    duration=round(EDGE_PAUSE_MS * request.pause_scale)
                 )
+                for j, tf in enumerate(temp_files):
+                    segment = AudioSegment.from_mp3(str(tf))
+                    if j > 0:
+                        combined += pause
+                    combined += segment
+
+            fmt_cfg = AUDIO_FORMATS[request.output_format]
+            combined.export(
+                str(output_path),
+                format=fmt_cfg["format"],
+                codec=fmt_cfg["codec"],
+                parameters=fmt_cfg["parameters"],
+            )
 
             logger.info(
                 "Audio exported: %s (%d bytes, %d chunks)",

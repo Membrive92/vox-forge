@@ -17,8 +17,12 @@ class FormatConfig(TypedDict):
 
 
 # Supported audio formats with ffmpeg/pydub conversion parameters.
+# Note: TTS engines (XTTS, Edge) output 24 kHz, an MPEG-2 MP3 rate that some
+# desktop players reject (playback cuts out a few seconds in). Resample MP3 to
+# the universal 44.1 kHz and use CBR so every player computes duration and
+# seeks correctly — no dependency on a Xing/VBR header.
 AUDIO_FORMATS: dict[str, FormatConfig] = {
-    "mp3":  {"format": "mp3",  "codec": "libmp3lame", "parameters": ["-q:a", "2"]},
+    "mp3":  {"format": "mp3",  "codec": "libmp3lame", "parameters": ["-ar", "44100", "-b:a", "192k"]},
     "wav":  {"format": "wav",  "codec": "pcm_s16le",  "parameters": []},
     "ogg":  {"format": "ogg",  "codec": "libvorbis",  "parameters": ["-q:a", "6"]},
     "flac": {"format": "flac", "codec": "flac",       "parameters": []},
